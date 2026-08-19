@@ -95,6 +95,16 @@ To run tests in a specific workspace:
 npm run test --workspace=apps/server
 ```
 
+#### End-to-End Tests
+
+The project uses Playwright for comprehensive End-to-End (E2E) testing across the entire system (frontend + backend). E2E tests are located in the `apps/e2e` workspace.
+
+To execute the full E2E test suite:
+
+```bash
+npm --workspace=@planitpoker/e2e run test
+```
+
 ### Code Formatting and Linting
 
 The project uses ESLint for code quality and Prettier for code formatting. The configurations are integrated so that Prettier handles all stylistic rules without conflicting with ESLint.
