@@ -97,8 +97,9 @@ export const PokerTable: React.FC = () => {
           display: 'flex',
           gap: 2,
           justifyContent: 'center',
-          mb: 2,
-          zIndex: 3,
+          mb: 4,
+          position: 'relative',
+          zIndex: 10,
         }}
       >
         {/* Synchronized Countdown Timer */}
@@ -187,9 +188,10 @@ export const PokerTable: React.FC = () => {
         sx={{
           alignItems: 'center',
           display: 'flex',
-          height: '380px',
+          height: '420px',
           justifyContent: 'center',
           maxWidth: '850px',
+          my: 2,
           position: 'relative',
           width: '100%',
         }}
@@ -326,9 +328,9 @@ export const PokerTable: React.FC = () => {
         >
           {participants.map((p, idx) => {
             const total = participants.length;
-            const angle = (idx / total) * 2 * Math.PI - Math.PI / 2;
-            const rx = 44;
-            const ry = 42;
+            const angle = (idx / total) * 2 * Math.PI + Math.PI / 2;
+            const rx = 42;
+            const ry = 38;
 
             const left = 50 + rx * Math.cos(angle);
             const top = 50 + ry * Math.sin(angle);
