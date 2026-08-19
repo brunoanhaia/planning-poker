@@ -1,5 +1,5 @@
 {
-  "name": "planitpoker-client",
+  "name": "@planitpoker/client",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -15,6 +15,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^6.4.5",
     "@mui/material": "^6.4.5",
+    "@planitpoker/shared": "*",
     "canvas-confetti": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -29,9 +30,9 @@
     "@typescript-eslint/parser": "^8.24.0",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^8.57.1",
-    "eslint-plugin-perfectionist": "^5.10.1",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-perfectionist": "^4.9.0",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-vitest": "^0.5.4",
     "jsdom": "^26.0.0",
     "tinyspy": "^3.0.2",

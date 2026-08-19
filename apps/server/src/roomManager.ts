@@ -1,4 +1,4 @@
-import { RoomState, Participant, Story, DeckType, PRESET_DECKS } from './types.js';
+import { DeckType, Participant, PRESET_DECKS, RoomState, Story } from '@planitpoker/shared';
 
 export class RoomManager {
   private rooms: Map<string, RoomState> = new Map();

@@ -1,19 +1,22 @@
 {
-  "name": "planitpoker",
+  "name": "planitpoker-monorepo",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev:server": "npm --prefix server run dev",
-    "dev:client": "npm --prefix client run dev",
-    "build:server": "npm --prefix server run build",
-    "build:client": "npm --prefix client run build",
-    "build": "npm run build:server && npm run build:client",
-    "test:server": "npm --prefix server run test",
-    "test:client": "npm --prefix client run test",
-    "test": "npm run test:server && npm run test:client",
-    "lint:server": "npm --prefix server run lint",
-    "lint:client": "npm --prefix client run lint",
-    "lint": "npm run lint:server && npm run lint:client",
+    "dev:server": "npm --workspace=@planitpoker/server run dev",
+    "dev:client": "npm --workspace=@planitpoker/client run dev",
+    "build:shared": "npm --workspace=@planitpoker/shared run build",
+    "build": "npm run build:shared && npm run build --workspaces --if-present",
+    "test:server": "npm --workspace=@planitpoker/server run test",
+    "test:client": "npm --workspace=@planitpoker/client run test",
+    "test": "npm run test --workspaces --if-present",
+    "lint:server": "npm --workspace=@planitpoker/server run lint",
+    "lint:client": "npm --workspace=@planitpoker/client run lint",
+    "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "devDependencies": {

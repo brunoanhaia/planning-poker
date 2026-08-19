@@ -1,5 +1,5 @@
 {
-  "name": "planitpoker-server",
+  "name": "@planitpoker/server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,7 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@planitpoker/shared": "*",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "ws": "^8.18.0"
@@ -23,7 +24,7 @@
     "@typescript-eslint/eslint-plugin": "^8.24.0",
     "@typescript-eslint/parser": "^8.24.0",
     "eslint": "^8.57.1",
-    "eslint-plugin-perfectionist": "^5.10.1",
+    "eslint-plugin-perfectionist": "^4.9.0",
     "eslint-plugin-vitest": "^0.5.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",

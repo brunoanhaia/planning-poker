@@ -1,13 +1,13 @@
 import { ThemeProvider, createTheme } from '@mui/material';
+import { RoomState } from '@planitpoker/shared';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 
-import { ResultsPanel } from '../components/ResultsPanel';
+import { PokerTable } from '../components/PokerTable';
 import * as SocketContextModule from '../context/SocketContext';
-import { RoomState } from '../types';
 
-const mockRevealedRoomState: RoomState = {
+const mockRoomState: RoomState = {
   id: 'ROOM01',
   title: 'Sprint 10 Estimation',
   hostId: 'user_1',
@@ -16,7 +16,7 @@ const mockRevealedRoomState: RoomState = {
   participants: [
     {
       id: 'user_1',
-      name: 'Alice',
+      name: 'Alice Host',
       avatar: '🚀',
       color: '#6366f1',
       vote: 5,
@@ -27,11 +27,11 @@ const mockRevealedRoomState: RoomState = {
     },
     {
       id: 'user_2',
-      name: 'Bob',
+      name: 'Bob Voter',
       avatar: '🎨',
       color: '#3b82f6',
-      vote: 5,
-      hasVoted: true,
+      vote: null,
+      hasVoted: false,
       isSpectator: false,
       isHost: false,
       isOnline: true,
@@ -41,18 +41,19 @@ const mockRevealedRoomState: RoomState = {
     {
       id: 'story_1',
       title: 'Setup Database Migration',
+      description: 'Run initial migration script for postgres schema',
       status: 'estimating',
     },
   ],
   currentStoryIndex: 0,
-  votesRevealed: true,
+  votesRevealed: false,
   createdAt: Date.now(),
 };
 
-describe('ResultsPanel Component', () => {
-  it('calculates 100% consensus and average score correctly', () => {
+describe('PokerTable Component', () => {
+  it('renders story title and reveal votes button', () => {
     vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue({
-      roomState: mockRevealedRoomState,
+      roomState: mockRoomState,
       currentUserId: 'user_1',
       isConnected: true,
       error: null,
@@ -74,12 +75,13 @@ describe('ResultsPanel Component', () => {
     const theme = createTheme();
     render(
       <ThemeProvider theme={theme}>
-        <ResultsPanel />
+        <PokerTable />
       </ThemeProvider>
     );
 
-    expect(screen.getByText('Estimation Results')).toBeInTheDocument();
-    expect(screen.getByText(/100% Consensus/i)).toBeInTheDocument();
-    expect(screen.getByText('5.0')).toBeInTheDocument(); // Average
+    expect(screen.getByText('Setup Database Migration')).toBeInTheDocument();
+    expect(screen.getByText('Alice Host (You)')).toBeInTheDocument();
+    expect(screen.getByText('Bob Voter')).toBeInTheDocument();
+    expect(screen.getByText(/Reveal Votes/i)).toBeInTheDocument();
   });
 });

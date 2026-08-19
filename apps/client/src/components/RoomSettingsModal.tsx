@@ -13,10 +13,10 @@ import {
   Box,
   FormHelperText,
 } from '@mui/material';
+import { DeckType, PRESET_DECKS } from '@planitpoker/shared';
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
-import { DeckType, PRESET_DECKS } from '../types';
 
 interface RoomSettingsModalProps {
   open: boolean;
@@ -86,8 +86,8 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ open, onCl
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
               Selected Cards Preview:
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-              {PRESET_DECKS[deckType].join('  ·  ')}
+            <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 700 }}>
+              {PRESET_DECKS[deckType as Exclude<DeckType, 'custom'>].join('  ·  ')}
             </Typography>
           </Box>
         )}

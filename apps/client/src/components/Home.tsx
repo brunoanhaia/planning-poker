@@ -17,10 +17,10 @@ import {
   FormHelperText,
   Alert,
 } from '@mui/material';
+import { AVATAR_COLORS, AVATARS, DeckType, PRESET_DECKS } from '@planitpoker/shared';
 import React, { useState, useEffect } from 'react';
 
 import { useSocket } from '../context/SocketContext';
-import { AVATARS, AVATAR_COLORS, DeckType, PRESET_DECKS } from '../types';
 
 export const Home: React.FC = () => {
   const { createRoom, joinRoom, error, clearError } = useSocket();
@@ -213,7 +213,7 @@ export const Home: React.FC = () => {
                 <MenuItem value="powers_of_2">Powers of 2 (1, 2, 4, 8, 16, 32...)</MenuItem>
               </Select>
               <FormHelperText>
-                Deck cards preview: {PRESET_DECKS[deckType].join(', ')}
+                Deck cards preview: {deckType !== 'custom' ? PRESET_DECKS[deckType].join(', ') : 'Custom'}
               </FormHelperText>
             </FormControl>
 

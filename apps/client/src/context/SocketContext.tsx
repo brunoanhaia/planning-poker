@@ -1,6 +1,5 @@
+import { DeckType, RoomState } from '@planitpoker/shared';
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-
-import { RoomState, DeckType } from '../types';
 
 interface SocketContextValue {
   roomState: RoomState | null;

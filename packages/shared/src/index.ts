@@ -1,14 +1,14 @@
 export type DeckType = 'fibonacci' | 'modified_fibonacci' | 'tshirt' | 'powers_of_2' | 'custom';
 
-export const PRESET_DECKS: Record<DeckType, (string | number)[]> = {
+export const PRESET_DECKS: Record<Exclude<DeckType, 'custom'>, (string | number)[]> = {
   fibonacci: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'],
   modified_fibonacci: [0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'],
   tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'],
   powers_of_2: [1, 2, 4, 8, 16, 32, 64, '?', '☕'],
-  custom: [1, 2, 3, 5, 8],
 };
 
 export const AVATARS = ['🚀', '🦊', '🐱', '🐶', '🦁', '🐼', '🦄', '🤖', '👾', '🧙', '🦸', '🥷'];
+
 export const AVATAR_COLORS = [
   '#6366f1',
   '#ec4899',
@@ -52,4 +52,25 @@ export interface RoomState {
   currentStoryIndex: number;
   votesRevealed: boolean;
   createdAt: number;
+}
+
+export type WSMessageType =
+  | 'CREATE_ROOM'
+  | 'JOIN_ROOM'
+  | 'VOTE'
+  | 'REVEAL_VOTES'
+  | 'RESET_VOTES'
+  | 'ADD_STORY'
+  | 'SET_CURRENT_STORY'
+  | 'UPDATE_STORY_ESTIMATE'
+  | 'DELETE_STORY'
+  | 'TOGGLE_SPECTATOR'
+  | 'CHANGE_DECK'
+  | 'TRANSFER_HOST'
+  | 'ROOM_STATE'
+  | 'ERROR';
+
+export interface WSMessage {
+  type: WSMessageType;
+  payload: any;
 }

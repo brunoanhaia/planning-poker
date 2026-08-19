@@ -1,9 +1,8 @@
 import StarIcon from '@mui/icons-material/Star';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { Box, Typography, Avatar } from '@mui/material';
+import { Participant } from '@planitpoker/shared';
 import React from 'react';
-
-import { Participant } from '../types';
 
 interface ParticipantCardProps {
   participant: Participant;

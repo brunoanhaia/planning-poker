@@ -1,7 +1,7 @@
+import { RoomState, WSMessage } from '@planitpoker/shared';
 import { WebSocketServer, WebSocket } from 'ws';
 
 import { roomManager } from './roomManager.js';
-import { WSMessage, RoomState } from './types.js';
 
 interface ExtendedWebSocket extends WebSocket {
   roomId?: string;
