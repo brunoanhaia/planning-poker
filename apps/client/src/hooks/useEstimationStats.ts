@@ -15,7 +15,9 @@ interface EstimationStats {
 
 export const useEstimationStats = (roomState: RoomState | null): EstimationStats => {
     const votedParticipants = useMemo(() => {
-        if (!roomState) return [];
+        if (!roomState) {
+            return [];
+        }
         return roomState.participants.filter(
             (p) => !p.isSpectator && p.vote !== null && p.vote !== undefined
         );

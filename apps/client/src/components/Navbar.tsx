@@ -53,14 +53,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     const currentUser = roomState?.participants.find((p) => p.id === currentUserId);
 
     const handleCopyLink = () => {
-        if (!roomState) return;
+        if (!roomState) {
+            return;
+        }
         const url = `${window.location.origin}/#${roomState.id}`;
         navigator.clipboard.writeText(url);
         setCopied(true);
     };
 
     const handleOpenEditTitle = () => {
-        if (!isAdmin || !roomState) return;
+        if (!isAdmin || !roomState) {
+            return;
+        }
         setNewTitle(roomState.title);
         setIsEditingTitle(true);
     };

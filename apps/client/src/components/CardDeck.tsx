@@ -7,7 +7,9 @@ import { useSocket } from '../context/SocketContext';
 export const CardDeck: React.FC = () => {
     const { roomState, currentUserId, submitVote, toggleSpectator } = useSocket();
 
-    if (!roomState) return null;
+    if (!roomState) {
+        return null;
+    }
 
     const currentUser = roomState.participants.find((p) => p.id === currentUserId);
     const activeDeck = roomState.activeDeck;

@@ -42,7 +42,9 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         roomState?.customDeck ? roomState.customDeck.join(', ') : '1, 2, 3, 5, 8'
     );
 
-    if (!roomState || !isAdmin) return null;
+    if (!roomState || !isAdmin) {
+        return null;
+    }
 
     const handleSave = () => {
         if (title.trim() && title.trim() !== roomState.title) {

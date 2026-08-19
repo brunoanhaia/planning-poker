@@ -76,21 +76,21 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
 
         rm.startTimer(roomId, hostId, 60);
-        let room = rm.getRoom(roomId)!;
-        expect(room.timer?.remaining).toBe(60);
-        expect(room.timer?.isRunning).toBe(true);
+        const initialRoom = rm.getRoom(roomId)!;
+        expect(initialRoom.timer?.remaining).toBe(60);
+        expect(initialRoom.timer?.isRunning).toBe(true);
 
         rm.tickTimer(roomId);
-        room = rm.getRoom(roomId)!;
-        expect(room.timer?.remaining).toBe(59);
+        const tickedRoom = rm.getRoom(roomId)!;
+        expect(tickedRoom.timer?.remaining).toBe(59);
 
         rm.pauseTimer(roomId, hostId);
-        room = rm.getRoom(roomId)!;
-        expect(room.timer?.isRunning).toBe(false);
+        const pausedRoom = rm.getRoom(roomId)!;
+        expect(pausedRoom.timer?.isRunning).toBe(false);
 
         rm.resetTimer(roomId, hostId);
-        room = rm.getRoom(roomId)!;
-        expect(room.timer?.remaining).toBe(60);
+        const resetRoom = rm.getRoom(roomId)!;
+        expect(resetRoom.timer?.remaining).toBe(60);
     });
 
     it('should allow admin to kick participant and toggle participant role', () => {

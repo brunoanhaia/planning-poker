@@ -61,11 +61,15 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [bulkText, setBulkText] = useState('');
 
-    if (!roomState) return null;
+    if (!roomState) {
+        return null;
+    }
 
     const handleCreateStory = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title.trim()) return;
+        if (!title.trim()) {
+            return;
+        }
         addStory(title.trim(), description.trim() || undefined);
         setTitle('');
         setDescription('');
@@ -73,7 +77,9 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
     };
 
     const handleBulkImport = () => {
-        if (!bulkText.trim()) return;
+        if (!bulkText.trim()) {
+            return;
+        }
 
         const lines = bulkText.split('\n').filter((l) => l.trim().length > 0);
         const parsedStories = lines.map((line) => {

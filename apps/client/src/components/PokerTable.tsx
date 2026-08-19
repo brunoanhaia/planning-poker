@@ -39,7 +39,9 @@ export const PokerTable: React.FC = () => {
     const participants = roomState?.participants ?? [];
     const positionedSeats = useSeatArrangement(participants);
 
-    if (!roomState) return null;
+    if (!roomState) {
+        return null;
+    }
 
     const activeVoters = participants.filter((p) => !p.isSpectator && p.isOnline);
     const votedCount = activeVoters.filter((p) => p.hasVoted).length;

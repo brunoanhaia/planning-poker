@@ -1,52 +1,110 @@
-import { DeckType, Participant, PRESET_DECKS, RoomState, Story } from '@planitpoker/shared';
+import {
+    Avatar,
+    AvatarColor,
+    CardValue,
+    DeckType,
+    Participant,
+    PRESET_DECKS,
+    RoomState,
+    Story,
+} from '@planitpoker/shared';
 
+import { DEFAULT_AVATAR, DEFAULT_HOST_COLOR, DEFAULT_TIMER_DURATION_SECONDS } from './constants.js';
+import { generateRoomId, generateStoryId, generateUserId } from './idGenerator.js';
+import {
+    joinParticipant,
+    JoinParticipantResult,
+    kickParticipant,
+    leaveParticipant,
+    promoteParticipantCoAdmin,
+    sanitizeRoomStateForUser,
+    submitVoteForParticipant,
+    toggleParticipantSpectator,
+    transferRoomAdmin,
+} from './participantService.js';
+import {
+    addStoryToRoom,
+    bulkAddStoriesToRoom,
+    deleteStoryFromRoom,
+    setRoomCurrentStory,
+    updateStoryEstimateInRoom,
+} from './storyService.js';
+
+export interface CreateRoomResult {
+    hostId: string;
+    roomId: string;
+    roomState: RoomState;
+}
+
+/**
+ * Coordinates and manages active Planning Poker rooms in-memory.
+ */
 export class RoomManager {
-    private rooms: Map<string, RoomState> = new Map();
+    private readonly rooms: Map<string, RoomState> = new Map();
 
-    private generateRoomId(): string {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        let id = '';
-        for (let i = 0; i < 6; i++) {
-            id += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return id;
-    }
-
+    /**
+     * Resets the voting state of a room for a new round.
+     *
+     * @param room - The room state to reset.
+     */
     private resetRoomVotes(room: RoomState): void {
         room.votesRevealed = false;
-        room.participants.forEach((p) => {
-            p.vote = null;
-            p.hasVoted = false;
+        room.participants.forEach((participant) => {
+            participant.vote = null;
+            participant.hasVoted = false;
         });
     }
 
+    /**
+     * Checks whether a user is the primary host or a co-administrator of the room.
+     *
+     * @param room - The active room state.
+     * @param userId - The user identifier to verify.
+     * @returns True if the user has administrative privileges.
+     */
     public isUserAdmin(room: RoomState, userId: string): boolean {
-        if (room.hostId === userId) return true;
+        if (room.hostId === userId) {
+            return true;
+        }
         const participant = room.participants.find((p) => p.id === userId);
-        return !!participant?.isAdmin;
+        return Boolean(participant?.isAdmin);
     }
 
+    /**
+     * Retrieves a room state by its room ID code.
+     *
+     * @param roomId - The room identifier code (case-insensitive).
+     * @returns The RoomState or undefined if not found.
+     */
     public getRoom(roomId: string): RoomState | undefined {
         return this.rooms.get(roomId.toUpperCase());
     }
 
+    /**
+     * Creates a new Planning Poker room with an initial user story.
+     *
+     * @param hostName - Name of the creator/host.
+     * @param hostAvatar - Avatar emoji of the host.
+     * @param hostColor - Theme color of the host.
+     * @param roomTitle - Optional title for the planning room.
+     * @param deckType - Estimation deck type (defaults to 'fibonacci').
+     * @param customDeck - Optional custom card values if deckType is 'custom'.
+     * @returns Object containing hostId, roomId, and the created roomState.
+     */
     public createRoom(
         hostName: string,
-        hostAvatar: string,
-        hostColor: string,
+        hostAvatar?: Avatar,
+        hostColor?: AvatarColor,
         roomTitle?: string,
         deckType: DeckType = 'fibonacci',
-        customDeck?: (string | number)[]
-    ): { hostId: string; roomId: string; roomState: RoomState } {
-        let roomId = this.generateRoomId();
-        while (this.rooms.has(roomId)) {
-            roomId = this.generateRoomId();
-        }
+        customDeck?: CardValue[]
+    ): CreateRoomResult {
+        const roomId = this.generateUniqueRoomId();
+        const hostId = generateUserId();
 
-        const hostId = `user_${Math.random().toString(36).substr(2, 9)}`;
         const host: Participant = {
-            avatar: hostAvatar || '👤',
-            color: hostColor || '#6366f1',
+            avatar: hostAvatar || DEFAULT_AVATAR,
+            color: hostColor || DEFAULT_HOST_COLOR,
             hasVoted: false,
             id: hostId,
             isAdmin: true,
@@ -57,14 +115,17 @@ export class RoomManager {
             vote: null,
         };
 
-        const activeDeck =
+        const activeDeck: CardValue[] =
             deckType === 'custom' && customDeck && customDeck.length > 0
-                ? customDeck
-                : PRESET_DECKS[deckType as Exclude<DeckType, 'custom'>] || PRESET_DECKS.fibonacci;
+                ? [...customDeck]
+                : [
+                      ...(PRESET_DECKS[deckType as Exclude<DeckType, 'custom'>] ||
+                          PRESET_DECKS.fibonacci),
+                  ];
 
         const initialStory: Story = {
             description: 'Welcome to Planit Poker! Add story details or estimate this topic.',
-            id: `story_${Math.random().toString(36).substr(2, 9)}`,
+            id: generateStoryId(),
             status: 'estimating',
             title: 'First User Story',
         };
@@ -91,106 +152,127 @@ export class RoomManager {
         return { hostId, roomId, roomState };
     }
 
+    /**
+     * Generates a collision-free room code identifier.
+     *
+     * @returns A guaranteed unique room code.
+     */
+    private generateUniqueRoomId(): string {
+        const candidateId = generateRoomId();
+        if (this.rooms.has(candidateId)) {
+            return this.generateUniqueRoomId();
+        }
+        return candidateId;
+    }
+
+    /**
+     * Joins a participant to a room.
+     *
+     * @param roomId - The room identifier code.
+     * @param userName - The participant's display name.
+     * @param avatar - Optional avatar emoji.
+     * @param color - Optional avatar color.
+     * @param existingUserId - Optional ID for reconnecting users.
+     * @returns Result object with participant/roomState or error message.
+     */
     public joinRoom(
         roomId: string,
         userName: string,
-        avatar: string,
-        color: string,
+        avatar?: Avatar,
+        color?: AvatarColor,
         existingUserId?: string
-    ): { error?: string; participant?: Participant; roomState?: RoomState } | null {
+    ): JoinParticipantResult | null {
         const room = this.getRoom(roomId);
-        if (!room) return null;
-
-        if (existingUserId) {
-            const existingParticipant = room.participants.find((p) => p.id === existingUserId);
-            if (existingParticipant) {
-                existingParticipant.isOnline = true;
-                existingParticipant.name = userName || existingParticipant.name;
-                existingParticipant.avatar = avatar || existingParticipant.avatar;
-                existingParticipant.color = color || existingParticipant.color;
-                return { participant: existingParticipant, roomState: room };
-            }
+        if (!room) {
+            return null;
         }
-
-        if (room.isLocked) {
-            return { error: 'Room is locked by the administrator.' };
-        }
-
-        const newId = `user_${Math.random().toString(36).substr(2, 9)}`;
-        const isFirstUser = room.participants.length === 0;
-
-        const participant: Participant = {
-            avatar: avatar || '👤',
-            color: color || '#3b82f6',
-            hasVoted: false,
-            id: newId,
-            isAdmin: isFirstUser,
-            isHost: isFirstUser,
-            isOnline: true,
-            isSpectator: false,
-            name: userName,
-            vote: null,
-        };
-
-        room.participants.push(participant);
-        if (isFirstUser) {
-            room.hostId = newId;
-        }
-
-        return { participant, roomState: room };
+        return joinParticipant(room, userName, avatar, color, existingUserId);
     }
 
+    /**
+     * Handles user disconnection from a room.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - The leaving user ID.
+     * @returns Updated RoomState or null if room not found.
+     */
     public leaveRoom(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room) return null;
-
-        const participant = room.participants.find((p) => p.id === userId);
-        if (!participant) return room;
-
-        participant.isOnline = false;
-
-        if (room.hostId === userId) {
-            const nextHost =
-                room.participants.find((p) => p.isOnline && p.isAdmin) ||
-                room.participants.find((p) => p.isOnline);
-
-            if (nextHost) {
-                nextHost.isHost = true;
-                nextHost.isAdmin = true;
-                room.hostId = nextHost.id;
-            }
+        if (!room) {
+            return null;
         }
-
-        return room;
+        return leaveParticipant(room, userId);
     }
 
+    /**
+     * Renames the planning poker room.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin requesting the change.
+     * @param newTitle - The new title text.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public updateRoomTitle(roomId: string, userId: string, newTitle: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         room.title = newTitle.trim() || room.title;
         return room;
     }
 
+    /**
+     * Toggles the locked status of a room (prevents new joins).
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin requesting the change.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public toggleLockRoom(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         room.isLocked = !room.isLocked;
         return room;
     }
 
+    /**
+     * Toggles auto-reveal of votes once all active participants have voted.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin requesting the change.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public toggleAutoReveal(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         room.autoReveal = !room.autoReveal;
         return room;
     }
 
-    public startTimer(roomId: string, userId: string, duration: number): RoomState | null {
+    /**
+     * Starts or restarts the synchronized discussion countdown timer.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin requesting the timer.
+     * @param duration - Timer duration in seconds.
+     * @returns Updated RoomState or null if unauthorized.
+     */
+    public startTimer(
+        roomId: string,
+        userId: string,
+        duration = DEFAULT_TIMER_DURATION_SECONDS
+    ): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         room.timer = {
             duration,
@@ -201,17 +283,35 @@ export class RoomManager {
         return room;
     }
 
+    /**
+     * Pauses or resumes the active countdown timer.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @returns Updated RoomState or null if unauthorized/no timer.
+     */
     public pauseTimer(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId) || !room.timer) return null;
+        if (!room || !this.isUserAdmin(room, userId) || !room.timer) {
+            return null;
+        }
 
         room.timer.isRunning = !room.timer.isRunning;
         return room;
     }
 
+    /**
+     * Resets the timer back to its initial duration and stops it.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public resetTimer(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         if (room.timer) {
             room.timer.remaining = room.timer.duration;
@@ -220,9 +320,17 @@ export class RoomManager {
         return room;
     }
 
+    /**
+     * Incremental ticker called every second to decrement active room timers.
+     *
+     * @param roomId - The room identifier.
+     * @returns Updated RoomState or null if timer is not active.
+     */
     public tickTimer(roomId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !room.timer || !room.timer.isRunning) return null;
+        if (!room || !room.timer || !room.timer.isRunning) {
+            return null;
+        }
 
         if (room.timer.remaining <= 1) {
             room.timer.remaining = 0;
@@ -234,118 +342,148 @@ export class RoomManager {
         return room;
     }
 
-    public submitVote(roomId: string, userId: string, vote: string | number): RoomState | null {
+    /**
+     * Submits a card vote for a participant.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the voter.
+     * @param vote - The chosen estimate value.
+     * @returns Updated RoomState or null if invalid.
+     */
+    public submitVote(roomId: string, userId: string, vote: CardValue): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room) return null;
-
-        const participant = room.participants.find((p) => p.id === userId);
-        if (!participant || participant.isSpectator) return null;
-
-        participant.vote = vote;
-        participant.hasVoted = true;
-
-        if (room.autoReveal) {
-            const activeVoters = room.participants.filter((p) => !p.isSpectator && p.isOnline);
-            const allVoted = activeVoters.length > 0 && activeVoters.every((p) => p.hasVoted);
-            if (allVoted) {
-                room.votesRevealed = true;
-            }
+        if (!room) {
+            return null;
         }
-
-        return room;
+        return submitVoteForParticipant(room, userId, vote);
     }
 
+    /**
+     * Reveals all votes to the entire room.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin or co-host.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public revealVotes(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         room.votesRevealed = true;
         return room;
     }
 
+    /**
+     * Resets all participant votes and hides cards for a new estimation round.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin or co-host.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public resetVotes(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         this.resetRoomVotes(room);
         return room;
     }
 
+    /**
+     * Toggles self spectator status for a participant.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the participant.
+     * @returns Updated RoomState or null if not found.
+     */
     public toggleSpectator(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room) return null;
-
-        const participant = room.participants.find((p) => p.id === userId);
-        if (!participant) return null;
-
-        participant.isSpectator = !participant.isSpectator;
-        if (participant.isSpectator) {
-            participant.vote = null;
-            participant.hasVoted = false;
+        if (!room) {
+            return null;
         }
-
-        return room;
+        return toggleParticipantSpectator(room, userId);
     }
 
+    /**
+     * Toggles another participant's role between Voter and Spectator (admin-only).
+     *
+     * @param roomId - The room identifier.
+     * @param adminId - ID of the admin.
+     * @param targetUserId - ID of the participant to modify.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public toggleUserRole(roomId: string, adminId: string, targetUserId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, adminId)) return null;
-
-        const target = room.participants.find((p) => p.id === targetUserId);
-        if (!target) return null;
-
-        target.isSpectator = !target.isSpectator;
-        if (target.isSpectator) {
-            target.vote = null;
-            target.hasVoted = false;
+        if (!room || !this.isUserAdmin(room, adminId)) {
+            return null;
         }
-
-        return room;
+        return toggleParticipantSpectator(room, targetUserId);
     }
 
+    /**
+     * Removes a participant from the room.
+     *
+     * @param roomId - The room identifier.
+     * @param adminId - ID of the admin.
+     * @param targetUserId - ID of the participant to remove.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public kickParticipant(
         roomId: string,
         adminId: string,
         targetUserId: string
     ): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, adminId)) return null;
-        if (room.hostId === targetUserId) return null;
-
-        room.participants = room.participants.filter((p) => p.id !== targetUserId);
-        return room;
+        if (!room || !this.isUserAdmin(room, adminId)) {
+            return null;
+        }
+        return kickParticipant(room, targetUserId);
     }
 
+    /**
+     * Promotes or demotes a participant to/from Co-Administrator.
+     *
+     * @param roomId - The room identifier.
+     * @param adminId - ID of the admin.
+     * @param targetUserId - ID of the participant to update.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public promoteCoAdmin(roomId: string, adminId: string, targetUserId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, adminId)) return null;
-
-        const target = room.participants.find((p) => p.id === targetUserId);
-        if (!target) return null;
-
-        target.isAdmin = !target.isAdmin;
-        return room;
+        if (!room || !this.isUserAdmin(room, adminId)) {
+            return null;
+        }
+        return promoteParticipantCoAdmin(room, targetUserId);
     }
 
+    /**
+     * Transfers primary room ownership to another participant.
+     *
+     * @param roomId - The room identifier.
+     * @param adminId - ID of the current host.
+     * @param targetUserId - ID of the target new host.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public transferAdmin(roomId: string, adminId: string, targetUserId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || room.hostId !== adminId) return null;
-
-        const target = room.participants.find((p) => p.id === targetUserId);
-        if (!target) return null;
-
-        const currentHost = room.participants.find((p) => p.id === adminId);
-        if (currentHost) {
-            currentHost.isHost = false;
+        if (!room || room.hostId !== adminId) {
+            return null;
         }
-
-        target.isHost = true;
-        target.isAdmin = true;
-        room.hostId = target.id;
-
-        return room;
+        return transferRoomAdmin(room, adminId, targetUserId);
     }
 
+    /**
+     * Adds a new story to the room's backlog.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @param title - Story title.
+     * @param description - Optional story details.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public addStory(
         roomId: string,
         userId: string,
@@ -353,136 +491,154 @@ export class RoomManager {
         description?: string
     ): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
-
-        const newStory: Story = {
-            description,
-            id: `story_${Math.random().toString(36).substr(2, 9)}`,
-            status: 'pending',
-            title,
-        };
-
-        room.stories.push(newStory);
-        return room;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
+        return addStoryToRoom(room, title, description);
     }
 
+    /**
+     * Adds multiple stories in bulk to the room's backlog.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @param storiesList - Array of stories to import.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public bulkAddStories(
         roomId: string,
         userId: string,
         storiesList: { description?: string; title: string }[]
     ): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId) || !Array.isArray(storiesList)) return null;
-
-        storiesList.forEach((item) => {
-            if (item.title && item.title.trim()) {
-                room.stories.push({
-                    description: item.description?.trim(),
-                    id: `story_${Math.random().toString(36).substr(2, 9)}`,
-                    status: 'pending',
-                    title: item.title.trim(),
-                });
-            }
-        });
-
-        return room;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
+        return bulkAddStoriesToRoom(room, storiesList);
     }
 
+    /**
+     * Sets the active story for estimation.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @param storyIndex - Target index in the stories list.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public setCurrentStory(roomId: string, userId: string, storyIndex: number): RoomState | null {
         const room = this.getRoom(roomId);
-        if (
-            !room ||
-            !this.isUserAdmin(room, userId) ||
-            storyIndex < 0 ||
-            storyIndex >= room.stories.length
-        ) {
+        if (!room || !this.isUserAdmin(room, userId)) {
             return null;
         }
 
-        room.currentStoryIndex = storyIndex;
-        room.stories.forEach((s, idx) => {
-            if (idx === storyIndex) s.status = 'estimating';
-        });
-
-        this.resetRoomVotes(room);
-        return room;
+        const updated = setRoomCurrentStory(room, storyIndex);
+        if (updated) {
+            this.resetRoomVotes(room);
+        }
+        return updated;
     }
 
+    /**
+     * Updates the finalized estimate on a story.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @param storyId - ID of the story.
+     * @param estimate - Final score/estimate value.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public updateStoryEstimate(
         roomId: string,
         userId: string,
         storyId: string,
-        estimate: string | number
+        estimate: CardValue
     ): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
-
-        const story = room.stories.find((s) => s.id === storyId);
-        if (!story) return null;
-
-        story.finalEstimate = estimate;
-        story.status = 'completed';
-
-        return room;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
+        return updateStoryEstimateInRoom(room, storyId, estimate);
     }
 
+    /**
+     * Deletes a story from the room backlog.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @param storyId - ID of the story to remove.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public deleteStory(roomId: string, userId: string, storyId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
-
-        room.stories = room.stories.filter((s) => s.id !== storyId);
-        if (room.currentStoryIndex >= room.stories.length) {
-            room.currentStoryIndex = Math.max(0, room.stories.length - 1);
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
         }
-        return room;
+        return deleteStoryFromRoom(room, storyId);
     }
 
+    /**
+     * Changes the active card estimation deck.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @param deckType - Chosen deck preset or 'custom'.
+     * @param customDeck - Custom card values if deckType is 'custom'.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public changeDeck(
         roomId: string,
         userId: string,
         deckType: DeckType,
-        customDeck?: (string | number)[]
+        customDeck?: CardValue[]
     ): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         room.deckType = deckType;
         room.activeDeck =
             deckType === 'custom' && customDeck
-                ? customDeck
-                : PRESET_DECKS[deckType as Exclude<DeckType, 'custom'>] || PRESET_DECKS.fibonacci;
+                ? [...customDeck]
+                : [
+                      ...(PRESET_DECKS[deckType as Exclude<DeckType, 'custom'>] ||
+                          PRESET_DECKS.fibonacci),
+                  ];
 
         if (deckType === 'custom' && customDeck) {
-            room.customDeck = customDeck;
+            room.customDeck = [...customDeck];
         }
 
         this.resetRoomVotes(room);
         return room;
     }
 
+    /**
+     * Marks a session as completed/ended.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin.
+     * @returns Updated RoomState or null if unauthorized.
+     */
     public endSession(roomId: string, userId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !this.isUserAdmin(room, userId)) return null;
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
 
         room.isEnded = true;
         return room;
     }
 
+    /**
+     * Sanitizes room state to hide unrevealed votes for recipient user.
+     *
+     * @param roomState - RoomState instance.
+     * @param currentUserId - ID of the user receiving the update.
+     * @returns Sanitized RoomState.
+     */
     public sanitizeStateForUser(roomState: RoomState, currentUserId: string): RoomState {
-        const sanitizedParticipants = roomState.participants.map((p) => {
-            if (roomState.votesRevealed || p.id === currentUserId) {
-                return { ...p };
-            }
-            return {
-                ...p,
-                vote: null,
-            };
-        });
-
-        return {
-            ...roomState,
-            participants: sanitizedParticipants,
-        };
+        return sanitizeRoomStateForUser(roomState, currentUserId);
     }
 }
 

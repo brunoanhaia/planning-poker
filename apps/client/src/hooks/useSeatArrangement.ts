@@ -14,7 +14,9 @@ export const useSeatArrangement = (
 ): PositionedParticipant[] => {
     return useMemo(() => {
         const total = participants.length;
-        if (total === 0) return [];
+        if (total === 0) {
+            return [];
+        }
 
         return participants.map((participant, index) => {
             const angle = (index / total) * 2 * Math.PI + Math.PI / 2;

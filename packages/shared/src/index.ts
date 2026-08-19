@@ -1,13 +1,32 @@
 export type DeckType = 'fibonacci' | 'modified_fibonacci' | 'tshirt' | 'powers_of_2' | 'custom';
 
-export const PRESET_DECKS: Record<Exclude<DeckType, 'custom'>, (string | number)[]> = {
-    fibonacci: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'],
-    modified_fibonacci: [0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'],
-    tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'],
-    powers_of_2: [1, 2, 4, 8, 16, 32, 64, '?', '☕'],
+export type CardValue = string | number;
+export type EstimateValue = string | number | null;
+export type StoryStatus = 'pending' | 'estimating' | 'completed';
+
+export const PRESET_DECKS: Record<Exclude<DeckType, 'custom'>, readonly CardValue[]> = {
+    fibonacci: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'] as const,
+    modified_fibonacci: [0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'] as const,
+    powers_of_2: [1, 2, 4, 8, 16, 32, 64, '?', '☕'] as const,
+    tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'] as const,
 };
 
-export const AVATARS = ['🚀', '🦊', '🐱', '🐶', '🦁', '🐼', '🦄', '🤖', '👾', '🧙', '🦸', '🥷'];
+export const AVATARS = [
+    '🚀',
+    '🦊',
+    '🐱',
+    '🐶',
+    '🦁',
+    '🐼',
+    '🦄',
+    '🤖',
+    '👾',
+    '🧙',
+    '🦸',
+    '🥷',
+] as const;
+
+export type Avatar = (typeof AVATARS)[number] | string;
 
 export const AVATAR_COLORS = [
     '#6366f1',
@@ -18,52 +37,54 @@ export const AVATAR_COLORS = [
     '#f59e0b',
     '#ef4444',
     '#14b8a6',
-];
+] as const;
+
+export type AvatarColor = (typeof AVATAR_COLORS)[number] | string;
 
 export interface Participant {
-    id: string;
-    name: string;
-    avatar: string;
-    color: string;
-    vote: string | number | null;
+    avatar: Avatar;
+    color: AvatarColor;
     hasVoted: boolean;
-    isSpectator: boolean;
-    isHost: boolean;
+    id: string;
     isAdmin: boolean;
+    isHost: boolean;
     isOnline: boolean;
+    isSpectator: boolean;
+    name: string;
+    vote: EstimateValue;
 }
 
 export interface Story {
-    id: string;
-    title: string;
     description?: string;
-    finalEstimate?: string | number | null;
-    status: 'pending' | 'estimating' | 'completed';
+    finalEstimate?: EstimateValue;
+    id: string;
+    status: StoryStatus;
+    title: string;
 }
 
 export interface TimerState {
-    duration: number; // total duration in seconds
-    remaining: number; // remaining seconds
+    duration: number;
     isRunning: boolean;
+    remaining: number;
     startedAt?: number;
 }
 
 export interface RoomState {
-    id: string;
-    title: string;
-    hostId: string;
+    activeDeck: CardValue[];
+    autoReveal: boolean;
+    createdAt: number;
+    currentStoryIndex: number;
+    customDeck?: CardValue[];
     deckType: DeckType;
-    customDeck?: (string | number)[];
-    activeDeck: (string | number)[];
+    hostId: string;
+    id: string;
+    isEnded: boolean;
+    isLocked: boolean;
     participants: Participant[];
     stories: Story[];
-    currentStoryIndex: number;
-    votesRevealed: boolean;
-    isLocked: boolean;
-    autoReveal: boolean;
     timer: TimerState | null;
-    isEnded: boolean;
-    createdAt: number;
+    title: string;
+    votesRevealed: boolean;
 }
 
 export type WSMessageType =
@@ -95,24 +116,24 @@ export type WSMessageType =
     | 'ERROR';
 
 export interface CreateRoomPayload {
-    avatar?: string;
-    color?: string;
-    customDeck?: (string | number)[];
+    avatar?: Avatar;
+    color?: AvatarColor;
+    customDeck?: CardValue[];
     deckType?: DeckType;
     name: string;
     title?: string;
 }
 
 export interface JoinRoomPayload {
-    avatar?: string;
-    color?: string;
+    avatar?: Avatar;
+    color?: AvatarColor;
     name: string;
     roomId: string;
     userId?: string | null;
 }
 
 export interface VotePayload {
-    vote: string | number;
+    vote: CardValue;
 }
 
 export interface AddStoryPayload {
@@ -129,7 +150,7 @@ export interface SetCurrentStoryPayload {
 }
 
 export interface UpdateStoryEstimatePayload {
-    estimate: string | number;
+    estimate: CardValue;
     storyId: string;
 }
 
@@ -142,7 +163,7 @@ export interface TargetUserPayload {
 }
 
 export interface ChangeDeckPayload {
-    customDeck?: (string | number)[];
+    customDeck?: CardValue[];
     deckType: DeckType;
 }
 

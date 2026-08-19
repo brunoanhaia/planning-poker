@@ -16,6 +16,14 @@ import {
 } from '@planitpoker/shared';
 import { WebSocket, WebSocketServer } from 'ws';
 
+import {
+    DEFAULT_AVATAR,
+    DEFAULT_HOST_COLOR,
+    DEFAULT_PARTICIPANT_COLOR,
+    DEFAULT_TIMER_DURATION_SECONDS,
+    HEARTBEAT_INTERVAL_MS,
+    TIMER_TICK_INTERVAL_MS,
+} from './constants.js';
 import { roomManager } from './roomManager.js';
 
 interface ExtendedWebSocket extends WebSocket {
@@ -24,9 +32,12 @@ interface ExtendedWebSocket extends WebSocket {
     userId?: string;
 }
 
+/**
+ * Handles real-time WebSocket connections, message routing, and room state broadcasting.
+ */
 export class WebSocketHandler {
     private timerInterval: NodeJS.Timeout | null = null;
-    private wss: WebSocketServer;
+    private readonly wss: WebSocketServer;
 
     constructor(wss: WebSocketServer) {
         this.wss = wss;
@@ -34,7 +45,10 @@ export class WebSocketHandler {
         this.startTimerTicker();
     }
 
-    private init() {
+    /**
+     * Initializes WebSocket listeners and client heartbeat interval.
+     */
+    private init(): void {
         this.wss.on('connection', (ws: ExtendedWebSocket) => {
             ws.isAlive = true;
 
@@ -53,7 +67,9 @@ export class WebSocketHandler {
             });
 
             ws.on('close', () => {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updatedRoom = roomManager.leaveRoom(ws.roomId, ws.userId);
                 if (updatedRoom) {
                     this.broadcastRoomState(ws.roomId);
@@ -61,23 +77,29 @@ export class WebSocketHandler {
             });
         });
 
-        // Heartbeat ping interval
         setInterval(() => {
             this.wss.clients.forEach((client) => {
                 const ws = client as ExtendedWebSocket;
-                if (ws.isAlive === false) return ws.terminate();
+                if (ws.isAlive === false) {
+                    return ws.terminate();
+                }
                 ws.isAlive = false;
                 ws.ping();
             });
-        }, 30000);
+        }, HEARTBEAT_INTERVAL_MS);
     }
 
-    private startTimerTicker() {
+    /**
+     * Starts the 1-second countdown ticker for active room timers.
+     */
+    private startTimerTicker(): void {
         this.timerInterval = setInterval(() => {
             const activeRooms = new Set<string>();
             this.wss.clients.forEach((client) => {
                 const ws = client as ExtendedWebSocket;
-                if (ws.roomId) activeRooms.add(ws.roomId);
+                if (ws.roomId) {
+                    activeRooms.add(ws.roomId);
+                }
             });
 
             activeRooms.forEach((roomId) => {
@@ -86,10 +108,16 @@ export class WebSocketHandler {
                     this.broadcastRoomState(roomId);
                 }
             });
-        }, 1000);
+        }, TIMER_TICK_INTERVAL_MS);
     }
 
-    private handleMessage(ws: ExtendedWebSocket, msg: WSMessage) {
+    /**
+     * Routes incoming WebSocket messages to domain operations.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param msg - The parsed incoming message.
+     */
+    private handleMessage(ws: ExtendedWebSocket, msg: WSMessage): void {
         const { payload, type } = msg;
 
         switch (type) {
@@ -98,8 +126,8 @@ export class WebSocketHandler {
                     payload as CreateRoomPayload;
                 const { hostId, roomId, roomState } = roomManager.createRoom(
                     name,
-                    avatar || '👤',
-                    color || '#6366f1',
+                    avatar || DEFAULT_AVATAR,
+                    color || DEFAULT_HOST_COLOR,
                     title,
                     deckType,
                     customDeck
@@ -120,8 +148,8 @@ export class WebSocketHandler {
                 const result = roomManager.joinRoom(
                     roomId,
                     name,
-                    avatar || '👤',
-                    color || '#3b82f6',
+                    avatar || DEFAULT_AVATAR,
+                    color || DEFAULT_PARTICIPANT_COLOR,
                     userId || undefined
                 );
 
@@ -149,7 +177,9 @@ export class WebSocketHandler {
             }
 
             case 'UPDATE_ROOM_TITLE': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { title } = payload as UpdateRoomTitlePayload;
                 const updated = roomManager.updateRoomTitle(ws.roomId, ws.userId, title);
                 if (!updated) {
@@ -160,7 +190,9 @@ export class WebSocketHandler {
             }
 
             case 'TOGGLE_LOCK_ROOM': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.toggleLockRoom(ws.roomId, ws.userId);
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can lock/unlock the room.');
@@ -170,7 +202,9 @@ export class WebSocketHandler {
             }
 
             case 'TOGGLE_AUTO_REVEAL': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.toggleAutoReveal(ws.roomId, ws.userId);
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can toggle auto-reveal.');
@@ -180,9 +214,15 @@ export class WebSocketHandler {
             }
 
             case 'START_TIMER': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { duration } = (payload as StartTimerPayload) || {};
-                const updated = roomManager.startTimer(ws.roomId, ws.userId, duration || 60);
+                const updated = roomManager.startTimer(
+                    ws.roomId,
+                    ws.userId,
+                    duration || DEFAULT_TIMER_DURATION_SECONDS
+                );
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can start the timer.');
                 }
@@ -191,7 +231,9 @@ export class WebSocketHandler {
             }
 
             case 'PAUSE_TIMER': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.pauseTimer(ws.roomId, ws.userId);
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can pause/resume the timer.');
@@ -201,7 +243,9 @@ export class WebSocketHandler {
             }
 
             case 'RESET_TIMER': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.resetTimer(ws.roomId, ws.userId);
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can reset the timer.');
@@ -211,7 +255,9 @@ export class WebSocketHandler {
             }
 
             case 'VOTE': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { vote } = payload as VotePayload;
                 const updated = roomManager.submitVote(ws.roomId, ws.userId, vote);
                 if (updated) {
@@ -221,7 +267,9 @@ export class WebSocketHandler {
             }
 
             case 'REVEAL_VOTES': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.revealVotes(ws.roomId, ws.userId);
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators or co-hosts can reveal votes.');
@@ -231,7 +279,9 @@ export class WebSocketHandler {
             }
 
             case 'RESET_VOTES': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.resetVotes(ws.roomId, ws.userId);
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can reset votes.');
@@ -241,7 +291,9 @@ export class WebSocketHandler {
             }
 
             case 'TOGGLE_SPECTATOR': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.toggleSpectator(ws.roomId, ws.userId);
                 if (updated) {
                     this.broadcastRoomState(ws.roomId);
@@ -250,7 +302,9 @@ export class WebSocketHandler {
             }
 
             case 'TOGGLE_USER_ROLE': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { targetUserId } = payload as TargetUserPayload;
                 const updated = roomManager.toggleUserRole(ws.roomId, ws.userId, targetUserId);
                 if (!updated) {
@@ -264,7 +318,9 @@ export class WebSocketHandler {
             }
 
             case 'KICK_PARTICIPANT': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { targetUserId } = payload as TargetUserPayload;
                 const updated = roomManager.kickParticipant(ws.roomId, ws.userId, targetUserId);
                 if (!updated) {
@@ -286,7 +342,9 @@ export class WebSocketHandler {
             }
 
             case 'PROMOTE_COADMIN': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { targetUserId } = payload as TargetUserPayload;
                 const updated = roomManager.promoteCoAdmin(ws.roomId, ws.userId, targetUserId);
                 if (!updated) {
@@ -297,7 +355,9 @@ export class WebSocketHandler {
             }
 
             case 'TRANSFER_ADMIN': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { targetUserId } = payload as TargetUserPayload;
                 const updated = roomManager.transferAdmin(ws.roomId, ws.userId, targetUserId);
                 if (!updated) {
@@ -311,7 +371,9 @@ export class WebSocketHandler {
             }
 
             case 'ADD_STORY': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { description, title } = payload as AddStoryPayload;
                 const updated = roomManager.addStory(ws.roomId, ws.userId, title, description);
                 if (!updated) {
@@ -325,7 +387,9 @@ export class WebSocketHandler {
             }
 
             case 'BULK_ADD_STORIES': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { stories } = payload as BulkAddStoriesPayload;
                 const updated = roomManager.bulkAddStories(ws.roomId, ws.userId, stories);
                 if (!updated) {
@@ -336,7 +400,9 @@ export class WebSocketHandler {
             }
 
             case 'SET_CURRENT_STORY': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { storyIndex } = payload as SetCurrentStoryPayload;
                 const updated = roomManager.setCurrentStory(ws.roomId, ws.userId, storyIndex);
                 if (!updated) {
@@ -347,7 +413,9 @@ export class WebSocketHandler {
             }
 
             case 'UPDATE_STORY_ESTIMATE': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { estimate, storyId } = payload as UpdateStoryEstimatePayload;
                 const updated = roomManager.updateStoryEstimate(
                     ws.roomId,
@@ -366,7 +434,9 @@ export class WebSocketHandler {
             }
 
             case 'DELETE_STORY': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { storyId } = payload as DeleteStoryPayload;
                 const updated = roomManager.deleteStory(ws.roomId, ws.userId, storyId);
                 if (!updated) {
@@ -380,7 +450,9 @@ export class WebSocketHandler {
             }
 
             case 'CHANGE_DECK': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const { customDeck, deckType } = payload as ChangeDeckPayload;
                 const updated = roomManager.changeDeck(ws.roomId, ws.userId, deckType, customDeck);
                 if (!updated) {
@@ -394,7 +466,9 @@ export class WebSocketHandler {
             }
 
             case 'END_SESSION': {
-                if (!ws.roomId || !ws.userId) return;
+                if (!ws.roomId || !ws.userId) {
+                    return;
+                }
                 const updated = roomManager.endSession(ws.roomId, ws.userId);
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can end the session.');
@@ -408,9 +482,16 @@ export class WebSocketHandler {
         }
     }
 
-    public broadcastRoomState(roomId: string) {
+    /**
+     * Broadcasts the sanitized room state to all clients connected to a room.
+     *
+     * @param roomId - The room identifier.
+     */
+    public broadcastRoomState(roomId: string): void {
         const rawState = roomManager.getRoom(roomId);
-        if (!rawState) return;
+        if (!rawState) {
+            return;
+        }
 
         this.wss.clients.forEach((client) => {
             const ws = client as ExtendedWebSocket;
@@ -424,13 +505,26 @@ export class WebSocketHandler {
         });
     }
 
-    private send(ws: WebSocket, type: WSMessageType, payload: unknown) {
+    /**
+     * Sends a typed message to a specific WebSocket client.
+     *
+     * @param ws - Target client.
+     * @param type - WebSocket message type.
+     * @param payload - Payload data.
+     */
+    private send(ws: WebSocket, type: WSMessageType, payload: unknown): void {
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ payload, type }));
         }
     }
 
-    private sendError(ws: WebSocket, message: string) {
+    /**
+     * Sends an error notification message to a specific WebSocket client.
+     *
+     * @param ws - Target client.
+     * @param message - Error description.
+     */
+    private sendError(ws: WebSocket, message: string): void {
         this.send(ws, 'ERROR', { message });
     }
 }

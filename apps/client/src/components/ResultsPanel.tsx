@@ -41,7 +41,9 @@ export const ResultsPanel: React.FC = () => {
     } = useEstimationStats(roomState);
     const currentStory = roomState?.stories[roomState?.currentStoryIndex ?? 0];
 
-    if (!roomState || !roomState.votesRevealed) return null;
+    if (!roomState || !roomState.votesRevealed) {
+        return null;
+    }
 
     if (votedParticipants.length === 0) {
         return (
@@ -53,17 +55,20 @@ export const ResultsPanel: React.FC = () => {
         );
     }
 
-    const handleSaveEstimate = (customEstimate?: number | string) => {
-        if (!currentStory || !isAdmin || !roomState) return;
-
-        let finalVal: number | string;
+    const computeFinalEstimate = (customEstimate?: number | string): number | string => {
         if (customEstimate !== undefined && customEstimate !== '') {
             const parsedNum = Number(customEstimate);
-            finalVal = !isNaN(parsedNum) ? parsedNum : customEstimate;
-        } else {
-            finalVal = hasNumeric ? Number(average) : modeVote;
+            return !isNaN(parsedNum) ? parsedNum : customEstimate;
+        }
+        return hasNumeric ? Number(average) : modeVote;
+    };
+
+    const handleSaveEstimate = (customEstimate?: number | string) => {
+        if (!currentStory || !isAdmin || !roomState) {
+            return;
         }
 
+        const finalVal = computeFinalEstimate(customEstimate);
         updateStoryEstimate(currentStory.id, finalVal);
 
         const nextIndex = roomState.currentStoryIndex + 1;
