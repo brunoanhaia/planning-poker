@@ -53,7 +53,7 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
     const [editingStory, setEditingStory] = useState<{
         id: string;
         title: string;
-        currentScore?: string | number;
+        currentScore?: string | number | null;
     } | null>(null);
     const [editScoreValue, setEditScoreValue] = useState('');
 
