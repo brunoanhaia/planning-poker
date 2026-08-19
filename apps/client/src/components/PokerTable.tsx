@@ -251,22 +251,37 @@ export const PokerTable: React.FC = () => {
           {/* Voting progress / Action Buttons */}
           <Box sx={{ alignItems: 'center', display: 'flex', gap: 2, mt: 1 }}>
             {!roomState.votesRevealed ? (
-              <Button
-                color="primary"
-                disabled={activeVoters.length === 0}
-                onClick={revealVotes}
-                startIcon={<VisibilityIcon />}
-                sx={{
-                  borderRadius: '20px',
-                  boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
-                  fontWeight: 700,
-                  px: 3,
-                  py: 1,
-                }}
-                variant="contained"
-              >
-                Reveal Votes ({votedCount}/{activeVoters.length})
-              </Button>
+              isAdmin ? (
+                <Button
+                  color="primary"
+                  disabled={activeVoters.length === 0}
+                  onClick={revealVotes}
+                  startIcon={<VisibilityIcon />}
+                  sx={{
+                    borderRadius: '20px',
+                    boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
+                    fontWeight: 700,
+                    px: 3,
+                    py: 1,
+                  }}
+                  variant="contained"
+                >
+                  Reveal Votes ({votedCount}/{activeVoters.length})
+                </Button>
+              ) : (
+                <Chip
+                  color="default"
+                  icon={<VisibilityIcon sx={{ fontSize: 16 }} />}
+                  label={`Votes: ${votedCount}/${activeVoters.length} cast (Waiting for Host to reveal)`}
+                  sx={{
+                    bgcolor: 'action.hover',
+                    fontWeight: 700,
+                    px: 1,
+                    py: 2,
+                  }}
+                  variant="outlined"
+                />
+              )
             ) : (
               isAdmin && (
                 <Button

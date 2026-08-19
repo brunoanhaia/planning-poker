@@ -204,6 +204,8 @@ export class WebSocketHandler {
         const updated = roomManager.revealVotes(ws.roomId, ws.userId);
         if (updated) {
           this.broadcastRoomState(ws.roomId);
+        } else {
+          this.sendError(ws, 'Only administrators or co-hosts can reveal votes.');
         }
         break;
       }

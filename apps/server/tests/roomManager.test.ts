@@ -144,4 +144,34 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     rm.endSession(roomId, hostId);
     expect(rm.getRoom(roomId)!.isEnded).toBe(true);
   });
+
+  it('should only allow admin or co-host to reveal votes and reject non-admin', () => {
+    const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+    const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
+    const bobId = bobResult.participant!.id;
+    const charlieResult = rm.joinRoom(roomId, 'Charlie', '🐱', '#10b981')!;
+    const charlieId = charlieResult.participant!.id;
+
+    // Bob (non-admin) tries to reveal votes -> rejected
+    const nonAdminReveal = rm.revealVotes(roomId, bobId);
+    expect(nonAdminReveal).toBeNull();
+    expect(rm.getRoom(roomId)!.votesRevealed).toBe(false);
+
+    // Promote Charlie to Co-Admin
+    rm.promoteCoAdmin(roomId, hostId, charlieId);
+
+    // Charlie (co-admin) can reveal votes
+    const coAdminReveal = rm.revealVotes(roomId, charlieId);
+    expect(coAdminReveal).not.toBeNull();
+    expect(rm.getRoom(roomId)!.votesRevealed).toBe(true);
+
+    // Reset votes
+    rm.resetVotes(roomId, hostId);
+    expect(rm.getRoom(roomId)!.votesRevealed).toBe(false);
+
+    // Alice (primary admin) can reveal votes
+    const adminReveal = rm.revealVotes(roomId, hostId);
+    expect(adminReveal).not.toBeNull();
+    expect(rm.getRoom(roomId)!.votesRevealed).toBe(true);
+  });
 });

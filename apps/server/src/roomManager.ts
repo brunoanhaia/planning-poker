@@ -252,9 +252,9 @@ export class RoomManager {
     return room;
   }
 
-  public revealVotes(roomId: string, _userId: string): RoomState | null {
+  public revealVotes(roomId: string, userId: string): RoomState | null {
     const room = this.getRoom(roomId);
-    if (!room) return null;
+    if (!room || !this.isUserAdmin(room, userId)) return null;
 
     room.votesRevealed = true;
     return room;

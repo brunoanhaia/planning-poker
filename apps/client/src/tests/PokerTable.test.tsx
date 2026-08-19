@@ -111,4 +111,52 @@ describe('PokerTable Component', () => {
     expect(screen.getByText(/Reveal Votes/i)).toBeInTheDocument();
     expect(screen.getByText('0:45')).toBeInTheDocument();
   });
+
+  it('renders waiting status instead of reveal button for non-admin users', () => {
+    vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue({
+      addStory: vi.fn(),
+      bulkAddStories: vi.fn(),
+      changeDeck: vi.fn(),
+      clearError: vi.fn(),
+      clearKickedMessage: vi.fn(),
+      createRoom: vi.fn(),
+      currentUserId: 'user_2',
+      deleteStory: vi.fn(),
+      endSession: vi.fn(),
+      error: null,
+      isAdmin: false,
+      isConnected: true,
+      isHost: false,
+      joinRoom: vi.fn(),
+      kickedMessage: null,
+      kickParticipant: vi.fn(),
+      leaveRoom: vi.fn(),
+      pauseTimer: vi.fn(),
+      promoteCoAdmin: vi.fn(),
+      resetTimer: vi.fn(),
+      resetVotes: vi.fn(),
+      revealVotes: vi.fn(),
+      roomState: mockRoomState,
+      setCurrentStory: vi.fn(),
+      startTimer: vi.fn(),
+      submitVote: vi.fn(),
+      toggleAutoReveal: vi.fn(),
+      toggleLockRoom: vi.fn(),
+      toggleSpectator: vi.fn(),
+      toggleUserRole: vi.fn(),
+      transferAdmin: vi.fn(),
+      updateRoomTitle: vi.fn(),
+      updateStoryEstimate: vi.fn(),
+    });
+
+    const theme = createTheme();
+    render(
+      <ThemeProvider theme={theme}>
+        <PokerTable />
+      </ThemeProvider>
+    );
+
+    expect(screen.queryByRole('button', { name: /Reveal Votes/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Waiting for Host to reveal/i)).toBeInTheDocument();
+  });
 });
