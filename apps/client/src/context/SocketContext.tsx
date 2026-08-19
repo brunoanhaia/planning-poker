@@ -41,7 +41,7 @@ interface SocketContextValue {
     toggleUserRole: (targetUserId: string) => void;
     transferAdmin: (targetUserId: string) => void;
     updateRoomTitle: (title: string) => void;
-    updateStoryEstimate: (storyId: string, estimate: number | string) => void;
+    updateStoryEstimate: (storyId: string, estimate: number | string | null) => void;
 }
 
 const SocketContext = createContext<SocketContextValue | undefined>(undefined);
@@ -217,7 +217,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         send('SET_CURRENT_STORY', { storyIndex });
     };
 
-    const updateStoryEstimate = (storyId: string, estimate: number | string) => {
+    const updateStoryEstimate = (storyId: string, estimate: number | string | null) => {
         send('UPDATE_STORY_ESTIMATE', { estimate, storyId });
     };
 

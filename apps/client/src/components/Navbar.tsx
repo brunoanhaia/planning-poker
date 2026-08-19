@@ -33,14 +33,12 @@ import { useSocket } from '../context/SocketContext';
 
 interface NavbarProps {
     darkMode: boolean;
-    onOpenBacklog: () => void;
     onOpenSettings: () => void;
     onToggleDarkMode: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
     darkMode,
-    onOpenBacklog,
     onOpenSettings,
     onToggleDarkMode,
 }) => {
@@ -258,18 +256,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 />
                             )}
 
-                            {/* Backlog Drawer Button */}
-                            <Tooltip title="Backlog Stories">
-                                <IconButton
-                                    aria-label="Backlog stories"
-                                    color="primary"
-                                    onClick={onOpenBacklog}
-                                    size="small"
-                                    sx={{ border: '1px solid rgba(148, 163, 184, 0.2)' }}
-                                >
-                                    <FormatListBulletedIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
 
                             {/* Settings Modal (Admin only) */}
                             {isAdmin && (

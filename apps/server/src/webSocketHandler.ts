@@ -408,6 +408,8 @@ export class WebSocketHandler {
                 if (!updated) {
                     return this.sendError(ws, 'Only administrators can change the active story.');
                 }
+                
+                roomManager.resetTimer(ws.roomId, ws.userId);
                 this.broadcastRoomState(ws.roomId);
                 break;
             }

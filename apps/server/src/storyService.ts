@@ -93,7 +93,7 @@ export const updateStoryEstimateInRoom = (
     }
 
     story.finalEstimate = estimate;
-    story.status = 'completed';
+    story.status = estimate === null ? 'pending' : 'completed';
     return room;
 };
 

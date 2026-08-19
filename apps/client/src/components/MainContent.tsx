@@ -7,16 +7,16 @@ import {
     DialogContent,
     DialogTitle,
     Typography,
+    Grid,
 } from '@mui/material';
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
-import { CardDeck } from './CardDeck';
 import { Home } from './Home';
 import { Navbar } from './Navbar';
-import { PokerTable } from './PokerTable';
-import { ResultsPanel } from './ResultsPanel';
 import { RoomSettingsModal } from './RoomSettingsModal';
+import { ParticipantsPanel } from './ParticipantsPanel';
+import { EstimationPanel } from './EstimationPanel';
 import { StoryBacklog } from './StoryBacklog';
 
 export interface MainContentProps {
@@ -26,7 +26,6 @@ export interface MainContentProps {
 
 export const MainContent: React.FC<MainContentProps> = ({ darkMode, onToggleDarkMode }) => {
     const { clearKickedMessage, kickedMessage, roomState } = useSocket();
-    const [backlogOpen, setBacklogOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
 
     return (
@@ -40,7 +39,6 @@ export const MainContent: React.FC<MainContentProps> = ({ darkMode, onToggleDark
         >
             <Navbar
                 darkMode={darkMode}
-                onOpenBacklog={() => setBacklogOpen(true)}
                 onOpenSettings={() => setSettingsOpen(true)}
                 onToggleDarkMode={onToggleDarkMode}
             />
@@ -49,7 +47,7 @@ export const MainContent: React.FC<MainContentProps> = ({ darkMode, onToggleDark
                 <Home />
             ) : (
                 <Container
-                    maxWidth="lg"
+                    maxWidth="xl"
                     sx={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -58,17 +56,27 @@ export const MainContent: React.FC<MainContentProps> = ({ darkMode, onToggleDark
                         py: { sm: 3, xs: 1.5 },
                     }}
                 >
-                    <PokerTable />
-                    <ResultsPanel />
-                    <CardDeck />
+                    <Grid container spacing={3}>
+                        {/* Participants Column (Left on Desktop, Top on Mobile) */}
+                        <Grid item xs={12} md={3}>
+                            <ParticipantsPanel />
+                        </Grid>
+
+                        {/* Estimation Column (Center on Desktop, Middle on Mobile) */}
+                        <Grid item xs={12} md={5} lg={6}>
+                            <EstimationPanel />
+                        </Grid>
+
+                        {/* Backlog Column (Right on Desktop, Bottom on Mobile) */}
+                        <Grid item xs={12} md={4} lg={3}>
+                            <StoryBacklog />
+                        </Grid>
+                    </Grid>
                 </Container>
             )}
 
             {roomState && (
-                <>
-                    <StoryBacklog onClose={() => setBacklogOpen(false)} open={backlogOpen} />
-                    <RoomSettingsModal onClose={() => setSettingsOpen(false)} open={settingsOpen} />
-                </>
+                <RoomSettingsModal onClose={() => setSettingsOpen(false)} open={settingsOpen} />
             )}
 
             {/* Kicked from Room Notification Dialog */}

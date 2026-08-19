@@ -28,6 +28,9 @@ export const ResultsPanel: React.FC = () => {
     const [isManualEditOpen, setIsManualEditOpen] = useState(false);
     const [manualScore, setManualScore] = useState('');
     const [allStoriesCompletedNotice, setAllStoriesCompletedNotice] = useState(false);
+    
+    const [confirmNextStoryOpen, setConfirmNextStoryOpen] = useState(false);
+    const [pendingEstimate, setPendingEstimate] = useState<number | string | undefined>(undefined);
 
     const {
         average,
@@ -63,12 +66,17 @@ export const ResultsPanel: React.FC = () => {
         return hasNumeric ? Number(average) : modeVote;
     };
 
-    const handleSaveEstimate = (customEstimate?: number | string) => {
+    const promptSaveEstimate = (customEstimate?: number | string) => {
+        setPendingEstimate(customEstimate);
+        setConfirmNextStoryOpen(true);
+    };
+
+    const confirmSaveEstimate = () => {
         if (!currentStory || !isAdmin || !roomState) {
             return;
         }
 
-        const finalVal = computeFinalEstimate(customEstimate);
+        const finalVal = computeFinalEstimate(pendingEstimate);
         updateStoryEstimate(currentStory.id, finalVal);
 
         const nextIndex = roomState.currentStoryIndex + 1;
@@ -78,6 +86,7 @@ export const ResultsPanel: React.FC = () => {
             setAllStoriesCompletedNotice(true);
         }
 
+        setConfirmNextStoryOpen(false);
         setIsManualEditOpen(false);
     };
 
@@ -142,7 +151,7 @@ export const ResultsPanel: React.FC = () => {
                             </Button>
                             <Button
                                 color="success"
-                                onClick={() => handleSaveEstimate()}
+                                onClick={() => promptSaveEstimate()}
                                 startIcon={<SaveIcon />}
                                 sx={{ borderRadius: '12px', fontWeight: 700 }}
                                 variant="contained"
@@ -379,15 +388,54 @@ export const ResultsPanel: React.FC = () => {
                         </Box>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3 }}>
-                    <Button onClick={() => setIsManualEditOpen(false)}>Cancel</Button>
+                <DialogActions sx={{ pb: 2, px: 3, justifyContent: 'space-between' }}>
                     <Button
-                        disabled={!manualScore.trim()}
-                        onClick={() => handleSaveEstimate(manualScore.trim())}
-                        sx={{ fontWeight: 700 }}
+                        color="error"
+                        onClick={() => {
+                            if (currentStory) {
+                                updateStoryEstimate(currentStory.id, null);
+                                setIsManualEditOpen(false);
+                            }
+                        }}
+                    >
+                        Reset
+                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button onClick={() => setIsManualEditOpen(false)}>Cancel</Button>
+                        <Button
+                            disabled={!manualScore.trim()}
+                            onClick={() => promptSaveEstimate(manualScore.trim())}
+                            sx={{ fontWeight: 700 }}
+                            variant="contained"
+                        >
+                            Save & Next
+                        </Button>
+                    </Box>
+                </DialogActions>
+            </Dialog>
+
+            {/* Confirm Next Story Dialog */}
+            <Dialog
+                fullWidth
+                maxWidth="xs"
+                onClose={() => setConfirmNextStoryOpen(false)}
+                open={confirmNextStoryOpen}
+                PaperProps={{ sx: { borderRadius: '16px', p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Confirm Story Change</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2">
+                        Are you sure you want to save this estimate and advance to the next story? This will affect all participants and reset the timer.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3 }}>
+                    <Button onClick={() => setConfirmNextStoryOpen(false)}>Cancel</Button>
+                    <Button
+                        color="primary"
+                        onClick={confirmSaveEstimate}
                         variant="contained"
                     >
-                        Save & Next
+                        Save & Advance
                     </Button>
                 </DialogActions>
             </Dialog>

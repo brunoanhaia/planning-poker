@@ -29,12 +29,7 @@ import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
 
-interface StoryBacklogProps {
-    onClose: () => void;
-    open: boolean;
-}
-
-export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => {
+export const StoryBacklog: React.FC = () => {
     const {
         addStory,
         bulkAddStories,
@@ -60,6 +55,8 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
     // Bulk Import state
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [bulkText, setBulkText] = useState('');
+
+    const [pendingStoryChange, setPendingStoryChange] = useState<number | null>(null);
 
     if (!roomState) {
         return null;
@@ -125,16 +122,15 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
 
     return (
         <>
-            <Drawer
-                anchor="right"
-                onClose={onClose}
-                open={open}
-                PaperProps={{
-                    sx: {
-                        boxSizing: 'border-box',
-                        p: 3,
-                        width: { sm: 420, xs: '100%' },
-                    },
+            <Paper
+                elevation={1}
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    p: 2,
+                    borderRadius: '16px',
+                    height: '100%',
+                    minHeight: 400,
                 }}
             >
                 {/* Header */}
@@ -149,9 +145,6 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                     <Typography sx={{ fontWeight: 800 }} variant="h6">
                         Story Backlog ({roomState.stories.length})
                     </Typography>
-                    <IconButton onClick={onClose}>
-                        <CloseIcon />
-                    </IconButton>
                 </Box>
 
                 {/* Action bar */}
@@ -392,7 +385,7 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                                                         color="primary"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            setCurrentStory(index);
+                                                            setPendingStoryChange(index);
                                                         }}
                                                         size="small"
                                                     >
@@ -419,7 +412,7 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                         );
                     })}
                 </List>
-            </Drawer>
+            </Paper>
 
             {/* Manual Score Edit Modal */}
             <Dialog
@@ -460,25 +453,38 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                         </Box>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3 }}>
-                    <Button onClick={() => setEditingStory(null)}>Cancel</Button>
+                <DialogActions sx={{ pb: 2, px: 3, justifyContent: 'space-between' }}>
                     <Button
-                        disabled={!editScoreValue.trim()}
+                        color="error"
                         onClick={() => {
                             if (editingStory) {
-                                const parsedNum = Number(editScoreValue.trim());
-                                const finalVal = !isNaN(parsedNum)
-                                    ? parsedNum
-                                    : editScoreValue.trim();
-                                updateStoryEstimate(editingStory.id, finalVal);
+                                updateStoryEstimate(editingStory.id, null);
                                 setEditingStory(null);
                             }
                         }}
-                        sx={{ fontWeight: 700 }}
-                        variant="contained"
                     >
-                        Save Score
+                        Reset
                     </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button onClick={() => setEditingStory(null)}>Cancel</Button>
+                        <Button
+                            disabled={!editScoreValue.trim()}
+                            onClick={() => {
+                                if (editingStory) {
+                                    const parsedNum = Number(editScoreValue.trim());
+                                    const finalVal = !isNaN(parsedNum)
+                                        ? parsedNum
+                                        : editScoreValue.trim();
+                                    updateStoryEstimate(editingStory.id, finalVal);
+                                    setEditingStory(null);
+                                }
+                            }}
+                            sx={{ fontWeight: 700 }}
+                            variant="contained"
+                        >
+                            Save Score
+                        </Button>
+                    </Box>
                 </DialogActions>
             </Dialog>
 
@@ -515,6 +521,37 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                         variant="contained"
                     >
                         Import Stories
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Confirm Story Change Modal */}
+            <Dialog
+                fullWidth
+                maxWidth="xs"
+                onClose={() => setPendingStoryChange(null)}
+                open={pendingStoryChange !== null}
+                PaperProps={{ sx: { borderRadius: '16px', p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 800 }}>Confirm Story Change</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2">
+                        Are you sure you want to change the active story? This will affect all participants and reset the timer.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3 }}>
+                    <Button onClick={() => setPendingStoryChange(null)}>Cancel</Button>
+                    <Button
+                        color="primary"
+                        onClick={() => {
+                            if (pendingStoryChange !== null) {
+                                setCurrentStory(pendingStoryChange);
+                                setPendingStoryChange(null);
+                            }
+                        }}
+                        variant="contained"
+                    >
+                        Change Story
                     </Button>
                 </DialogActions>
             </Dialog>
