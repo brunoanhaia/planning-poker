@@ -6,8 +6,8 @@ Welcome to the PlanItPoker repository! As an AI agent working in this project, y
 
 - **Type**: Real-time Planning Poker application.
 - **Architecture**: Monorepo using npm Workspaces.
-    - `apps/client`: React, Vite, Tailwind CSS (or Vanilla CSS based on preference), Socket.io-client.
-    - `apps/server`: Node.js, Express, Socket.io.
+    - `apps/client`: React, Vite, Tailwind CSS (or Vanilla CSS based on preference), native WebSocket client.
+    - `apps/server`: Node.js, Express, native WebSocket (`ws`).
     - `packages/shared`: TypeScript types, enums, and constants.
 
 ## General Guidelines
@@ -33,7 +33,7 @@ This repository implements the **Antigravity Customization System**.
 
 - Custom **Skills** are located in `.agents/skills/`. You should proactively utilize these skills when performing related tasks:
     - `clean-code-refactoring`: For strict clean code adherence.
-    - `realtime-socketio-manager`: For robust WebSocket management.
+    - `realtime-websocket-manager`: For robust WebSocket management using native WebSockets.
     - `react-clean-architecture`: For separating React logic into custom hooks.
     - `accessible-ui-components`: For WAI-ARIA compliant frontend components.
     - `modular-css-architecture`: For scoped, vanilla CSS/Modules styling.

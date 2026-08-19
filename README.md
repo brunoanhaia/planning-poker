@@ -8,8 +8,8 @@ The application uses a client-server model communicating over WebSockets for rea
 
 ### Monorepo Structure
 
-- **`apps/client`**: The frontend application. Built with React, Vite, and Tailwind CSS. It uses `socket.io-client` to connect to the backend.
-- **`apps/server`**: The backend server. Built with Node.js, Express, and `socket.io`. It manages the state of all active rooms and handles WebSocket connections.
+- **`apps/client`**: The frontend application. Built with React, Vite, and Tailwind CSS. It uses native WebSocket to connect to the backend.
+- **`apps/server`**: The backend server. Built with Node.js, Express, and native WebSocket (`ws`). It manages the state of all active rooms and handles WebSocket connections.
 - **`packages/shared`**: A shared library containing TypeScript interfaces, enums, and constants used by both the client and server.
 
 ### System Diagram
@@ -17,7 +17,7 @@ The application uses a client-server model communicating over WebSockets for rea
 ```mermaid
 graph TD
     Client[Client App: React + Vite]
-    Server[Server App: Node.js + Socket.io]
+    Server[Server App: Node.js + WebSocket]
     Shared[Shared Package: Types & Constants]
 
     Client -- WebSockets --> Server

@@ -1,6 +1,6 @@
 ---
-name: realtime-socketio-manager
-description: Architect robust, scalable, and decoupled WebSocket communication using Socket.io. Use this skill when adding new real-time features, events, or handling connection lifecycles.
+name: realtime-websocket-manager
+description: Architect robust, scalable, and decoupled WebSocket communication using native WebSockets. Use this skill when adding new real-time features, events, or handling connection lifecycles.
 license: Complete terms in LICENSE.txt
 ---
 
@@ -8,9 +8,9 @@ This skill ensures that WebSocket implementations are resilient, secure, and arc
 
 ## Architecture Guidelines
 
-- **Decouple Logic from Transport**: Do not write business logic inside Socket.io event listeners. The event listener should only extract the payload, validate it, and pass it to an independent service/controller (e.g., `RoomManager`).
-- **Strict Typing for Events**: Always use shared TypeScript definitions (from the `@planitpoker/shared` package) for event names and payload structures. Never use raw strings for event names.
-- **Error Boundary and Acknowledgements**: Every socket event that mutates state must handle errors gracefully and use Socket.io acknowledgements (callbacks) to confirm success or failure to the client.
+- **Decouple Logic from Transport**: Do not write business logic inside WebSocket message handlers. The handler should only extract the payload, validate it, and pass it to an independent service/controller (e.g., `RoomManager`).
+- **Strict Typing for Events**: Always use shared TypeScript definitions (from the `@planitpoker/shared` package) for message types and payload structures. Never use raw strings for message types.
+- **Error Boundary and Acknowledgements**: Every WebSocket message that mutates state must handle errors gracefully and use acknowledgements (e.g., reply messages) to confirm success or failure to the client.
 - **State Synchronization**: Guarantee that the source of truth remains on the server. When state changes, broadcast the minimal necessary delta or a sanitized full state to the clients.
 - **Resilience**: Implement logic to handle disconnects, reconnects, and stale connections (e.g., cleaning up user state if they drop out of a room).
 
