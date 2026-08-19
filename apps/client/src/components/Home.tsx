@@ -28,7 +28,9 @@ export const Home: React.FC = () => {
   const [tabIndex, setTabIndex] = useState(0);
   const [userName, setUserName] = useState(() => localStorage.getItem('planit_name') || '');
   const [avatar, setAvatar] = useState(() => localStorage.getItem('planit_avatar') || AVATARS[0]);
-  const [color, setColor] = useState(() => localStorage.getItem('planit_color') || AVATAR_COLORS[0]);
+  const [color, setColor] = useState(
+    () => localStorage.getItem('planit_color') || AVATAR_COLORS[0]
+  );
 
   // Create room form
   const [roomTitle, setRoomTitle] = useState('');
@@ -132,7 +134,11 @@ export const Home: React.FC = () => {
             sx={{ mb: 2.5 }}
           />
 
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 1 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontWeight: 600, display: 'block', mb: 1 }}
+          >
             Choose Avatar & Theme Color:
           </Typography>
 
@@ -208,12 +214,15 @@ export const Home: React.FC = () => {
                 onChange={(e) => setDeckType(e.target.value as DeckType)}
               >
                 <MenuItem value="fibonacci">Fibonacci (1, 2, 3, 5, 8, 13, 21...)</MenuItem>
-                <MenuItem value="modified_fibonacci">Modified Fibonacci (0, 0.5, 1, 2, 3, 5...)</MenuItem>
+                <MenuItem value="modified_fibonacci">
+                  Modified Fibonacci (0, 0.5, 1, 2, 3, 5...)
+                </MenuItem>
                 <MenuItem value="tshirt">T-Shirt Sizes (XS, S, M, L, XL, XXL)</MenuItem>
                 <MenuItem value="powers_of_2">Powers of 2 (1, 2, 4, 8, 16, 32...)</MenuItem>
               </Select>
               <FormHelperText>
-                Deck cards preview: {deckType !== 'custom' ? PRESET_DECKS[deckType].join(', ') : 'Custom'}
+                Deck cards preview:{' '}
+                {deckType !== 'custom' ? PRESET_DECKS[deckType].join(', ') : 'Custom'}
               </FormHelperText>
             </FormControl>
 
@@ -244,7 +253,10 @@ export const Home: React.FC = () => {
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
               required
-              inputProps={{ maxLength: 6, style: { textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700 } }}
+              inputProps={{
+                maxLength: 6,
+                style: { textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 700 },
+              }}
               sx={{ mb: 3 }}
             />
 

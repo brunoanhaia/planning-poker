@@ -315,11 +315,7 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
         </DialogContent>
         <DialogActions sx={{ pb: 2, px: 3 }}>
           <Button onClick={() => setIsBulkOpen(false)}>Cancel</Button>
-          <Button
-            disabled={!bulkText.trim()}
-            onClick={handleBulkImport}
-            variant="contained"
-          >
+          <Button disabled={!bulkText.trim()} onClick={handleBulkImport} variant="contained">
             Import Stories
           </Button>
         </DialogActions>

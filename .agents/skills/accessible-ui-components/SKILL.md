@@ -8,7 +8,7 @@ This skill ensures that all UI components are fully accessible, semantically cor
 
 ## Accessibility Design Rules
 
-- **Semantic HTML First**: Always prefer native semantic HTML elements (`<button>`, `<dialog>`, `<nav>`, `<fieldset>`) over generic `<div>` or `<span>` elements with custom behaviors. 
+- **Semantic HTML First**: Always prefer native semantic HTML elements (`<button>`, `<dialog>`, `<nav>`, `<fieldset>`) over generic `<div>` or `<span>` elements with custom behaviors.
 - **Keyboard Navigation**: Ensure every interactive component can be fully controlled using the keyboard (Tab, Enter, Space, Escape, and Arrow keys). Manage focus correctly, especially inside modals (focus trapping) and dropdowns.
 - **ARIA Attributes**: When custom complex components are necessary, use WAI-ARIA roles, states, and properties (`aria-expanded`, `aria-hidden`, `aria-describedby`) to communicate the component's state to assistive technologies.
 - **Visual Feedback**: Never rely solely on color to convey information. Ensure distinct visual focus rings for keyboard users.

@@ -4,7 +4,17 @@ import SecurityIcon from '@mui/icons-material/Security';
 import StarIcon from '@mui/icons-material/Star';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { Avatar, Box, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Tooltip, Typography } from '@mui/material';
+import {
+  Avatar,
+  Box,
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import { Participant } from '@planitpoker/shared';
 import React, { useState } from 'react';
 
@@ -148,9 +158,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
           <ListItemIcon>
             <SwapHorizIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>
-            {participant.isSpectator ? 'Make Voter' : 'Make Spectator'}
-          </ListItemText>
+          <ListItemText>{participant.isSpectator ? 'Make Voter' : 'Make Spectator'}</ListItemText>
         </MenuItem>
 
         <MenuItem onClick={handlePromoteCoAdmin}>
@@ -209,8 +217,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
           sx={{
             height: '100%',
             position: 'relative',
-            transform:
-              votesRevealed && participant.hasVoted ? 'rotateY(180deg)' : 'rotateY(0deg)',
+            transform: votesRevealed && participant.hasVoted ? 'rotateY(180deg)' : 'rotateY(0deg)',
             transformStyle: 'preserve-3d',
             transition: 'transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1)',
             width: '100%',

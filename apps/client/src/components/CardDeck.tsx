@@ -56,7 +56,11 @@ export const CardDeck: React.FC = () => {
         py: 2,
       }}
     >
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}
+      >
         Select your estimation card:
       </Typography>
 
@@ -97,7 +101,10 @@ export const CardDeck: React.FC = () => {
                 color: isSelected ? '#ffffff' : 'text.primary',
                 border: isSelected
                   ? '2px solid #818cf8'
-                  : (theme) => (theme.palette.mode === 'dark' ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)'),
+                  : (theme) =>
+                      theme.palette.mode === 'dark'
+                        ? '1px solid rgba(255,255,255,0.1)'
+                        : '1px solid rgba(0,0,0,0.1)',
                 transform: isSelected ? 'translateY(-12px) scale(1.08)' : 'none',
                 '&:hover': {
                   transform: isSelected ? 'translateY(-14px) scale(1.1)' : 'translateY(-6px)',

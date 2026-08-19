@@ -47,7 +47,10 @@ export const getAppTheme = (mode: PaletteMode) =>
             transition: 'all 0.2s ease-in-out',
             '&:hover': {
               transform: 'translateY(-2px)',
-              boxShadow: mode === 'dark' ? '0 10px 20px -5px rgba(99, 102, 241, 0.4)' : '0 10px 20px -5px rgba(99, 102, 241, 0.25)',
+              boxShadow:
+                mode === 'dark'
+                  ? '0 10px 20px -5px rgba(99, 102, 241, 0.4)'
+                  : '0 10px 20px -5px rgba(99, 102, 241, 0.25)',
             },
           },
         },
@@ -57,10 +60,14 @@ export const getAppTheme = (mode: PaletteMode) =>
           root: {
             backgroundImage: 'none',
             backdropFilter: 'blur(16px)',
-            boxShadow: mode === 'dark'
-              ? '0 8px 32px 0 rgba(0, 0, 0, 0.36)'
-              : '0 8px 30px 0 rgba(0, 0, 0, 0.06)',
-            border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.06)',
+            boxShadow:
+              mode === 'dark'
+                ? '0 8px 32px 0 rgba(0, 0, 0, 0.36)'
+                : '0 8px 30px 0 rgba(0, 0, 0, 0.06)',
+            border:
+              mode === 'dark'
+                ? '1px solid rgba(255, 255, 255, 0.08)'
+                : '1px solid rgba(0, 0, 0, 0.06)',
           },
         },
       },

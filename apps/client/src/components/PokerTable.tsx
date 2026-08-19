@@ -4,7 +4,17 @@ import PauseIcon from '@mui/icons-material/Pause';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { Box, Button, Chip, IconButton, Menu, MenuItem, Paper, Tooltip, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Chip,
+  IconButton,
+  Menu,
+  MenuItem,
+  Paper,
+  Tooltip,
+  Typography,
+} from '@mui/material';
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';

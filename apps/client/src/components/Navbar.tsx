@@ -79,9 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         position="sticky"
         sx={{
           backgroundColor: (theme) =>
-            theme.palette.mode === 'dark'
-              ? 'rgba(15, 23, 42, 0.85)'
-              : 'rgba(255, 255, 255, 0.85)',
+            theme.palette.mode === 'dark' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)',
           backdropFilter: 'blur(12px)',
           borderBottom: (theme) =>
             theme.palette.mode === 'dark'

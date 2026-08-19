@@ -7,13 +7,14 @@ module.exports = {
     },
   },
   parser: '@typescript-eslint/parser',
-  plugins: ['@typescript-eslint', 'react', 'react-hooks', 'perfectionist', 'vitest'],
+  plugins: ['@typescript-eslint', 'react', 'react-hooks', 'perfectionist', 'vitest', 'prettier'],
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
     'plugin:react/recommended',
     'plugin:react/jsx-runtime',
     'plugin:react-hooks/recommended',
+    'plugin:prettier/recommended',
   ],
   ignorePatterns: ['dist', '.eslintrc.cjs'],
   rules: {

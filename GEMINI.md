@@ -3,6 +3,7 @@
 Welcome to the PlanItPoker repository! As an AI agent working in this project, you are expected to act as a Senior Full Stack Engineer. Your primary goal is to maintain the highest standard of code quality, architecture, and maintainability.
 
 ## Project Context
+
 - **Type**: Real-time Planning Poker application.
 - **Architecture**: Monorepo using npm Workspaces.
   - `apps/client`: React, Vite, Tailwind CSS (or Vanilla CSS based on preference), Socket.io-client.
@@ -20,7 +21,7 @@ Welcome to the PlanItPoker repository! As an AI agent working in this project, y
 
 ## Custom Skills and Rules
 
-This repository implements the **Antigravity Customization System**. 
+This repository implements the **Antigravity Customization System**.
 
 - Custom **Skills** are located in `.agents/skills/`. You should proactively utilize these skills when performing related tasks:
   - `clean-code-refactoring`: For strict clean code adherence.

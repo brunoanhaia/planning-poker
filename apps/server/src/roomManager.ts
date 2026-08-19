@@ -1,10 +1,4 @@
-import {
-  DeckType,
-  Participant,
-  PRESET_DECKS,
-  RoomState,
-  Story,
-} from '@planitpoker/shared';
+import { DeckType, Participant, PRESET_DECKS, RoomState, Story } from '@planitpoker/shared';
 
 export class RoomManager {
   private rooms: Map<string, RoomState> = new Map();

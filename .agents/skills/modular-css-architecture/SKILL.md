@@ -10,7 +10,7 @@ This skill dictates how to write and organize CSS to ensure the React component'
 
 - **Separation of Concerns**: Keep the JSX focused strictly on semantic structure and state representation. All visual styling must reside in a dedicated `.module.css` (or `.css`) file adjacent to the component.
 - **Scoped Styling (CSS Modules)**: Use CSS Modules to scope styles locally to the component. This prevents class name collisions and global side effects. Import styles as a `styles` object (e.g., `className={styles.container}`).
-- **Semantic Class Naming**: Use clear, semantic class names that describe *what* the element is, not *how* it looks (e.g., use `.submitButton` instead of `.redBtnLarge`). If not using CSS Modules, enforce a naming convention like BEM (Block Element Modifier) to emulate scoping.
+- **Semantic Class Naming**: Use clear, semantic class names that describe _what_ the element is, not _how_ it looks (e.g., use `.submitButton` instead of `.redBtnLarge`). If not using CSS Modules, enforce a naming convention like BEM (Block Element Modifier) to emulate scoping.
 - **Dynamic Styling & Variants**: Handle dynamic states (like active, disabled, or variants) by conditionally applying semantic classes (using libraries like `clsx` or simple template literals: `className={\`${styles.button} ${isActive ? styles.active : ''}\`}`). Do NOT use inline styles for anything other than dynamic calculations (e.g., passing a specific `px` height calculated by JavaScript).
 - **CSS Variables (Custom Properties)**: Rely heavily on CSS variables (`var(--primary-color)`) defined at the root level for theming, colors, typography, and spacing. This ensures visual consistency without relying on utility classes.
 

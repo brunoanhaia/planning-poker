@@ -102,7 +102,9 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
             value={deckType}
           >
             <MenuItem value="fibonacci">Fibonacci (1, 2, 3, 5, 8, 13, 21...)</MenuItem>
-            <MenuItem value="modified_fibonacci">Modified Fibonacci (0, 0.5, 1, 2, 3, 5...)</MenuItem>
+            <MenuItem value="modified_fibonacci">
+              Modified Fibonacci (0, 0.5, 1, 2, 3, 5...)
+            </MenuItem>
             <MenuItem value="tshirt">T-Shirt Sizes (XS, S, M, L, XL, XXL)</MenuItem>
             <MenuItem value="powers_of_2">Powers of 2 (1, 2, 4, 8, 16, 32...)</MenuItem>
             <MenuItem value="custom">Custom Deck</MenuItem>
@@ -140,11 +142,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <FormControlLabel
             control={
-              <Switch
-                checked={roomState.autoReveal}
-                color="primary"
-                onChange={toggleAutoReveal}
-              />
+              <Switch checked={roomState.autoReveal} color="primary" onChange={toggleAutoReveal} />
             }
             label={
               <Box>
@@ -160,11 +158,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
 
           <FormControlLabel
             control={
-              <Switch
-                checked={roomState.isLocked}
-                color="error"
-                onChange={toggleLockRoom}
-              />
+              <Switch checked={roomState.isLocked} color="error" onChange={toggleLockRoom} />
             }
             label={
               <Box>
