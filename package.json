@@ -1,27 +1,27 @@
 {
-  "name": "planitpoker-monorepo",
-  "version": "1.0.0",
-  "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "scripts": {
-    "dev:server": "npm --workspace=@planitpoker/server run dev",
-    "dev:client": "npm --workspace=@planitpoker/client run dev",
-    "build:shared": "npm --workspace=@planitpoker/shared run build",
-    "build": "npm run build:shared && npm run build --workspaces --if-present",
-    "test:server": "npm --workspace=@planitpoker/server run test",
-    "test:client": "npm --workspace=@planitpoker/client run test",
-    "test": "npm run test --workspaces --if-present",
-    "lint:server": "npm --workspace=@planitpoker/server run lint",
-    "lint:client": "npm --workspace=@planitpoker/client run lint",
-    "lint": "npm run lint --workspaces --if-present",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
-  },
-  "devDependencies": {
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.6",
-    "prettier": "^3.9.6"
-  }
+    "name": "planitpoker-monorepo",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev:server": "npm --workspace=@planitpoker/server run dev",
+        "dev:client": "npm --workspace=@planitpoker/client run dev",
+        "build:shared": "npm --workspace=@planitpoker/shared run build",
+        "build": "npm run build:shared && npm run build --workspaces --if-present",
+        "test:server": "npm --workspace=@planitpoker/server run test",
+        "test:client": "npm --workspace=@planitpoker/client run test",
+        "test": "npm run test --workspaces --if-present",
+        "lint:server": "npm --workspace=@planitpoker/server run lint",
+        "lint:client": "npm --workspace=@planitpoker/client run lint",
+        "lint": "npm run lint --workspaces --if-present",
+        "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
+    },
+    "devDependencies": {
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.6",
+        "prettier": "^3.9.6"
+    }
 }

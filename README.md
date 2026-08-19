@@ -41,18 +41,18 @@ The application supports multiple users connecting to a single room to vote on t
 ### Functionalities
 
 - **Standard Features**:
-  - Join a room using a unique URL.
-  - Select a card to submit an estimate.
-  - Toggle personal status between Voter and Spectator.
-  - View the current story backlog.
-  - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
+    - Join a room using a unique URL.
+    - Select a card to submit an estimate.
+    - Toggle personal status between Voter and Spectator.
+    - View the current story backlog.
+    - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
 
 - **Administrative Features** (Restricted to Admin and Co-host):
-  - **Room Settings**: Rename the room, lock/unlock the room to prevent new joins, and change the estimation deck type (e.g., Fibonacci, T-Shirt sizes).
-  - **Participant Management**: Kick users from the room, promote users to Co-host, and transfer the primary Administrator role.
-  - **Voting Control**: Reveal all submitted votes, reset the current voting session, and finalize the agreed-upon estimate (automated average/mode or custom manual override) with automatic progression to the next backlog story.
-  - **Backlog Management**: Add new stories, delete stories, bulk import stories, and manually edit story estimates.
-  - **Time Management**: Start, stop, and manage a synchronized countdown timer for discussions.
+    - **Room Settings**: Rename the room, lock/unlock the room to prevent new joins, and change the estimation deck type (e.g., Fibonacci, T-Shirt sizes).
+    - **Participant Management**: Kick users from the room, promote users to Co-host, and transfer the primary Administrator role.
+    - **Voting Control**: Reveal all submitted votes, reset the current voting session, and finalize the agreed-upon estimate (automated average/mode or custom manual override) with automatic progression to the next backlog story.
+    - **Backlog Management**: Add new stories, delete stories, bulk import stories, and manually edit story estimates.
+    - **Time Management**: Start, stop, and manage a synchronized countdown timer for discussions.
 
 ### UI & Responsiveness Principles
 

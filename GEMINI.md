@@ -6,9 +6,9 @@ Welcome to the PlanItPoker repository! As an AI agent working in this project, y
 
 - **Type**: Real-time Planning Poker application.
 - **Architecture**: Monorepo using npm Workspaces.
-  - `apps/client`: React, Vite, Tailwind CSS (or Vanilla CSS based on preference), Socket.io-client.
-  - `apps/server`: Node.js, Express, Socket.io.
-  - `packages/shared`: TypeScript types, enums, and constants.
+    - `apps/client`: React, Vite, Tailwind CSS (or Vanilla CSS based on preference), Socket.io-client.
+    - `apps/server`: Node.js, Express, Socket.io.
+    - `packages/shared`: TypeScript types, enums, and constants.
 
 ## General Guidelines
 
@@ -25,12 +25,12 @@ Welcome to the PlanItPoker repository! As an AI agent working in this project, y
 This repository implements the **Antigravity Customization System**.
 
 - Custom **Skills** are located in `.agents/skills/`. You should proactively utilize these skills when performing related tasks:
-  - `clean-code-refactoring`: For strict clean code adherence.
-  - `realtime-socketio-manager`: For robust WebSocket management.
-  - `react-clean-architecture`: For separating React logic into custom hooks.
-  - `accessible-ui-components`: For WAI-ARIA compliant frontend components.
-  - `modular-css-architecture`: For scoped, vanilla CSS/Modules styling.
-  - `isolated-component-design`: For decoupled, pure UI components.
+    - `clean-code-refactoring`: For strict clean code adherence.
+    - `realtime-socketio-manager`: For robust WebSocket management.
+    - `react-clean-architecture`: For separating React logic into custom hooks.
+    - `accessible-ui-components`: For WAI-ARIA compliant frontend components.
+    - `modular-css-architecture`: For scoped, vanilla CSS/Modules styling.
+    - `isolated-component-design`: For decoupled, pure UI components.
 - Custom **Rules** are located in `.agents/rules/`. For instance, you must always respect the `update-readme.md` rule to keep documentation updated, and the `update-gemini-config.md` rule to maintain this `GEMINI.md` file updated whenever new skills are created.
 
 By adhering to this `GEMINI.md` file and the available skills/rules, you will ensure the long-term success and scalability of the PlanItPoker project.
