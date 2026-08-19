@@ -90,7 +90,9 @@ npm run dev
 
 ### Testing
 
-The project uses Vitest for testing. To run the test suites across all workspaces:
+The project uses Vitest for unit/integration testing and Playwright + Axe-core for E2E and visual validation.
+
+To run the unit/integration test suites across all workspaces:
 
 ```bash
 npm run test
@@ -102,14 +104,23 @@ To run tests in a specific workspace:
 npm run test --workspace=apps/server
 ```
 
-#### End-to-End Tests
+#### End-to-End & Exploratory Visual Testing
 
-The project uses Playwright for comprehensive End-to-End (E2E) testing across the entire system (frontend + backend). E2E tests are located in the `apps/e2e` workspace.
+The project uses Playwright with `@axe-core/playwright` for comprehensive End-to-End (E2E) testing and exploratory UI element collision/text visibility testing across multiple viewports:
+
+- **Breakpoints Tested**: Mobile (`320px`), Tablet (`768px`), and Desktop (`1280px`).
+- **Validation**: Ensures no overlapping interactive/text elements and guarantees full text readability and WCAG accessibility standards.
 
 To execute the full E2E test suite:
 
 ```bash
 npm --workspace=@planitpoker/e2e run test
+```
+
+To run the visual overlap exploratory validation specifically:
+
+```bash
+npm --workspace=@planitpoker/e2e run test tests/overlap-axe.spec.ts
 ```
 
 ### Code Formatting and Linting

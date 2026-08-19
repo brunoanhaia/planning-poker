@@ -8,11 +8,13 @@ description: Provides Gemini agents with guidelines to minimise token consumptio
 This skill offers a concise reference for Gemini agents to follow token‑saving principles during interactions.
 
 ## When to Apply
+
 - Before generating prompts or responses.
 - When embedding large data blocks (code, logs, JSON) in messages.
 - When selecting a model for a task.
 
 ## Guideline Summary
+
 - **Concise prompts** – keep messages short.
 - **Context pruning** – retain only relevant history; summarise older parts.
 - **External data via tools** – fetch large content with `view_file`, `grep_search`, `run_command` instead of inlining.
@@ -24,6 +26,7 @@ This skill offers a concise reference for Gemini agents to follow token‑saving
 - **Token budget awareness** – monitor usage; set limits for long‑running commands.
 
 ## Enforcement (pseudo‑code)
+
 ```yaml
 apply:
   when: "prompt_generated"
@@ -36,4 +39,5 @@ apply:
 ```
 
 ---
-*Skill file location: `.agents/skills/token-usage-best-practices/SKILL.md`.*
+
+_Skill file location: `.agents/skills/token-usage-best-practices/SKILL.md`._

@@ -115,7 +115,14 @@ export const Home: React.FC = () => {
                         mb: 4,
                         borderBottom: 1,
                         borderColor: 'divider',
-                        '& .MuiTab-root': { fontWeight: 700, fontSize: '15px' },
+                        '& .MuiTab-root': {
+                            fontWeight: 700,
+                            fontSize: '15px',
+                            '&.Mui-selected': {
+                                color: (theme) =>
+                                    theme.palette.mode === 'dark' ? '#818cf8' : '#4f46e5',
+                            },
+                        },
                     }}
                 >
                     <Tab icon={<RocketLaunchIcon />} label="Create Session" iconPosition="start" />
@@ -150,7 +157,15 @@ export const Home: React.FC = () => {
                         {AVATARS.map((emoji) => (
                             <Grid item key={emoji}>
                                 <Box
+                                    aria-label={`Select avatar ${emoji}`}
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => setAvatar(emoji)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            setAvatar(emoji);
+                                        }
+                                    }}
                                     sx={{
                                         width: 42,
                                         height: 42,
@@ -177,7 +192,15 @@ export const Home: React.FC = () => {
                         {AVATAR_COLORS.map((c) => (
                             <Grid item key={c}>
                                 <Box
+                                    aria-label={`Select color ${c}`}
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => setColor(c)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            setColor(c);
+                                        }
+                                    }}
                                     sx={{
                                         width: 32,
                                         height: 32,
@@ -212,8 +235,12 @@ export const Home: React.FC = () => {
                         />
 
                         <FormControl fullWidth sx={{ mb: 3 }}>
-                            <InputLabel>Estimation Deck Type</InputLabel>
+                            <InputLabel id="deck-type-select-label">
+                                Estimation Deck Type
+                            </InputLabel>
                             <Select
+                                labelId="deck-type-select-label"
+                                id="deck-type-select"
                                 value={deckType}
                                 label="Estimation Deck Type"
                                 onChange={(e) => setDeckType(e.target.value as DeckType)}

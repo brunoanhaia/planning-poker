@@ -142,6 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     {isAdmin && (
                                         <Tooltip title="Rename Room">
                                             <IconButton
+                                                aria-label="Rename room"
                                                 onClick={handleOpenEditTitle}
                                                 size="small"
                                                 sx={{ p: 0.2 }}
@@ -260,6 +261,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             {/* Backlog Drawer Button */}
                             <Tooltip title="Backlog Stories">
                                 <IconButton
+                                    aria-label="Backlog stories"
                                     color="primary"
                                     onClick={onOpenBacklog}
                                     size="small"
@@ -273,6 +275,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             {isAdmin && (
                                 <Tooltip title="Room Settings (Admin)">
                                     <IconButton
+                                        aria-label="Room settings"
                                         color="primary"
                                         onClick={onOpenSettings}
                                         size="small"
@@ -286,6 +289,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             {/* Leave Room */}
                             <Tooltip title="Leave Room">
                                 <IconButton
+                                    aria-label="Leave room"
                                     color="error"
                                     onClick={leaveRoom}
                                     size="small"
@@ -298,7 +302,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     )}
 
                     {/* Theme mode toggle */}
-                    <IconButton color="inherit" onClick={onToggleDarkMode}>
+                    <IconButton
+                        aria-label="Toggle dark mode"
+                        color="inherit"
+                        onClick={onToggleDarkMode}
+                    >
                         {darkMode ? <Brightness7Icon /> : <Brightness4Icon />}
                     </IconButton>
                 </Toolbar>
