@@ -1,5 +1,5 @@
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { Box, Paper, Typography, Button, Tooltip } from '@mui/material';
+import { Box, Button, Paper, Typography } from '@mui/material';
 import React from 'react';
 
 import { useSocket } from '../context/SocketContext';

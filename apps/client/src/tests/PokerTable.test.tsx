@@ -1,75 +1,101 @@
-import { ThemeProvider, createTheme } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material';
 import { RoomState } from '@planitpoker/shared';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { PokerTable } from '../components/PokerTable';
 import * as SocketContextModule from '../context/SocketContext';
 
 const mockRoomState: RoomState = {
-  id: 'ROOM01',
-  title: 'Sprint 10 Estimation',
-  hostId: 'user_1',
-  deckType: 'fibonacci',
   activeDeck: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'],
+  autoReveal: false,
+  createdAt: Date.now(),
+  currentStoryIndex: 0,
+  deckType: 'fibonacci',
+  hostId: 'user_1',
+  id: 'ROOM01',
+  isEnded: false,
+  isLocked: false,
   participants: [
     {
-      id: 'user_1',
-      name: 'Alice Host',
       avatar: '🚀',
       color: '#6366f1',
-      vote: 5,
       hasVoted: true,
-      isSpectator: false,
+      id: 'user_1',
+      isAdmin: true,
       isHost: true,
       isOnline: true,
+      isSpectator: false,
+      name: 'Alice Host',
+      vote: 5,
     },
     {
-      id: 'user_2',
-      name: 'Bob Voter',
       avatar: '🎨',
       color: '#3b82f6',
-      vote: null,
       hasVoted: false,
-      isSpectator: false,
+      id: 'user_2',
+      isAdmin: false,
       isHost: false,
       isOnline: true,
+      isSpectator: false,
+      name: 'Bob Voter',
+      vote: null,
     },
   ],
   stories: [
     {
-      id: 'story_1',
-      title: 'Setup Database Migration',
       description: 'Run initial migration script for postgres schema',
+      id: 'story_1',
       status: 'estimating',
+      title: 'Setup Database Migration',
     },
   ],
-  currentStoryIndex: 0,
+  timer: {
+    duration: 60,
+    isRunning: true,
+    remaining: 45,
+  },
+  title: 'Sprint 10 Estimation',
   votesRevealed: false,
-  createdAt: Date.now(),
 };
 
 describe('PokerTable Component', () => {
-  it('renders story title and reveal votes button', () => {
+  it('renders story title, reveal votes button, and live timer', () => {
     vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue({
-      roomState: mockRoomState,
-      currentUserId: 'user_1',
-      isConnected: true,
-      error: null,
-      createRoom: vi.fn(),
-      joinRoom: vi.fn(),
-      submitVote: vi.fn(),
-      revealVotes: vi.fn(),
-      resetVotes: vi.fn(),
-      toggleSpectator: vi.fn(),
       addStory: vi.fn(),
-      setCurrentStory: vi.fn(),
-      updateStoryEstimate: vi.fn(),
-      deleteStory: vi.fn(),
+      bulkAddStories: vi.fn(),
       changeDeck: vi.fn(),
-      leaveRoom: vi.fn(),
       clearError: vi.fn(),
+      clearKickedMessage: vi.fn(),
+      createRoom: vi.fn(),
+      currentUserId: 'user_1',
+      deleteStory: vi.fn(),
+      endSession: vi.fn(),
+      error: null,
+      isAdmin: true,
+      isConnected: true,
+      isHost: true,
+      joinRoom: vi.fn(),
+      kickedMessage: null,
+      kickParticipant: vi.fn(),
+      leaveRoom: vi.fn(),
+      pauseTimer: vi.fn(),
+      promoteCoAdmin: vi.fn(),
+      resetTimer: vi.fn(),
+      resetVotes: vi.fn(),
+      revealVotes: vi.fn(),
+      roomState: mockRoomState,
+      setCurrentStory: vi.fn(),
+      startTimer: vi.fn(),
+      submitVote: vi.fn(),
+      toggleAutoReveal: vi.fn(),
+      toggleLockRoom: vi.fn(),
+      toggleSpectator: vi.fn(),
+      toggleUserRole: vi.fn(),
+      transferAdmin: vi.fn(),
+      updateRoomTitle: vi.fn(),
+      updateStoryEstimate: vi.fn(),
     });
 
     const theme = createTheme();
@@ -83,5 +109,6 @@ describe('PokerTable Component', () => {
     expect(screen.getByText('Alice Host (You)')).toBeInTheDocument();
     expect(screen.getByText('Bob Voter')).toBeInTheDocument();
     expect(screen.getByText(/Reveal Votes/i)).toBeInTheDocument();
+    expect(screen.getByText('0:45')).toBeInTheDocument();
   });
 });

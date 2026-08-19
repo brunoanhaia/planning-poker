@@ -1,5 +1,16 @@
-import { ThemeProvider, CssBaseline, Box, Container } from '@mui/material';
-import React, { useState, useMemo } from 'react';
+import {
+  Box,
+  Button,
+  Container,
+  CssBaseline,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  ThemeProvider,
+  Typography,
+} from '@mui/material';
+import React, { useMemo, useState } from 'react';
 
 import { CardDeck } from './components/CardDeck';
 import { Home } from './components/Home';
@@ -15,23 +26,33 @@ const MainContent: React.FC<{
   darkMode: boolean;
   onToggleDarkMode: () => void;
 }> = ({ darkMode, onToggleDarkMode }) => {
-  const { roomState } = useSocket();
+  const { clearKickedMessage, kickedMessage, roomState } = useSocket();
   const [backlogOpen, setBacklogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
+    <Box
+      sx={{
+        bgcolor: 'background.default',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+      }}
+    >
       <Navbar
         darkMode={darkMode}
-        onToggleDarkMode={onToggleDarkMode}
         onOpenBacklog={() => setBacklogOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onToggleDarkMode={onToggleDarkMode}
       />
 
       {!roomState ? (
         <Home />
       ) : (
-        <Container maxWidth="lg" sx={{ flexGrow: 1, py: 3, display: 'flex', flexDirection: 'column' }}>
+        <Container
+          maxWidth="lg"
+          sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, py: 3 }}
+        >
           <PokerTable />
           <ResultsPanel />
           <CardDeck />
@@ -40,10 +61,28 @@ const MainContent: React.FC<{
 
       {roomState && (
         <>
-          <StoryBacklog open={backlogOpen} onClose={() => setBacklogOpen(false)} />
-          <RoomSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+          <StoryBacklog onClose={() => setBacklogOpen(false)} open={backlogOpen} />
+          <RoomSettingsModal onClose={() => setSettingsOpen(false)} open={settingsOpen} />
         </>
       )}
+
+      {/* Kicked from Room Notification Dialog */}
+      <Dialog
+        maxWidth="xs"
+        onClose={clearKickedMessage}
+        open={Boolean(kickedMessage)}
+        PaperProps={{ sx: { borderRadius: '16px', p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Session Notice</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">{kickedMessage}</Typography>
+        </DialogContent>
+        <DialogActions sx={{ pb: 2, px: 3 }}>
+          <Button onClick={clearKickedMessage} variant="contained">
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

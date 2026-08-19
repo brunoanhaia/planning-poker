@@ -1,74 +1,96 @@
-import { ThemeProvider, createTheme } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material';
 import { RoomState } from '@planitpoker/shared';
 import { render, screen } from '@testing-library/react';
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ResultsPanel } from '../components/ResultsPanel';
 import * as SocketContextModule from '../context/SocketContext';
 
 const mockRevealedRoomState: RoomState = {
-  id: 'ROOM01',
-  title: 'Sprint 10 Estimation',
-  hostId: 'user_1',
-  deckType: 'fibonacci',
   activeDeck: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'],
+  autoReveal: false,
+  createdAt: Date.now(),
+  currentStoryIndex: 0,
+  deckType: 'fibonacci',
+  hostId: 'user_1',
+  id: 'ROOM01',
+  isEnded: false,
+  isLocked: false,
   participants: [
     {
-      id: 'user_1',
-      name: 'Alice',
       avatar: '🚀',
       color: '#6366f1',
-      vote: 5,
       hasVoted: true,
-      isSpectator: false,
+      id: 'user_1',
+      isAdmin: true,
       isHost: true,
       isOnline: true,
+      isSpectator: false,
+      name: 'Alice',
+      vote: 5,
     },
     {
-      id: 'user_2',
-      name: 'Bob',
       avatar: '🎨',
       color: '#3b82f6',
-      vote: 5,
       hasVoted: true,
-      isSpectator: false,
+      id: 'user_2',
+      isAdmin: false,
       isHost: false,
       isOnline: true,
+      isSpectator: false,
+      name: 'Bob',
+      vote: 5,
     },
   ],
   stories: [
     {
       id: 'story_1',
-      title: 'Setup Database Migration',
       status: 'estimating',
+      title: 'Setup Database Migration',
     },
   ],
-  currentStoryIndex: 0,
+  timer: null,
+  title: 'Sprint 10 Estimation',
   votesRevealed: true,
-  createdAt: Date.now(),
 };
 
 describe('ResultsPanel Component', () => {
-  it('calculates 100% consensus and average score correctly', () => {
+  it('calculates 100% consensus, average score, and renders Accept Score for admin', () => {
     vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue({
-      roomState: mockRevealedRoomState,
-      currentUserId: 'user_1',
-      isConnected: true,
-      error: null,
-      createRoom: vi.fn(),
-      joinRoom: vi.fn(),
-      submitVote: vi.fn(),
-      revealVotes: vi.fn(),
-      resetVotes: vi.fn(),
-      toggleSpectator: vi.fn(),
       addStory: vi.fn(),
-      setCurrentStory: vi.fn(),
-      updateStoryEstimate: vi.fn(),
-      deleteStory: vi.fn(),
+      bulkAddStories: vi.fn(),
       changeDeck: vi.fn(),
-      leaveRoom: vi.fn(),
       clearError: vi.fn(),
+      clearKickedMessage: vi.fn(),
+      createRoom: vi.fn(),
+      currentUserId: 'user_1',
+      deleteStory: vi.fn(),
+      endSession: vi.fn(),
+      error: null,
+      isAdmin: true,
+      isConnected: true,
+      isHost: true,
+      joinRoom: vi.fn(),
+      kickedMessage: null,
+      kickParticipant: vi.fn(),
+      leaveRoom: vi.fn(),
+      pauseTimer: vi.fn(),
+      promoteCoAdmin: vi.fn(),
+      resetTimer: vi.fn(),
+      resetVotes: vi.fn(),
+      revealVotes: vi.fn(),
+      roomState: mockRevealedRoomState,
+      setCurrentStory: vi.fn(),
+      startTimer: vi.fn(),
+      submitVote: vi.fn(),
+      toggleAutoReveal: vi.fn(),
+      toggleLockRoom: vi.fn(),
+      toggleSpectator: vi.fn(),
+      toggleUserRole: vi.fn(),
+      transferAdmin: vi.fn(),
+      updateRoomTitle: vi.fn(),
+      updateStoryEstimate: vi.fn(),
     });
 
     const theme = createTheme();
@@ -80,6 +102,55 @@ describe('ResultsPanel Component', () => {
 
     expect(screen.getByText('Estimation Results')).toBeInTheDocument();
     expect(screen.getByText(/100% Consensus/i)).toBeInTheDocument();
-    expect(screen.getByText('5.0')).toBeInTheDocument(); // Average
+    expect(screen.getByText('5.0')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Accept Avg/i })).toBeInTheDocument();
+  });
+
+  it('hides Accept Score button for non-admin participants', () => {
+    vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue({
+      addStory: vi.fn(),
+      bulkAddStories: vi.fn(),
+      changeDeck: vi.fn(),
+      clearError: vi.fn(),
+      clearKickedMessage: vi.fn(),
+      createRoom: vi.fn(),
+      currentUserId: 'user_2',
+      deleteStory: vi.fn(),
+      endSession: vi.fn(),
+      error: null,
+      isAdmin: false,
+      isConnected: true,
+      isHost: false,
+      joinRoom: vi.fn(),
+      kickedMessage: null,
+      kickParticipant: vi.fn(),
+      leaveRoom: vi.fn(),
+      pauseTimer: vi.fn(),
+      promoteCoAdmin: vi.fn(),
+      resetTimer: vi.fn(),
+      resetVotes: vi.fn(),
+      revealVotes: vi.fn(),
+      roomState: mockRevealedRoomState,
+      setCurrentStory: vi.fn(),
+      startTimer: vi.fn(),
+      submitVote: vi.fn(),
+      toggleAutoReveal: vi.fn(),
+      toggleLockRoom: vi.fn(),
+      toggleSpectator: vi.fn(),
+      toggleUserRole: vi.fn(),
+      transferAdmin: vi.fn(),
+      updateRoomTitle: vi.fn(),
+      updateStoryEstimate: vi.fn(),
+    });
+
+    const theme = createTheme();
+    render(
+      <ThemeProvider theme={theme}>
+        <ResultsPanel />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByText('Estimation Results')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Accept Avg/i })).not.toBeInTheDocument();
   });
 });

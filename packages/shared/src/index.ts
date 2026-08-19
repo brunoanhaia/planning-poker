@@ -29,6 +29,7 @@ export interface Participant {
   hasVoted: boolean;
   isSpectator: boolean;
   isHost: boolean;
+  isAdmin: boolean;
   isOnline: boolean;
 }
 
@@ -38,6 +39,13 @@ export interface Story {
   description?: string;
   finalEstimate?: string | number | null;
   status: 'pending' | 'estimating' | 'completed';
+}
+
+export interface TimerState {
+  duration: number; // total duration in seconds
+  remaining: number; // remaining seconds
+  isRunning: boolean;
+  startedAt?: number;
 }
 
 export interface RoomState {
@@ -51,6 +59,10 @@ export interface RoomState {
   stories: Story[];
   currentStoryIndex: number;
   votesRevealed: boolean;
+  isLocked: boolean;
+  autoReveal: boolean;
+  timer: TimerState | null;
+  isEnded: boolean;
   createdAt: number;
 }
 
@@ -61,12 +73,24 @@ export type WSMessageType =
   | 'REVEAL_VOTES'
   | 'RESET_VOTES'
   | 'ADD_STORY'
+  | 'BULK_ADD_STORIES'
   | 'SET_CURRENT_STORY'
   | 'UPDATE_STORY_ESTIMATE'
   | 'DELETE_STORY'
   | 'TOGGLE_SPECTATOR'
+  | 'TOGGLE_USER_ROLE'
   | 'CHANGE_DECK'
-  | 'TRANSFER_HOST'
+  | 'TRANSFER_ADMIN'
+  | 'PROMOTE_COADMIN'
+  | 'KICK_PARTICIPANT'
+  | 'KICKED'
+  | 'UPDATE_ROOM_TITLE'
+  | 'TOGGLE_LOCK_ROOM'
+  | 'TOGGLE_AUTO_REVEAL'
+  | 'START_TIMER'
+  | 'PAUSE_TIMER'
+  | 'RESET_TIMER'
+  | 'END_SESSION'
   | 'ROOM_STATE'
   | 'ERROR';
 

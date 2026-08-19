@@ -1,40 +1,49 @@
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import {
-  Drawer,
   Box,
-  Typography,
-  IconButton,
   Button,
-  TextField,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Drawer,
+  IconButton,
   List,
   ListItem,
-  ListItemText,
   ListItemSecondaryAction,
-  Chip,
-  Divider,
+  ListItemText,
   Paper,
+  TextField,
   Tooltip,
+  Typography,
 } from '@mui/material';
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
 
 interface StoryBacklogProps {
-  open: boolean;
   onClose: () => void;
+  open: boolean;
 }
 
-export const StoryBacklog: React.FC<StoryBacklogProps> = ({ open, onClose }) => {
-  const { roomState, addStory, setCurrentStory, deleteStory } = useSocket();
+export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => {
+  const { addStory, bulkAddStories, deleteStory, isAdmin, roomState, setCurrentStory } =
+    useSocket();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+
+  // Bulk Import state
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
 
   if (!roomState) return null;
 
@@ -45,6 +54,29 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ open, onClose }) => 
     setTitle('');
     setDescription('');
     setIsAdding(false);
+  };
+
+  const handleBulkImport = () => {
+    if (!bulkText.trim()) return;
+
+    const lines = bulkText.split('\n').filter((l) => l.trim().length > 0);
+    const parsedStories = lines.map((line) => {
+      const parts = line.split(/[;,|]/);
+      if (parts.length > 1) {
+        return {
+          title: parts[0].trim(),
+          description: parts.slice(1).join(' - ').trim(),
+        };
+      }
+      return { title: line.trim() };
+    });
+
+    if (parsedStories.length > 0) {
+      bulkAddStories(parsedStories);
+    }
+
+    setBulkText('');
+    setIsBulkOpen(false);
   };
 
   const handleExportCSV = () => {
@@ -71,145 +103,227 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ open, onClose }) => 
   };
 
   return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: { xs: '100%', sm: 420 },
-          p: 3,
-          boxSizing: 'border-box',
-        },
-      }}
-    >
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          Story Backlog ({roomState.stories.length})
-        </Typography>
-        <IconButton onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
-
-      {/* Action bar */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-        <Button
-          variant="contained"
-          fullWidth
-          startIcon={<AddIcon />}
-          onClick={() => setIsAdding(!isAdding)}
-          sx={{ fontWeight: 700 }}
+    <>
+      <Drawer
+        anchor="right"
+        onClose={onClose}
+        open={open}
+        PaperProps={{
+          sx: {
+            boxSizing: 'border-box',
+            p: 3,
+            width: { sm: 420, xs: '100%' },
+          },
+        }}
+      >
+        {/* Header */}
+        <Box
+          sx={{
+            alignItems: 'center',
+            display: 'flex',
+            justifyContent: 'space-between',
+            mb: 3,
+          }}
         >
-          Add New Story
-        </Button>
-        <Tooltip title="Export to CSV">
-          <IconButton onClick={handleExportCSV} color="primary" sx={{ border: '1px solid rgba(148, 163, 184, 0.2)' }}>
-            <DownloadIcon />
+          <Typography sx={{ fontWeight: 800 }} variant="h6">
+            Story Backlog ({roomState.stories.length})
+          </Typography>
+          <IconButton onClick={onClose}>
+            <CloseIcon />
           </IconButton>
-        </Tooltip>
-      </Box>
+        </Box>
 
-      {/* Add Form */}
-      {isAdding && (
-        <Paper
-          elevation={2}
-          component="form"
-          onSubmit={handleCreateStory}
-          sx={{ p: 2, mb: 3, borderRadius: '16px', bgcolor: 'action.hover' }}
-        >
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-            New Story Details
+        {/* Action bar */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+          {isAdmin && (
+            <>
+              <Button
+                fullWidth
+                onClick={() => setIsAdding(!isAdding)}
+                startIcon={<AddIcon />}
+                sx={{ fontWeight: 700 }}
+                variant="contained"
+              >
+                Add Story
+              </Button>
+
+              <Tooltip title="Bulk Import Stories (Admin)">
+                <IconButton
+                  color="primary"
+                  onClick={() => setIsBulkOpen(true)}
+                  sx={{ border: '1px solid rgba(148, 163, 184, 0.2)' }}
+                >
+                  <FileUploadIcon />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+
+          <Tooltip title="Export to CSV">
+            <IconButton
+              color="primary"
+              onClick={handleExportCSV}
+              sx={{ border: '1px solid rgba(148, 163, 184, 0.2)' }}
+            >
+              <DownloadIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Add Form */}
+        {isAdding && isAdmin && (
+          <Paper
+            component="form"
+            elevation={2}
+            onSubmit={handleCreateStory}
+            sx={{ bgcolor: 'action.hover', borderRadius: '16px', mb: 3, p: 2 }}
+          >
+            <Typography sx={{ fontWeight: 700, mb: 1.5 }} variant="subtitle2">
+              New Story Details
+            </Typography>
+            <TextField
+              fullWidth
+              label="Story Title"
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              size="small"
+              sx={{ mb: 1.5 }}
+              value={title}
+            />
+            <TextField
+              fullWidth
+              label="Description / Acceptance Criteria"
+              multiline
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              size="small"
+              sx={{ mb: 2 }}
+              value={description}
+            />
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              <Button onClick={() => setIsAdding(false)} size="small">
+                Cancel
+              </Button>
+              <Button disabled={!title.trim()} size="small" type="submit" variant="contained">
+                Save Story
+              </Button>
+            </Box>
+          </Paper>
+        )}
+
+        <Divider sx={{ mb: 2 }} />
+
+        {/* Stories List */}
+        <List sx={{ flexGrow: 1, overflowY: 'auto' }}>
+          {roomState.stories.map((story, index) => {
+            const isActive = index === roomState.currentStoryIndex;
+
+            return (
+              <Paper
+                elevation={isActive ? 4 : 0}
+                key={story.id}
+                sx={{
+                  bgcolor: isActive ? 'action.selected' : 'background.paper',
+                  border: isActive ? '2px solid #6366f1' : '1px solid rgba(148, 163, 184, 0.2)',
+                  borderRadius: '14px',
+                  mb: 1.5,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <ListItem alignItems="flex-start" sx={{ py: 1.5 }}>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ alignItems: 'center', display: 'flex', gap: 1 }}>
+                        <Typography sx={{ fontWeight: 700 }} variant="subtitle2">
+                          {index + 1}. {story.title}
+                        </Typography>
+                        {isActive && (
+                          <Chip
+                            color="primary"
+                            label="Estimating"
+                            size="small"
+                            sx={{ fontSize: 11, fontWeight: 700, height: 20 }}
+                          />
+                        )}
+                        {story.finalEstimate !== undefined && story.finalEstimate !== null && (
+                          <Chip
+                            color="success"
+                            label={`Score: ${story.finalEstimate}`}
+                            size="small"
+                            sx={{ fontSize: 11, fontWeight: 700, height: 20 }}
+                          />
+                        )}
+                      </Box>
+                    }
+                    secondary={story.description}
+                  />
+                  {isAdmin && (
+                    <ListItemSecondaryAction>
+                      {!isActive && (
+                        <Tooltip title="Estimate This Story (Admin)">
+                          <IconButton
+                            color="primary"
+                            onClick={() => setCurrentStory(index)}
+                            size="small"
+                          >
+                            <PlayArrowIcon />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {roomState.stories.length > 1 && (
+                        <IconButton
+                          color="error"
+                          onClick={() => deleteStory(story.id)}
+                          size="small"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </ListItemSecondaryAction>
+                  )}
+                </ListItem>
+              </Paper>
+            );
+          })}
+        </List>
+      </Drawer>
+
+      {/* Bulk Import Modal */}
+      <Dialog
+        fullWidth
+        maxWidth="sm"
+        onClose={() => setIsBulkOpen(false)}
+        open={isBulkOpen}
+        PaperProps={{ sx: { borderRadius: '20px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Bulk Import User Stories</DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary" sx={{ mb: 2 }} variant="body2">
+            Paste multiple user stories below. Enter one story per line (e.g.{' '}
+            <code>Story Title; Story Description</code>).
           </Typography>
           <TextField
+            autoFocus
             fullWidth
-            size="small"
-            label="Story Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-            sx={{ mb: 1.5 }}
-          />
-          <TextField
-            fullWidth
-            size="small"
+            label="User Stories (One per line)"
             multiline
-            rows={2}
-            label="Description / Acceptance Criteria"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            sx={{ mb: 2 }}
+            onChange={(e) => setBulkText(e.target.value)}
+            placeholder="User Login API; Implement OAuth authentication&#10;Dashboard Widgets; Build responsive metrics cards&#10;Export PDF Reports; Generate monthly summary"
+            rows={8}
+            value={bulkText}
           />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-            <Button size="small" onClick={() => setIsAdding(false)}>
-              Cancel
-            </Button>
-            <Button size="small" type="submit" variant="contained" disabled={!title.trim()}>
-              Save Story
-            </Button>
-          </Box>
-        </Paper>
-      )}
-
-      <Divider sx={{ mb: 2 }} />
-
-      {/* Stories List */}
-      <List sx={{ flexGrow: 1, overflowY: 'auto' }}>
-        {roomState.stories.map((story, index) => {
-          const isActive = index === roomState.currentStoryIndex;
-
-          return (
-            <Paper
-              key={story.id}
-              elevation={isActive ? 4 : 0}
-              sx={{
-                mb: 1.5,
-                borderRadius: '14px',
-                border: isActive ? '2px solid #6366f1' : '1px solid rgba(148, 163, 184, 0.2)',
-                bgcolor: isActive ? 'action.selected' : 'background.paper',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <ListItem alignItems="flex-start" sx={{ py: 1.5 }}>
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                        {index + 1}. {story.title}
-                      </Typography>
-                      {isActive && <Chip label="Estimating" color="primary" size="small" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />}
-                      {story.finalEstimate !== undefined && story.finalEstimate !== null && (
-                        <Chip
-                          label={`Score: ${story.finalEstimate}`}
-                          color="success"
-                          size="small"
-                          sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
-                        />
-                      )}
-                    </Box>
-                  }
-                  secondary={story.description}
-                />
-                <ListItemSecondaryAction>
-                  {!isActive && (
-                    <Tooltip title="Estimate This Story">
-                      <IconButton size="small" color="primary" onClick={() => setCurrentStory(index)}>
-                        <PlayArrowIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  {roomState.stories.length > 1 && (
-                    <IconButton size="small" color="error" onClick={() => deleteStory(story.id)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  )}
-                </ListItemSecondaryAction>
-              </ListItem>
-            </Paper>
-          );
-        })}
-      </List>
-    </Drawer>
+        </DialogContent>
+        <DialogActions sx={{ pb: 2, px: 3 }}>
+          <Button onClick={() => setIsBulkOpen(false)}>Cancel</Button>
+          <Button
+            disabled={!bulkText.trim()}
+            onClick={handleBulkImport}
+            variant="contained"
+          >
+            Import Stories
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
