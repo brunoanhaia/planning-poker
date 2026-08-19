@@ -84,8 +84,8 @@ export const CardDeck: React.FC = () => {
               onClick={() => submitVote(val)}
               elevation={isSelected ? 8 : 2}
               sx={{
-                width: { xs: 46, sm: 58 },
-                height: { xs: 70, sm: 86 },
+                width: { xs: 42, sm: 58 },
+                height: { xs: 62, sm: 86 },
                 borderRadius: '12px',
                 display: 'flex',
                 alignItems: 'center',
@@ -93,7 +93,7 @@ export const CardDeck: React.FC = () => {
                 cursor: 'pointer',
                 userSelect: 'none',
                 fontWeight: 800,
-                fontSize: { xs: '18px', sm: '22px' },
+                fontSize: { xs: '16px', sm: '22px' },
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 background: isSelected
                   ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'

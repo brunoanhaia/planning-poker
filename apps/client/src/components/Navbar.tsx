@@ -145,7 +145,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Room info & Actions */}
           {roomState && (
-            <Box sx={{ alignItems: 'center', display: 'flex', gap: 1.5 }}>
+            <Box
+              sx={{
+                alignItems: 'center',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: { xs: 0.5, sm: 1.5 },
+                justifyContent: 'flex-end',
+              }}
+            >
               {/* Admin Badge */}
               {isAdmin && (
                 <Chip
@@ -162,7 +170,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Chip
                     color="error"
                     icon={<LockIcon sx={{ fontSize: 14 }} />}
-                    label="Locked"
+                    label={
+                      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                        Locked
+                      </Box>
+                    }
                     size="small"
                     sx={{ fontWeight: 700, height: 24 }}
                   />
@@ -173,14 +185,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Tooltip title="Click to copy invite link">
                 <Chip
                   color="primary"
-                  icon={<ContentCopyIcon sx={{ fontSize: 16 }} />}
+                  icon={<ContentCopyIcon sx={{ fontSize: { xs: 13, sm: 16 } }} />}
                   label={`Room: ${roomState.id}`}
                   onClick={handleCopyLink}
+                  size="small"
                   sx={{
                     borderRadius: '10px',
                     cursor: 'pointer',
-                    fontSize: '14px',
+                    fontSize: { xs: '12px', sm: '14px' },
                     fontWeight: 700,
+                    height: { xs: 26, sm: 32 },
                     '&:hover': {
                       backgroundColor: 'primary.light',
                       color: 'primary.contrastText',
@@ -216,9 +230,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ) : (
                         <VisibilityIcon fontSize="small" />
                       )}
-                      {currentUser.isSpectator ? 'Spectator' : 'Voter'}
+                      <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
+                        {currentUser.isSpectator ? 'Spectator' : 'Voter'}
+                      </Box>
                     </Box>
                   }
+                  sx={{ mr: { xs: 0, sm: 1 } }}
                 />
               )}
 
@@ -227,6 +244,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <IconButton
                   color="primary"
                   onClick={onOpenBacklog}
+                  size="small"
                   sx={{ border: '1px solid rgba(148, 163, 184, 0.2)' }}
                 >
                   <FormatListBulletedIcon fontSize="small" />
@@ -239,6 +257,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <IconButton
                     color="primary"
                     onClick={onOpenSettings}
+                    size="small"
                     sx={{ border: '1px solid rgba(148, 163, 184, 0.2)' }}
                   >
                     <SettingsIcon fontSize="small" />
@@ -251,6 +270,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <IconButton
                   color="error"
                   onClick={leaveRoom}
+                  size="small"
                   sx={{ border: '1px solid rgba(239, 68, 68, 0.2)' }}
                 >
                   <ExitToAppIcon fontSize="small" />

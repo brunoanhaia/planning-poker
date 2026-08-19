@@ -51,7 +51,13 @@ const MainContent: React.FC<{
       ) : (
         <Container
           maxWidth="lg"
-          sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, py: 3 }}
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            flexGrow: 1,
+            px: { sm: 3, xs: 1 },
+            py: { sm: 3, xs: 1.5 },
+          }}
         >
           <PokerTable />
           <ResultsPanel />

@@ -2,6 +2,7 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
+import EditIcon from '@mui/icons-material/Edit';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import {
@@ -34,12 +35,27 @@ interface StoryBacklogProps {
 }
 
 export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => {
-  const { addStory, bulkAddStories, deleteStory, isAdmin, roomState, setCurrentStory } =
-    useSocket();
+  const {
+    addStory,
+    bulkAddStories,
+    deleteStory,
+    isAdmin,
+    roomState,
+    setCurrentStory,
+    updateStoryEstimate,
+  } = useSocket();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+
+  // Score editing state
+  const [editingStory, setEditingStory] = useState<{
+    id: string;
+    title: string;
+    currentScore?: string | number;
+  } | null>(null);
+  const [editScoreValue, setEditScoreValue] = useState('');
 
   // Bulk Import state
   const [isBulkOpen, setIsBulkOpen] = useState(false);
@@ -222,12 +238,26 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
               <Paper
                 elevation={isActive ? 4 : 0}
                 key={story.id}
+                onClick={() => {
+                  if (isAdmin && !isActive) {
+                    setCurrentStory(index);
+                  }
+                }}
                 sx={{
                   bgcolor: isActive ? 'action.selected' : 'background.paper',
                   border: isActive ? '2px solid #6366f1' : '1px solid rgba(148, 163, 184, 0.2)',
                   borderRadius: '14px',
+                  cursor: isAdmin && !isActive ? 'pointer' : 'default',
                   mb: 1.5,
                   transition: 'all 0.2s ease',
+                  '&:hover':
+                    isAdmin && !isActive
+                      ? {
+                          borderColor: 'primary.main',
+                          boxShadow: 2,
+                          transform: 'translateX(4px)',
+                        }
+                      : {},
                 }}
               >
                 <ListItem alignItems="flex-start" sx={{ py: 1.5 }}>
@@ -245,13 +275,49 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                             sx={{ fontSize: 11, fontWeight: 700, height: 20 }}
                           />
                         )}
-                        {story.finalEstimate !== undefined && story.finalEstimate !== null && (
-                          <Chip
-                            color="success"
-                            label={`Score: ${story.finalEstimate}`}
-                            size="small"
-                            sx={{ fontSize: 11, fontWeight: 700, height: 20 }}
-                          />
+                        {story.finalEstimate !== undefined && story.finalEstimate !== null ? (
+                          <Tooltip title={isAdmin ? 'Click to edit score' : ''}>
+                            <Chip
+                              clickable={isAdmin}
+                              color="success"
+                              label={`Score: ${story.finalEstimate}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isAdmin) {
+                                  setEditingStory({
+                                    id: story.id,
+                                    title: story.title,
+                                    currentScore: story.finalEstimate,
+                                  });
+                                  setEditScoreValue(String(story.finalEstimate));
+                                }
+                              }}
+                              size="small"
+                              sx={{ fontSize: 11, fontWeight: 700, height: 20 }}
+                            />
+                          </Tooltip>
+                        ) : (
+                          isAdmin && (
+                            <Tooltip title="Set Score Manually">
+                              <Chip
+                                clickable
+                                color="default"
+                                label="+ Score"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingStory({
+                                    id: story.id,
+                                    title: story.title,
+                                    currentScore: '',
+                                  });
+                                  setEditScoreValue('');
+                                }}
+                                size="small"
+                                sx={{ fontSize: 11, fontWeight: 700, height: 20 }}
+                                variant="outlined"
+                              />
+                            </Tooltip>
+                          )
                         )}
                       </Box>
                     }
@@ -259,11 +325,35 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                   />
                   {isAdmin && (
                     <ListItemSecondaryAction>
+                      <Tooltip title="Edit Score">
+                        <IconButton
+                          color="default"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingStory({
+                              id: story.id,
+                              title: story.title,
+                              currentScore: story.finalEstimate,
+                            });
+                            setEditScoreValue(
+                              story.finalEstimate !== undefined && story.finalEstimate !== null
+                                ? String(story.finalEstimate)
+                                : ''
+                            );
+                          }}
+                          size="small"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       {!isActive && (
                         <Tooltip title="Estimate This Story (Admin)">
                           <IconButton
                             color="primary"
-                            onClick={() => setCurrentStory(index)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentStory(index);
+                            }}
                             size="small"
                           >
                             <PlayArrowIcon />
@@ -273,7 +363,10 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
                       {roomState.stories.length > 1 && (
                         <IconButton
                           color="error"
-                          onClick={() => deleteStory(story.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteStory(story.id);
+                          }}
                           size="small"
                         >
                           <DeleteIcon fontSize="small" />
@@ -287,6 +380,65 @@ export const StoryBacklog: React.FC<StoryBacklogProps> = ({ onClose, open }) => 
           })}
         </List>
       </Drawer>
+
+      {/* Manual Score Edit Modal */}
+      <Dialog
+        fullWidth
+        maxWidth="xs"
+        onClose={() => setEditingStory(null)}
+        open={Boolean(editingStory)}
+        PaperProps={{ sx: { borderRadius: '20px', p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>✏️ Edit Story Score</DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary" sx={{ mb: 2 }} variant="body2">
+            Set the final score for <strong>{editingStory?.title}</strong>:
+          </Typography>
+
+          <TextField
+            autoFocus
+            fullWidth
+            label="Final Estimate / Points"
+            onChange={(e) => setEditScoreValue(e.target.value)}
+            placeholder="e.g. 1, 2, 3, 5, 8, M, etc."
+            sx={{ mb: 2 }}
+            value={editScoreValue}
+          />
+
+          {roomState?.activeDeck && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {roomState.activeDeck.map((val) => (
+                <Chip
+                  clickable
+                  color={editScoreValue === String(val) ? 'primary' : 'default'}
+                  key={String(val)}
+                  label={val}
+                  onClick={() => setEditScoreValue(String(val))}
+                  sx={{ fontWeight: 700 }}
+                />
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ pb: 2, px: 3 }}>
+          <Button onClick={() => setEditingStory(null)}>Cancel</Button>
+          <Button
+            disabled={!editScoreValue.trim()}
+            onClick={() => {
+              if (editingStory) {
+                const parsedNum = Number(editScoreValue.trim());
+                const finalVal = !isNaN(parsedNum) ? parsedNum : editScoreValue.trim();
+                updateStoryEstimate(editingStory.id, finalVal);
+                setEditingStory(null);
+              }
+            }}
+            sx={{ fontWeight: 700 }}
+            variant="contained"
+          >
+            Save Score
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Bulk Import Modal */}
       <Dialog

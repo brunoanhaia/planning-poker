@@ -70,7 +70,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
         flexDirection: 'column',
         gap: 0.5,
         position: 'relative',
-        width: 110,
+        width: { xs: 80, sm: 110 },
       }}
     >
       {/* Avatar Ring */}
@@ -93,9 +93,9 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
           sx={{
             bgcolor: participant.color,
             border: isSelf ? '3px solid #fff' : '2px solid rgba(255,255,255,0.4)',
-            fontSize: '28px',
-            height: 52,
-            width: 52,
+            fontSize: { xs: '20px', sm: '28px' },
+            height: { xs: 40, sm: 52 },
+            width: { xs: 40, sm: 52 },
           }}
         >
           {participant.avatar}
@@ -112,15 +112,15 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
                 boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
                 color: '#fff',
                 display: 'flex',
-                height: 22,
+                height: { xs: 18, sm: 22 },
                 justifyContent: 'center',
                 position: 'absolute',
                 right: -6,
                 top: -6,
-                width: 22,
+                width: { xs: 18, sm: 22 },
               }}
             >
-              {participant.isHost ? '👑' : <StarIcon sx={{ fontSize: 13 }} />}
+              {participant.isHost ? '👑' : <StarIcon sx={{ fontSize: { xs: 10, sm: 13 } }} />}
             </Box>
           </Tooltip>
         )}
@@ -191,9 +191,10 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       <Typography
         sx={{
           color: 'text.primary',
+          fontSize: { xs: '11px', sm: '12px' },
           fontWeight: 700,
           lineHeight: 1.2,
-          maxWidth: '100px',
+          maxWidth: { xs: '75px', sm: '100px' },
           overflow: 'hidden',
           textAlign: 'center',
           textOverflow: 'ellipsis',
@@ -207,10 +208,10 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
       {/* Card Seat / Voting visual */}
       <Box
         sx={{
-          height: 70,
+          height: { xs: 56, sm: 70 },
           mt: 0.5,
           perspective: '1000px',
-          width: 50,
+          width: { xs: 40, sm: 50 },
         }}
       >
         <Box

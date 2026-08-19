@@ -188,7 +188,7 @@ export const PokerTable: React.FC = () => {
         sx={{
           alignItems: 'center',
           display: 'flex',
-          height: '420px',
+          height: { xs: '370px', sm: '420px' },
           justifyContent: 'center',
           maxWidth: '850px',
           my: 2,
@@ -206,19 +206,19 @@ export const PokerTable: React.FC = () => {
                 ? 'radial-gradient(ellipse at center, #1e293b 0%, #0f172a 100%)'
                 : 'radial-gradient(ellipse at center, #e0e7ff 0%, #c7d2fe 100%)',
             border: (theme) =>
-              theme.palette.mode === 'dark' ? '8px solid #334155' : '8px solid #818cf8',
-            borderRadius: '120px',
+              theme.palette.mode === 'dark' ? '6px solid #334155' : '6px solid #818cf8',
+            borderRadius: { xs: '70px', sm: '120px' },
             boxShadow: (theme) =>
               theme.palette.mode === 'dark'
                 ? '0 0 50px rgba(99, 102, 241, 0.25), inset 0 0 30px rgba(0,0,0,0.6)'
                 : '0 0 40px rgba(99, 102, 241, 0.2), inset 0 0 20px rgba(99, 102, 241, 0.2)',
             display: 'flex',
             flexDirection: 'column',
-            height: '240px',
+            height: { xs: '180px', sm: '240px' },
             justifyContent: 'center',
-            p: 3,
+            p: { xs: 1.5, sm: 3 },
             textAlign: 'center',
-            width: '80%',
+            width: { xs: '88%', sm: '80%' },
             zIndex: 1,
           }}
         >
@@ -227,11 +227,17 @@ export const PokerTable: React.FC = () => {
             color="primary"
             label={`Story ${roomState.currentStoryIndex + 1} of ${roomState.stories.length}`}
             size="small"
-            sx={{ fontWeight: 700, height: 22, mb: 1 }}
+            sx={{
+              fontWeight: 700,
+              height: { xs: 18, sm: 22 },
+              fontSize: { xs: 10, sm: 12 },
+              mb: 0.5,
+            }}
           />
 
           <Typography
             sx={{
+              fontSize: { xs: '14px', sm: '20px' },
               fontWeight: 800,
               maxWidth: '90%',
               mb: 0.5,
@@ -248,11 +254,13 @@ export const PokerTable: React.FC = () => {
             <Typography
               color="text.secondary"
               sx={{
+                display: { xs: 'none', sm: '-webkit-box' },
                 maxWidth: '80%',
-                mb: 2,
+                mb: 1.5,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 1,
               }}
               variant="caption"
             >
@@ -261,20 +269,22 @@ export const PokerTable: React.FC = () => {
           )}
 
           {/* Voting progress / Action Buttons */}
-          <Box sx={{ alignItems: 'center', display: 'flex', gap: 2, mt: 1 }}>
+          <Box sx={{ alignItems: 'center', display: 'flex', gap: 1.5, mt: 0.5 }}>
             {!roomState.votesRevealed ? (
               isAdmin ? (
                 <Button
                   color="primary"
                   disabled={activeVoters.length === 0}
                   onClick={revealVotes}
+                  size="small"
                   startIcon={<VisibilityIcon />}
                   sx={{
                     borderRadius: '20px',
                     boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
+                    fontSize: { xs: '12px', sm: '14px' },
                     fontWeight: 700,
-                    px: 3,
-                    py: 1,
+                    px: { xs: 2, sm: 3 },
+                    py: { xs: 0.5, sm: 1 },
                   }}
                   variant="contained"
                 >
@@ -284,12 +294,13 @@ export const PokerTable: React.FC = () => {
                 <Chip
                   color="default"
                   icon={<VisibilityIcon sx={{ fontSize: 16 }} />}
-                  label={`Votes: ${votedCount}/${activeVoters.length} cast (Waiting for Host to reveal)`}
+                  label={`Votes: ${votedCount}/${activeVoters.length} cast (Waiting for Host)`}
+                  size="small"
                   sx={{
                     bgcolor: 'action.hover',
                     fontWeight: 700,
                     px: 1,
-                    py: 2,
+                    py: 1.5,
                   }}
                   variant="outlined"
                 />
@@ -299,12 +310,14 @@ export const PokerTable: React.FC = () => {
                 <Button
                   color="secondary"
                   onClick={resetVotes}
+                  size="small"
                   startIcon={<RefreshIcon />}
                   sx={{
                     borderRadius: '20px',
+                    fontSize: { xs: '12px', sm: '14px' },
                     fontWeight: 700,
-                    px: 3,
-                    py: 1,
+                    px: { xs: 2, sm: 3 },
+                    py: { xs: 0.5, sm: 1 },
                   }}
                   variant="outlined"
                 >

@@ -69,28 +69,32 @@ export const Home: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ pt: 6, pb: 8 }}>
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
+    <Container
+      maxWidth="sm"
+      sx={{ pb: { sm: 8, xs: 4 }, pt: { sm: 6, xs: 3 }, px: { sm: 3, xs: 2 } }}
+    >
+      <Box sx={{ mb: 4, textAlign: 'center' }}>
         <Typography
-          variant="h3"
           sx={{
-            fontWeight: 800,
             background: 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            fontSize: { sm: '2.75rem', xs: '2rem' },
+            fontWeight: 800,
             letterSpacing: '-0.03em',
             mb: 1,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
           }}
+          variant="h3"
         >
           Planit Poker Real-Time
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography color="text.secondary" variant="body1">
           Agile estimation made fun, fast, and effortless for remote software teams.
         </Typography>
       </Box>
 
       {error && (
-        <Alert severity="error" onClose={clearError} sx={{ mb: 3, borderRadius: '12px' }}>
+        <Alert onClose={clearError} severity="error" sx={{ borderRadius: '12px', mb: 3 }}>
           {error}
         </Alert>
       )}
@@ -98,9 +102,9 @@ export const Home: React.FC = () => {
       <Paper
         elevation={6}
         sx={{
-          borderRadius: '24px',
+          borderRadius: { sm: '24px', xs: '20px' },
           overflow: 'hidden',
-          p: { xs: 3, sm: 4 },
+          p: { sm: 4, xs: 2.5 },
         }}
       >
         <Tabs
