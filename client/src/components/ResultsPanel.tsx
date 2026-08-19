@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import SaveIcon from '@mui/icons-material/Save';
 import {
   Box,
   Paper,
@@ -9,29 +10,17 @@ import {
   Chip,
 } from '@mui/material';
 import confetti from 'canvas-confetti';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import SaveIcon from '@mui/icons-material/Save';
+import React, { useEffect } from 'react';
+
 import { useSocket } from '../context/SocketContext';
 
 export const ResultsPanel: React.FC = () => {
   const { roomState, updateStoryEstimate } = useSocket();
 
-  if (!roomState || !roomState.votesRevealed) return null;
-
-  const currentStory = roomState.stories[roomState.currentStoryIndex];
-  const votedParticipants = roomState.participants.filter(
+  const currentStory = roomState?.stories[roomState?.currentStoryIndex ?? 0];
+  const votedParticipants = (roomState?.participants || []).filter(
     (p) => !p.isSpectator && p.vote !== null && p.vote !== undefined
   );
-
-  if (votedParticipants.length === 0) {
-    return (
-      <Paper sx={{ p: 3, textAlign: 'center', my: 2, borderRadius: '20px' }}>
-        <Typography variant="body1" color="text.secondary">
-          No votes were cast for this story yet.
-        </Typography>
-      </Paper>
-    );
-  }
 
   // Calculate Vote Breakdown
   const voteCounts: Record<string, number> = {};
@@ -55,25 +44,37 @@ export const ResultsPanel: React.FC = () => {
   const average = hasNumeric ? (sum / numericVotes.length).toFixed(1) : 'N/A';
 
   // Consensus calculation
-  const highestFrequency = Math.max(...Object.values(voteCounts));
-  const consensusPercentage = Math.round((highestFrequency / totalVotes) * 100);
+  const highestFrequency = Math.max(0, ...Object.values(voteCounts));
+  const consensusPercentage = totalVotes > 0 ? Math.round((highestFrequency / totalVotes) * 100) : 0;
   const isFullConsensus = consensusPercentage === 100 && totalVotes > 1;
 
   // Most common vote (Mode)
-  const modeVote = Object.keys(voteCounts).reduce((a, b) =>
-    voteCounts[a] > voteCounts[b] ? a : b
-  );
+  const modeVote = Object.keys(voteCounts).length > 0
+    ? Object.keys(voteCounts).reduce((a, b) => (voteCounts[a] > voteCounts[b] ? a : b))
+    : '-';
 
-  // Trigger confetti on 100% consensus
+  // Trigger confetti on 100% consensus (Hook called unconditionally before early return)
   useEffect(() => {
-    if (isFullConsensus) {
+    if (isFullConsensus && roomState?.votesRevealed) {
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
       });
     }
-  }, [isFullConsensus]);
+  }, [isFullConsensus, roomState?.votesRevealed]);
+
+  if (!roomState || !roomState.votesRevealed) return null;
+
+  if (votedParticipants.length === 0) {
+    return (
+      <Paper sx={{ p: 3, textAlign: 'center', my: 2, borderRadius: '20px' }}>
+        <Typography variant="body1" color="text.secondary">
+          No votes were cast for this story yet.
+        </Typography>
+      </Paper>
+    );
+  }
 
   const handleSaveEstimate = () => {
     if (!currentStory) return;

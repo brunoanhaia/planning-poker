@@ -1,7 +1,8 @@
-import React from 'react';
-import { Box, Paper, Typography, Button, Chip } from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import { Box, Paper, Typography, Button, Chip } from '@mui/material';
+import React from 'react';
+
 import { useSocket } from '../context/SocketContext';
 import { ParticipantCard } from './ParticipantCard';
 

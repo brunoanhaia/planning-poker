@@ -1,10 +1,11 @@
-import React from 'react';
+import { ThemeProvider, createTheme } from '@mui/material';
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
+
 import { PokerTable } from '../components/PokerTable';
 import * as SocketContextModule from '../context/SocketContext';
 import { RoomState } from '../types';
-import { ThemeProvider, createTheme } from '@mui/material';
 
 const mockRoomState: RoomState = {
   id: 'ROOM01',

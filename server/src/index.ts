@@ -1,7 +1,8 @@
+import cors from 'cors';
 import express from 'express';
 import http from 'http';
-import cors from 'cors';
 import { WebSocketServer } from 'ws';
+
 import { WebSocketHandler } from './webSocketHandler.js';
 
 const app = express();

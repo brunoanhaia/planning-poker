@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import {
   Container,
   Paper,
@@ -16,8 +17,8 @@ import {
   FormHelperText,
   Alert,
 } from '@mui/material';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import React, { useState, useEffect } from 'react';
+
 import { useSocket } from '../context/SocketContext';
 import { AVATARS, AVATAR_COLORS, DeckType, PRESET_DECKS } from '../types';
 

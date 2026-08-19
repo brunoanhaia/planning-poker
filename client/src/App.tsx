@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from 'react';
 import { ThemeProvider, CssBaseline, Box, Container } from '@mui/material';
-import { getAppTheme } from './theme';
-import { SocketProvider, useSocket } from './context/SocketContext';
-import { Navbar } from './components/Navbar';
-import { Home } from './components/Home';
-import { PokerTable } from './components/PokerTable';
+import React, { useState, useMemo } from 'react';
+
 import { CardDeck } from './components/CardDeck';
+import { Home } from './components/Home';
+import { Navbar } from './components/Navbar';
+import { PokerTable } from './components/PokerTable';
 import { ResultsPanel } from './components/ResultsPanel';
-import { StoryBacklog } from './components/StoryBacklog';
 import { RoomSettingsModal } from './components/RoomSettingsModal';
+import { StoryBacklog } from './components/StoryBacklog';
+import { SocketProvider, useSocket } from './context/SocketContext';
+import { getAppTheme } from './theme';
 
 const MainContent: React.FC<{
   darkMode: boolean;
