@@ -15,7 +15,7 @@ Welcome to the PlanItPoker repository! As an AI agent working in this project, y
 1. **Clean Code Principles**: Always write highly readable code. Avoid deep nesting, use early returns (bouncer pattern), and ensure variables/functions have meaningful names.
 2. **Imports Strategy**: Prefer named imports for better clarity. However, be cautious when importing from barrel files (`index.ts`), as named imports from them can import the entire module and negatively impact tree-shaking. Import directly from the specific file when appropriate.
 3. **Type Safety**: Strictly utilize the shared `@planitpoker/shared` package for all Socket events, payloads, and domain models. Avoid using `any` or redefining types locally.
-4. **Component Architecture**: Keep React components "dumb". Extract complex logic into custom hooks. Ensure styling is modular and does not pollute the JSX.
+4. **Component Architecture**: Keep React components "dumb". Extract complex logic into custom hooks. Ensure styling is modular and does not pollute the JSX. Enforce single responsibility by having strictly one component per file.
 5. **Real-time Communication**: Never put core business logic inside socket event listeners. Keep the transport layer decoupled from the domain logic.
 6. **Accessibility**: All UI components must be fully accessible (WAI-ARIA compliant, keyboard navigable).
 7. **Responsive Design**: All UI layouts, components, and interactive controls must be strictly responsive across all device viewports (mobile 320px+, tablet, and desktop) without horizontal scrolling, clipping, or component overlaps.
