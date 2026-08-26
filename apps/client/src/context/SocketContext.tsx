@@ -1,5 +1,5 @@
 import { DeckType, RoomState } from '@planitpoker/shared';
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, use, useEffect, useRef, useState } from 'react';
 
 interface SocketContextValue {
     addStory: (title: string, description?: string) => void;
@@ -312,7 +312,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 };
 
 export const useSocket = () => {
-    const context = useContext(SocketContext);
+    const context = use(SocketContext);
     if (!context) {
         throw new Error('useSocket must be used within a SocketProvider');
     }

@@ -1,5 +1,5 @@
 import tseslint from 'typescript-eslint';
-import eslintPluginReact from 'eslint-plugin-react';
+import eslintReact from '@eslint-react/eslint-plugin';
 import eslintPluginReactHooks from 'eslint-plugin-react-hooks';
 import eslintPluginPrettier from 'eslint-plugin-prettier/recommended';
 import eslintPluginPerfectionist from 'eslint-plugin-perfectionist';
@@ -12,6 +12,7 @@ export default tseslint.config(
     },
     ...tseslint.configs.recommended,
     eslintPluginPrettier,
+    eslintReact.configs['recommended-typescript'],
     {
         files: ['src/**/*.{ts,tsx}'],
         languageOptions: {
@@ -21,23 +22,14 @@ export default tseslint.config(
             },
         },
         plugins: {
-            react: eslintPluginReact,
             'react-hooks': eslintPluginReactHooks,
             perfectionist: eslintPluginPerfectionist,
             vitest: eslintPluginVitest,
         },
-        settings: {
-            react: {
-                version: 'detect',
-            },
-        },
         rules: {
-            ...eslintPluginReact.configs.recommended.rules,
-            ...eslintPluginReact.configs['jsx-runtime'].rules,
             ...eslintPluginReactHooks.configs.recommended.rules,
             '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
             '@typescript-eslint/no-explicit-any': 'off',
-            'react/prop-types': 'off',
             'vitest/no-disabled-tests': 'warn',
             'vitest/no-focused-tests': 'error',
             'perfectionist/sort-imports': [
