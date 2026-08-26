@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { PokerTable } from '../components/PokerTable';
+import { MainContent } from '../components/MainContent';
 import * as SocketContextModule from '../context/SocketContext';
 
 const mockRoomState: RoomState = {
@@ -101,12 +101,13 @@ describe('PokerTable Component', () => {
         const theme = createTheme();
         render(
             <ThemeProvider theme={theme}>
-                <PokerTable />
+                <MainContent darkMode={false} onToggleDarkMode={vi.fn()} />
             </ThemeProvider>
         );
 
         expect(screen.getByText('Setup Database Migration')).toBeInTheDocument();
-        expect(screen.getByText('Alice Host (You)')).toBeInTheDocument();
+        expect(screen.getByText('Alice Host')).toBeInTheDocument();
+        expect(screen.getByText('(you)')).toBeInTheDocument();
         expect(screen.getByText('Bob Voter')).toBeInTheDocument();
         expect(screen.getByText(/Reveal Votes/i)).toBeInTheDocument();
         expect(screen.getByText('0:45')).toBeInTheDocument();
@@ -152,7 +153,7 @@ describe('PokerTable Component', () => {
         const theme = createTheme();
         render(
             <ThemeProvider theme={theme}>
-                <PokerTable />
+                <MainContent darkMode={false} onToggleDarkMode={vi.fn()} />
             </ThemeProvider>
         );
 

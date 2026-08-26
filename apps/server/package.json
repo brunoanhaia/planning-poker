@@ -8,26 +8,28 @@
         "build": "tsc",
         "start": "node dist/index.js",
         "test": "vitest run",
-        "lint": "eslint src --ext .ts"
+        "lint": "eslint src"
     },
     "dependencies": {
         "@planitpoker/shared": "*",
-        "cors": "^2.8.5",
-        "express": "^4.21.2",
-        "ws": "^8.18.0"
+        "cors": "^2.8.6",
+        "express": "^5.2.1",
+        "ws": "^8.21.3"
     },
     "devDependencies": {
-        "@types/cors": "^2.8.17",
-        "@types/express": "^4.17.21",
-        "@types/node": "^20.17.19",
-        "@types/ws": "^8.5.13",
-        "@typescript-eslint/eslint-plugin": "^8.24.0",
-        "@typescript-eslint/parser": "^8.24.0",
-        "eslint": "^8.57.1",
-        "eslint-plugin-perfectionist": "^4.9.0",
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.6",
+        "@types/node": "^26.3.0",
+        "@types/ws": "^8.18.1",
+        "@typescript-eslint/eslint-plugin": "^8.68.0",
+        "@typescript-eslint/parser": "^8.68.0",
+        "eslint": "^9.39.5",
+        "eslint-plugin-perfectionist": "^5.10.1",
         "eslint-plugin-vitest": "^0.5.4",
-        "tsx": "^4.19.2",
-        "typescript": "^5.7.3",
-        "vitest": "^4.1.10"
+        "globals": "^16.3.0",
+        "tsx": "^4.23.12",
+        "typescript": "^6.0.3",
+        "typescript-eslint": "^8.68.0",
+        "vitest": "^4.1.11"
     }
 }

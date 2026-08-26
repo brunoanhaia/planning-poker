@@ -1,5 +1,4 @@
 import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
@@ -14,11 +13,9 @@ import {
     DialogContent,
     DialogTitle,
     Divider,
-    Drawer,
     IconButton,
     List,
     ListItem,
-    ListItemSecondaryAction,
     ListItemText,
     Paper,
     TextField,
@@ -265,7 +262,64 @@ export const StoryBacklog: React.FC = () => {
                                             : {},
                                 }}
                             >
-                                <ListItem alignItems="flex-start" sx={{ py: 1.5 }}>
+                                <ListItem
+                                    alignItems="flex-start"
+                                    sx={{ py: 1.5 }}
+                                    secondaryAction={
+                                        isAdmin && (
+                                            <>
+                                                <Tooltip title="Edit Score">
+                                                    <IconButton
+                                                        color="default"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingStory({
+                                                                id: story.id,
+                                                                title: story.title,
+                                                                currentScore: story.finalEstimate,
+                                                            });
+                                                            setEditScoreValue(
+                                                                story.finalEstimate !== undefined &&
+                                                                    story.finalEstimate !== null
+                                                                    ? String(story.finalEstimate)
+                                                                    : ''
+                                                            );
+                                                        }}
+                                                        size="small"
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                {!isActive && (
+                                                    <Tooltip title="Estimate This Story (Admin)">
+                                                        <IconButton
+                                                            color="primary"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setPendingStoryChange(index);
+                                                            }}
+                                                            size="small"
+                                                        >
+                                                            <PlayArrowIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                                {roomState.stories.length > 1 && (
+                                                    <IconButton
+                                                        color="error"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteStory(story.id);
+                                                        }}
+                                                        size="small"
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </>
+                                        )
+                                    }
+                                >
                                     <ListItemText
                                         primary={
                                             <Box
@@ -355,58 +409,6 @@ export const StoryBacklog: React.FC = () => {
                                         }
                                         secondary={story.description}
                                     />
-                                    {isAdmin && (
-                                        <ListItemSecondaryAction>
-                                            <Tooltip title="Edit Score">
-                                                <IconButton
-                                                    color="default"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingStory({
-                                                            id: story.id,
-                                                            title: story.title,
-                                                            currentScore: story.finalEstimate,
-                                                        });
-                                                        setEditScoreValue(
-                                                            story.finalEstimate !== undefined &&
-                                                                story.finalEstimate !== null
-                                                                ? String(story.finalEstimate)
-                                                                : ''
-                                                        );
-                                                    }}
-                                                    size="small"
-                                                >
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            {!isActive && (
-                                                <Tooltip title="Estimate This Story (Admin)">
-                                                    <IconButton
-                                                        color="primary"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setPendingStoryChange(index);
-                                                        }}
-                                                        size="small"
-                                                    >
-                                                        <PlayArrowIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            )}
-                                            {roomState.stories.length > 1 && (
-                                                <IconButton
-                                                    color="error"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteStory(story.id);
-                                                    }}
-                                                    size="small"
-                                                >
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                        </ListItemSecondaryAction>
-                                    )}
                                 </ListItem>
                             </Paper>
                         );
@@ -420,7 +422,7 @@ export const StoryBacklog: React.FC = () => {
                 maxWidth="xs"
                 onClose={() => setEditingStory(null)}
                 open={Boolean(editingStory)}
-                PaperProps={{ sx: { borderRadius: '20px', p: 1 } }}
+                slotProps={{ paper: { sx: { borderRadius: '20px', p: 1 } } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>✏️ Edit Story Score</DialogTitle>
                 <DialogContent>
@@ -494,7 +496,7 @@ export const StoryBacklog: React.FC = () => {
                 maxWidth="sm"
                 onClose={() => setIsBulkOpen(false)}
                 open={isBulkOpen}
-                PaperProps={{ sx: { borderRadius: '20px' } }}
+                slotProps={{ paper: { sx: { borderRadius: '20px' } } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>Bulk Import User Stories</DialogTitle>
                 <DialogContent>
@@ -531,12 +533,13 @@ export const StoryBacklog: React.FC = () => {
                 maxWidth="xs"
                 onClose={() => setPendingStoryChange(null)}
                 open={pendingStoryChange !== null}
-                PaperProps={{ sx: { borderRadius: '16px', p: 1 } }}
+                slotProps={{ paper: { sx: { borderRadius: '16px', p: 1 } } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>Confirm Story Change</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2">
-                        Are you sure you want to change the active story? This will affect all participants and reset the timer.
+                        Are you sure you want to change the active story? This will affect all
+                        participants and reset the timer.
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3 }}>

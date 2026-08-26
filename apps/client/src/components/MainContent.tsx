@@ -12,11 +12,11 @@ import {
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
+import { EstimationPanel } from './EstimationPanel';
 import { Home } from './Home';
 import { Navbar } from './Navbar';
-import { RoomSettingsModal } from './RoomSettingsModal';
 import { ParticipantsPanel } from './ParticipantsPanel';
-import { EstimationPanel } from './EstimationPanel';
+import { RoomSettingsModal } from './RoomSettingsModal';
 import { StoryBacklog } from './StoryBacklog';
 
 export interface MainContentProps {
@@ -58,17 +58,17 @@ export const MainContent: React.FC<MainContentProps> = ({ darkMode, onToggleDark
                 >
                     <Grid container spacing={3}>
                         {/* Participants Column (Left on Desktop, Top on Mobile) */}
-                        <Grid item xs={12} md={3}>
+                        <Grid size={{ xs: 12, md: 3 }}>
                             <ParticipantsPanel />
                         </Grid>
 
                         {/* Estimation Column (Center on Desktop, Middle on Mobile) */}
-                        <Grid item xs={12} md={5} lg={6}>
+                        <Grid size={{ xs: 12, md: 5, lg: 6 }}>
                             <EstimationPanel />
                         </Grid>
 
                         {/* Backlog Column (Right on Desktop, Bottom on Mobile) */}
-                        <Grid item xs={12} md={4} lg={3}>
+                        <Grid size={{ xs: 12, md: 4, lg: 3 }}>
                             <StoryBacklog />
                         </Grid>
                     </Grid>
@@ -84,7 +84,7 @@ export const MainContent: React.FC<MainContentProps> = ({ darkMode, onToggleDark
                 maxWidth="xs"
                 onClose={clearKickedMessage}
                 open={Boolean(kickedMessage)}
-                PaperProps={{ sx: { borderRadius: '16px', p: 1 } }}
+                slotProps={{ paper: { sx: { borderRadius: '16px', p: 1 } } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>Session Notice</DialogTitle>
                 <DialogContent>

@@ -18,14 +18,20 @@ import {
     Alert,
 } from '@mui/material';
 import { AVATAR_COLORS, AVATARS, DeckType, PRESET_DECKS } from '@planitpoker/shared';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
 
 export const Home: React.FC = () => {
     const { createRoom, joinRoom, error, clearError } = useSocket();
 
-    const [tabIndex, setTabIndex] = useState(0);
+    const [tabIndex, setTabIndex] = useState(() => {
+        const hash =
+            typeof window !== 'undefined'
+                ? window.location.hash.replace('#', '').toUpperCase()
+                : '';
+        return hash && hash.length === 6 ? 1 : 0;
+    });
     const [userName, setUserName] = useState(() => localStorage.getItem('planit_name') || '');
     const [avatar, setAvatar] = useState(() => localStorage.getItem('planit_avatar') || AVATARS[0]);
     const [color, setColor] = useState(
@@ -37,16 +43,13 @@ export const Home: React.FC = () => {
     const [deckType, setDeckType] = useState<DeckType>('fibonacci');
 
     // Join room form
-    const [roomCode, setRoomCode] = useState('');
-
-    // Check URL hash for direct room link (e.g. /#ABC123)
-    useEffect(() => {
-        const hash = window.location.hash.replace('#', '').toUpperCase();
-        if (hash && hash.length === 6) {
-            setRoomCode(hash);
-            setTabIndex(1); // Switch to Join tab
-        }
-    }, []);
+    const [roomCode, setRoomCode] = useState(() => {
+        const hash =
+            typeof window !== 'undefined'
+                ? window.location.hash.replace('#', '').toUpperCase()
+                : '';
+        return hash && hash.length === 6 ? hash : '';
+    });
 
     const savePreferences = () => {
         localStorage.setItem('planit_name', userName);
@@ -155,7 +158,7 @@ export const Home: React.FC = () => {
 
                     <Grid container spacing={1} sx={{ mb: 2 }}>
                         {AVATARS.map((emoji) => (
-                            <Grid item key={emoji}>
+                            <Grid key={emoji}>
                                 <Box
                                     aria-label={`Select avatar ${emoji}`}
                                     role="button"
@@ -190,7 +193,7 @@ export const Home: React.FC = () => {
 
                     <Grid container spacing={1}>
                         {AVATAR_COLORS.map((c) => (
-                            <Grid item key={c}>
+                            <Grid key={c}>
                                 <Box
                                     aria-label={`Select color ${c}`}
                                     role="button"
@@ -293,12 +296,14 @@ export const Home: React.FC = () => {
                             value={roomCode}
                             onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
                             required
-                            inputProps={{
-                                maxLength: 6,
-                                style: {
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '2px',
-                                    fontWeight: 700,
+                            slotProps={{
+                                htmlInput: {
+                                    maxLength: 6,
+                                    style: {
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '2px',
+                                        fontWeight: 700,
+                                    },
                                 },
                             }}
                             sx={{ mb: 3 }}

@@ -3,7 +3,6 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditIcon from '@mui/icons-material/Edit';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import LockIcon from '@mui/icons-material/Lock';
 import SettingsIcon from '@mui/icons-material/Settings';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -12,6 +11,7 @@ import {
     Alert,
     AppBar,
     Box,
+    Button,
     Chip,
     Dialog,
     DialogActions,
@@ -26,7 +26,6 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import Button from '@mui/material/Button';
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
@@ -37,11 +36,7 @@ interface NavbarProps {
     onToggleDarkMode: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
-    darkMode,
-    onOpenSettings,
-    onToggleDarkMode,
-}) => {
+export const Navbar: React.FC<NavbarProps> = ({ darkMode, onOpenSettings, onToggleDarkMode }) => {
     const { currentUserId, isAdmin, leaveRoom, roomState, toggleSpectator, updateRoomTitle } =
         useSocket();
     const [copied, setCopied] = useState(false);
@@ -256,7 +251,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 />
                             )}
 
-
                             {/* Settings Modal (Admin only) */}
                             {isAdmin && (
                                 <Tooltip title="Room Settings (Admin)">
@@ -304,7 +298,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 maxWidth="xs"
                 onClose={() => setIsEditingTitle(false)}
                 open={isEditingTitle}
-                PaperProps={{ sx: { borderRadius: '16px' } }}
+                slotProps={{ paper: { sx: { borderRadius: '16px' } } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>Rename Room</DialogTitle>
                 <DialogContent>
