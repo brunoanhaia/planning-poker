@@ -28,7 +28,7 @@ export const ResultsPanel: React.FC = () => {
     const [isManualEditOpen, setIsManualEditOpen] = useState(false);
     const [manualScore, setManualScore] = useState('');
     const [allStoriesCompletedNotice, setAllStoriesCompletedNotice] = useState(false);
-    
+
     const [confirmNextStoryOpen, setConfirmNextStoryOpen] = useState(false);
     const [pendingEstimate, setPendingEstimate] = useState<number | string | undefined>(undefined);
 
@@ -163,7 +163,7 @@ export const ResultsPanel: React.FC = () => {
                 </Box>
 
                 <Grid container spacing={{ sm: 3, xs: 1.5 }} sx={{ mb: { sm: 4, xs: 2.5 } }}>
-                    <Grid item sm={3} xs={6}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                         <Box
                             sx={{
                                 bgcolor: 'action.hover',
@@ -193,7 +193,7 @@ export const ResultsPanel: React.FC = () => {
                         </Box>
                     </Grid>
 
-                    <Grid item sm={3} xs={6}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                         <Box
                             sx={{
                                 bgcolor: 'action.hover',
@@ -223,7 +223,7 @@ export const ResultsPanel: React.FC = () => {
                         </Box>
                     </Grid>
 
-                    <Grid item sm={3} xs={6}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                         <Box
                             sx={{
                                 bgcolor: 'action.hover',
@@ -253,7 +253,7 @@ export const ResultsPanel: React.FC = () => {
                         </Box>
                     </Grid>
 
-                    <Grid item sm={3} xs={6}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
                         <Box
                             sx={{
                                 bgcolor: 'action.hover',
@@ -354,7 +354,7 @@ export const ResultsPanel: React.FC = () => {
                 maxWidth="xs"
                 onClose={() => setIsManualEditOpen(false)}
                 open={isManualEditOpen}
-                PaperProps={{ sx: { borderRadius: '20px', p: 1 } }}
+                slotProps={{ paper: { sx: { borderRadius: '20px', p: 1 } } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>✏️ Set Custom Story Score</DialogTitle>
                 <DialogContent>
@@ -420,21 +420,18 @@ export const ResultsPanel: React.FC = () => {
                 maxWidth="xs"
                 onClose={() => setConfirmNextStoryOpen(false)}
                 open={confirmNextStoryOpen}
-                PaperProps={{ sx: { borderRadius: '16px', p: 1 } }}
+                slotProps={{ paper: { sx: { borderRadius: '16px', p: 1 } } }}
             >
                 <DialogTitle sx={{ fontWeight: 800 }}>Confirm Story Change</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2">
-                        Are you sure you want to save this estimate and advance to the next story? This will affect all participants and reset the timer.
+                        Are you sure you want to save this estimate and advance to the next story?
+                        This will affect all participants and reset the timer.
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3 }}>
                     <Button onClick={() => setConfirmNextStoryOpen(false)}>Cancel</Button>
-                    <Button
-                        color="primary"
-                        onClick={confirmSaveEstimate}
-                        variant="contained"
-                    >
+                    <Button color="primary" onClick={confirmSaveEstimate} variant="contained">
                         Save & Advance
                     </Button>
                 </DialogActions>

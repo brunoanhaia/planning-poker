@@ -64,7 +64,7 @@ The application supports multiple users connecting to a single room to vote on t
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js (v20 or higher)
 - npm
 
 ### Installation

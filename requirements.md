@@ -6,9 +6,9 @@
 2. **Room lifecycle**: Users can create a new room, join an existing room via a unique URL, and leave a room. The server tracks active rooms and participants.
 3. **User roles**: Four roles are supported – Administrator, Co‑host, Voter, Spectator – each with defined permissions for room settings, participant management, and voting.
 4. **Voting flow**:
-   - Voters can select a card to submit an estimate.
-   - Administrator/Co‑host can reveal all votes, reset the voting session, and finalize the estimate.
-   - Automatic progression to the next story after finalization.
+    - Voters can select a card to submit an estimate.
+    - Administrator/Co‑host can reveal all votes, reset the voting session, and finalize the estimate.
+    - Automatic progression to the next story after finalization.
 5. **Room settings**: Admin/Co‑host can rename the room, lock/unlock the room, and change the estimation deck type (e.g., Fibonacci, T‑Shirt sizes).
 6. **Participant management**: Admin/Co‑host can kick users, promote users to Co‑host, and transfer the Administrator role.
 7. **Backlog management**: Add, edit, delete, and bulk‑import stories; manually adjust story estimates.
@@ -27,4 +27,4 @@
 7. **Maintainability**: Modular architecture with separate client, server, and shared packages; custom skills (`realtime‑websocket‑manager`, `react‑clean‑architecture`, etc.) enforce separation of concerns.
 8. **Documentation**: Up‑to‑date README, GEMINI.md, and requirements file reflecting the native WebSocket stack.
 
-*This file should be updated whenever new functional or non‑functional requirements are added.*
+_This file should be updated whenever new functional or non‑functional requirements are added._

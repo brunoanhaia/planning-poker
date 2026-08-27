@@ -1,7 +1,18 @@
-import { Box, Paper, Typography, Chip, List, ListItem, ListItemText, ListItemAvatar, Avatar } from '@mui/material';
-import React from 'react';
-import { useSocket } from '../context/SocketContext';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import {
+    Avatar,
+    Box,
+    Chip,
+    List,
+    ListItem,
+    ListItemAvatar,
+    ListItemText,
+    Paper,
+    Typography,
+} from '@mui/material';
+import React from 'react';
+
+import { useSocket } from '../context/SocketContext';
 
 export const ParticipantsPanel: React.FC = () => {
     const { currentUserId, roomState } = useSocket();
@@ -61,9 +72,25 @@ export const ParticipantsPanel: React.FC = () => {
                             </ListItemAvatar>
                             <ListItemText
                                 primary={
-                                    <Typography variant="body2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                        {participant.name} 
-                                        {isSelf && <Typography component="span" variant="caption" color="primary.main">(you)</Typography>}
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            fontWeight: 700,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 0.5,
+                                        }}
+                                    >
+                                        {participant.name}
+                                        {isSelf && (
+                                            <Typography
+                                                component="span"
+                                                variant="caption"
+                                                color="primary.main"
+                                            >
+                                                (you)
+                                            </Typography>
+                                        )}
                                     </Typography>
                                 }
                             />
@@ -77,7 +104,12 @@ export const ParticipantsPanel: React.FC = () => {
                                 />
                             )}
                             {participant.isSpectator && (
-                                <Chip label="Spectator" size="small" variant="outlined" sx={{ fontWeight: 700, height: 24 }} />
+                                <Chip
+                                    label="Spectator"
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontWeight: 700, height: 24 }}
+                                />
                             )}
                         </ListItem>
                     );

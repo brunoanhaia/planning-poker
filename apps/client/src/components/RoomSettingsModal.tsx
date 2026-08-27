@@ -78,7 +78,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
             maxWidth="xs"
             onClose={onClose}
             open={open}
-            PaperProps={{ sx: { borderRadius: '20px', p: 1 } }}
+            slotProps={{ paper: { sx: { borderRadius: '20px', p: 1 } } }}
         >
             <DialogTitle sx={{ fontWeight: 800 }}>👑 Room & Session Settings</DialogTitle>
             <DialogContent>

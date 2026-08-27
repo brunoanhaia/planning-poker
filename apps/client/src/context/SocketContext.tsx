@@ -1,5 +1,5 @@
 import { DeckType, RoomState } from '@planitpoker/shared';
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, use, useEffect, useRef, useState } from 'react';
 
 interface SocketContextValue {
     addStory: (title: string, description?: string) => void;
@@ -56,69 +56,92 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [kickedMessage, setKickedMessage] = useState<null | string>(null);
     const socketRef = useRef<null | WebSocket>(null);
 
-    const connect = useCallback(() => {
-        if (
-            socketRef.current &&
-            (socketRef.current.readyState === WebSocket.OPEN ||
-                socketRef.current.readyState === WebSocket.CONNECTING)
-        ) {
-            return;
-        }
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = import.meta.env.DEV ? 'localhost:5000' : window.location.host;
-        const wsUrl = `${protocol}//${host}`;
-
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-            setIsConnected(true);
-            setError(null);
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const { payload, type } = JSON.parse(event.data);
-                if (type === 'ROOM_STATE') {
-                    setRoomState(payload.roomState);
-                    if (payload.currentUserId) {
-                        setCurrentUserId(payload.currentUserId);
-                        localStorage.setItem('planit_user_id', payload.currentUserId);
-                    }
-                } else if (type === 'KICKED') {
-                    setRoomState(null);
-                    setKickedMessage(payload.message || 'You have been removed from the session.');
-                } else if (type === 'ERROR') {
-                    setError(payload.message || 'An error occurred');
-                }
-            } catch (err) {
-                console.error('Failed to parse WS payload:', err);
-            }
-        };
-
-        ws.onclose = () => {
-            setIsConnected(false);
-            setTimeout(() => {
-                connect();
-            }, 2000);
-        };
-
-        ws.onerror = (err) => {
-            console.error('WebSocket connection error:', err);
-            setIsConnected(false);
-        };
-
-        socketRef.current = ws;
-    }, []);
-
     useEffect(() => {
+        let isMounted = true;
+        let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        const connect = () => {
+            if (
+                socketRef.current &&
+                (socketRef.current.readyState === WebSocket.OPEN ||
+                    socketRef.current.readyState === WebSocket.CONNECTING)
+            ) {
+                return;
+            }
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = import.meta.env.DEV ? 'localhost:5000' : window.location.host;
+            const wsUrl = `${protocol}//${host}`;
+
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                if (!isMounted) {
+                    return;
+                }
+                setIsConnected(true);
+                setError(null);
+            };
+
+            ws.onmessage = (event) => {
+                if (!isMounted) {
+                    return;
+                }
+                try {
+                    const { payload, type } = JSON.parse(event.data);
+                    if (type === 'ROOM_STATE') {
+                        setRoomState(payload.roomState);
+                        if (payload.currentUserId) {
+                            setCurrentUserId(payload.currentUserId);
+                            localStorage.setItem('planit_user_id', payload.currentUserId);
+                        }
+                    } else if (type === 'KICKED') {
+                        setRoomState(null);
+                        setKickedMessage(
+                            payload.message || 'You have been removed from the session.'
+                        );
+                    } else if (type === 'ERROR') {
+                        setError(payload.message || 'An error occurred');
+                    }
+                } catch (err) {
+                    console.error('Failed to parse WS payload:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                if (!isMounted) {
+                    return;
+                }
+                setIsConnected(false);
+                reconnectTimeout = setTimeout(() => {
+                    if (isMounted) {
+                        connect();
+                    }
+                }, 2000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket connection error:', err);
+                if (isMounted) {
+                    setIsConnected(false);
+                }
+            };
+
+            socketRef.current = ws;
+        };
+
         connect();
+
         return () => {
+            isMounted = false;
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+            }
             if (socketRef.current) {
                 socketRef.current.close();
             }
         };
-    }, [connect]);
+    }, []);
 
     const send = (type: string, payload: any) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -246,7 +269,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const isAdmin = isHost || !!currentParticipant?.isAdmin;
 
     return (
-        <SocketContext.Provider
+        <SocketContext
             value={{
                 addStory,
                 bulkAddStories,
@@ -284,12 +307,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             }}
         >
             {children}
-        </SocketContext.Provider>
+        </SocketContext>
     );
 };
 
 export const useSocket = () => {
-    const context = useContext(SocketContext);
+    const context = use(SocketContext);
     if (!context) {
         throw new Error('useSocket must be used within a SocketProvider');
     }
