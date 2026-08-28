@@ -69,9 +69,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return;
             }
 
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = import.meta.env.DEV ? 'localhost:5000' : window.location.host;
-            const wsUrl = `${protocol}//${host}`;
+            const wsUrl =
+                import.meta.env.VITE_WS_URL ||
+                (import.meta.env.DEV
+                    ? 'ws://localhost:5000'
+                    : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`);
 
             const ws = new WebSocket(wsUrl);
 

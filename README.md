@@ -132,3 +132,21 @@ To format all files in the repository:
 ```bash
 npx prettier --write .
 ```
+
+## Deployment (Production)
+
+This project is configured for deployment using a decoupled architecture: **Vercel** for the frontend and **Render** for the backend.
+
+### Backend (Render)
+The backend is a Node.js web service running Express and native WebSockets.
+1. Connect your repository to Render.
+2. The included `render.yaml` blueprint will automatically configure the build and start commands for the monorepo.
+3. Configure the `ALLOWED_ORIGINS` environment variable in the Render Dashboard to match your Vercel frontend URL (e.g., `https://planitpoker.vercel.app`).
+
+### Frontend (Vercel)
+The frontend is a React/Vite SPA.
+1. Import the repository into Vercel and select the `apps/client` root directory.
+2. In Vercel Project Settings > General, enable **Include source files outside of the Root Directory**.
+3. Set the Build Command to: `cd ../.. && npm install && npm run build:shared && npm --workspace=@planitpoker/client run build`
+4. Configure the `VITE_WS_URL` environment variable to point to your Render backend WebSocket URL (e.g., `wss://planitpoker-server.onrender.com`).
+
