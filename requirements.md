@@ -25,6 +25,6 @@
 5. **Code Quality**: Strict TypeScript typing via `@planitpoker/shared`, ESLint/Prettier compliance, and clean‑code conventions (no magic values, early returns, explicit blocks).
 6. **Testing**: Comprehensive unit, integration, and end‑to‑end tests using Vitest, Playwright, and Axe‑core covering functional flows and accessibility.
 7. **Maintainability**: Modular architecture with separate client, server, and shared packages; custom skills (`realtime‑websocket‑manager`, `react‑clean‑architecture`, etc.) enforce separation of concerns.
-8. **Documentation**: Up‑to‑date README, GEMINI.md, and requirements file reflecting the native WebSocket stack.
+8. **Documentation**: Up‑to‑date README, AGENTS.md, and requirements file reflecting the native WebSocket stack.
 
 _This file should be updated whenever new functional or non‑functional requirements are added._
