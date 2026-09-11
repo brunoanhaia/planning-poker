@@ -18,21 +18,23 @@ ENV VITE_WS_URL=${VITE_WS_URL}
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/client/package.json ./apps/client/
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY packages/shared ./packages/shared
 COPY apps/client ./apps/client
 COPY tsconfig.base.json ./
 RUN npm run build:shared && npm --workspace=@planitpoker/client run build
 
-FROM nginx:1.27-alpine AS runner
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runner
 
 # Final image contains ONLY: nginx.conf + static dist/ (no *.test.*,
 # no setupTests, no e2e). Vite bundles just the imported app graph.
 COPY apps/client/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/apps/client/dist /usr/share/nginx/html
 
-EXPOSE 80
+USER nginx
+
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1

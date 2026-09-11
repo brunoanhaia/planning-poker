@@ -75,7 +75,7 @@ docker compose up --build   # client :80, server :5000
 ```
 
 - **Server image**: `apps/server/Dockerfile` (Node 20 multi-stage, `HEALTHCHECK` on `/api/health`, runs `node dist/index.js` as `node` user).
-- **Client image**: `apps/client/Dockerfile` (Vite build + `nginx:1.27-alpine`, config in `apps/client/nginx.conf`). Nginx serves the SPA with fallback to `index.html` and proxies `/api/*` + `/ws` (with `Upgrade`) to the `server` service.
+- **Client image**: `apps/client/Dockerfile` (Vite build + `nginxinc/nginx-unprivileged:1.27-alpine` as `nginx` user on `:8080`, config in `apps/client/nginx.conf`). Nginx serves the SPA with fallback to `index.html` and proxies `/api/*` + `/ws` (with `Upgrade`) to the `server` service.
 
 ## Style & Conventions
 

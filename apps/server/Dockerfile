@@ -15,7 +15,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/server/package.json ./apps/server/
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy only the sources required by tsc (tsconfig includes src/**/*,
 # so tests/ directories are never compiled into dist/).
