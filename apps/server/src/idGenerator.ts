@@ -22,7 +22,7 @@ export const generateRoomId = (): string => {
  * @returns A unique user identifier prefixed with 'user_'.
  */
 export const generateUserId = (): string => {
-    const randomSegment = randomUUID().replace(/-/g, '').slice(0, 9);
+    const randomSegment = randomUUID().replaceAll('-', '').slice(0, 9);
     return `user_${randomSegment}`;
 };
 
@@ -33,6 +33,6 @@ export const generateUserId = (): string => {
  * @returns A unique story identifier prefixed with 'story_'.
  */
 export const generateStoryId = (): string => {
-    const randomSegment = randomUUID().replace(/-/g, '').slice(0, 9);
+    const randomSegment = randomUUID().replaceAll('-', '').slice(0, 9);
     return `story_${randomSegment}`;
 };
