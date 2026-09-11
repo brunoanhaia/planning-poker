@@ -75,6 +75,7 @@ export class WebSocketHandler {
             this.handleUpdateStoryEstimate(ws, payload as UpdateStoryEstimatePayload),
         VOTE: (ws, payload) => this.handleVote(ws, payload as VotePayload),
     };
+    private heartbeatInterval: NodeJS.Timeout | null = null;
     private timerInterval: NodeJS.Timeout | null = null;
     private readonly wss: WebSocketServer;
 
@@ -116,7 +117,7 @@ export class WebSocketHandler {
             });
         });
 
-        setInterval(() => {
+        this.heartbeatInterval = setInterval(() => {
             this.wss.clients.forEach((client) => {
                 const ws = client as ExtendedWebSocket;
                 if (ws.isAlive === false) {
@@ -668,10 +669,14 @@ export class WebSocketHandler {
     }
 
     /**
-     * Stops the timer ticker and closes all WebSocket connections.
+     * Stops the heartbeat and timer tickers and closes all WebSocket connections.
      * Used for graceful shutdown on process termination signals.
      */
     public shutdown(): void {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;
