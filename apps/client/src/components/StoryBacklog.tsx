@@ -114,7 +114,7 @@ export const StoryBacklog: React.FC = () => {
         link.setAttribute('download', `${roomState.title}_Backlog_Estimates.csv`);
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        link.remove();
     };
 
     return (
@@ -474,7 +474,7 @@ export const StoryBacklog: React.FC = () => {
                             onClick={() => {
                                 if (editingStory) {
                                     const parsedNum = Number(editScoreValue.trim());
-                                    const finalVal = !isNaN(parsedNum)
+                                    const finalVal = !Number.isNaN(parsedNum)
                                         ? parsedNum
                                         : editScoreValue.trim();
                                     updateStoryEstimate(editingStory.id, finalVal);

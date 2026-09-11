@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import http from 'http';
+import http from 'node:http';
 import { WebSocketServer } from 'ws';
 
 import { WebSocketHandler } from './webSocketHandler.js';
@@ -12,7 +12,7 @@ app.use(
     cors({
         origin: ALLOWED_ORIGINS,
         credentials: true,
-    }),
+    })
 );
 app.use(express.json());
 
@@ -25,7 +25,15 @@ app.get('/api/health', (req, res) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-new WebSocketHandler(wss);
+const webSocketHandler = new WebSocketHandler(wss);
+
+const shutdown = (): void => {
+    webSocketHandler.shutdown();
+    server.close(() => process.exit(0));
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 server.listen(PORT, () => {
     console.log(`🚀 Planit Poker WebSocket & HTTP server listening on port ${PORT}`);

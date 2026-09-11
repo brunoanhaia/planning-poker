@@ -328,7 +328,7 @@ export class RoomManager {
      */
     public tickTimer(roomId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || !room.timer || !room.timer.isRunning) {
+        if (!room?.timer?.isRunning) {
             return null;
         }
 
@@ -469,7 +469,7 @@ export class RoomManager {
      */
     public transferAdmin(roomId: string, adminId: string, targetUserId: string): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || room.hostId !== adminId) {
+        if (room?.hostId !== adminId) {
             return null;
         }
         return transferRoomAdmin(room, adminId, targetUserId);

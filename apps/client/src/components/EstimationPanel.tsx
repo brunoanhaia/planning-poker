@@ -18,11 +18,201 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
+import { Story, TimerState } from '@planitpoker/shared';
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
 import { CardDeck } from './CardDeck';
 import { ResultsPanel } from './ResultsPanel';
+
+interface VoteActionsArgs {
+    activeVoterCount: number;
+    isAdmin: boolean;
+    onResetVotes: () => void;
+    onRevealVotes: () => void;
+    votedCount: number;
+    votesRevealed: boolean;
+}
+
+/**
+ * Checks whether the countdown timer is in its final seconds.
+ */
+const isTimerEnding = (timer: TimerState | null | undefined): boolean => {
+    if (!timer) {
+        return false;
+    }
+    return timer.remaining <= 10 && timer.remaining > 0;
+};
+
+/**
+ * Resolves the timer badge background for its current state.
+ */
+const getTimerBackground = (timerEnding: boolean, isRunning: boolean): string => {
+    if (timerEnding) {
+        return 'error.dark';
+    }
+    if (isRunning) {
+        return 'action.selected';
+    }
+    return 'background.default';
+};
+
+/**
+ * Resolves the timer badge text color for its current state.
+ */
+const getTimerTextColor = (timerEnding: boolean): string => {
+    if (timerEnding) {
+        return '#fff';
+    }
+    return 'text.primary';
+};
+
+/**
+ * Resolves the timer icon color for its current state.
+ */
+const getTimerIconColor = (
+    timerEnding: boolean,
+    isRunning: boolean
+): 'action' | 'inherit' | 'primary' => {
+    if (timerEnding) {
+        return 'inherit';
+    }
+    if (isRunning) {
+        return 'primary';
+    }
+    return 'action';
+};
+
+/**
+ * Resolves the timer control tooltip for its current state.
+ */
+const getTimerTooltip = (isRunning: boolean): string => {
+    if (isRunning) {
+        return 'Pause Timer';
+    }
+    return 'Start Timer';
+};
+
+/**
+ * Formats the remaining time, or a placeholder when the timer is off.
+ */
+const formatTimerDisplay = (timer: TimerState | null | undefined): string => {
+    if (!timer) {
+        return 'Timer: Off';
+    }
+    return `${Math.floor(timer.remaining / 60)}:${String(timer.remaining % 60).padStart(2, '0')}`;
+};
+
+/**
+ * Resolves the paper elevation for the timer badge.
+ */
+const getTimerElevation = (timer: TimerState | null | undefined): number => {
+    if (timer?.isRunning) {
+        return 2;
+    }
+    return 0;
+};
+
+/**
+ * Renders the play/pause icon matching the timer state.
+ */
+const renderTimerIcon = (isRunning: boolean): React.ReactNode => {
+    if (isRunning) {
+        return <PauseIcon fontSize="small" />;
+    }
+    return <PlayArrowIcon fontSize="small" />;
+};
+
+/**
+ * Resolves the current story heading, with a fallback when none is active.
+ */
+const getCurrentStoryTitle = (story: Story | undefined): string => {
+    if (!story) {
+        return 'No active story selected';
+    }
+    return story.title;
+};
+
+/**
+ * Renders the voting deck or the results, depending on the reveal state.
+ */
+const renderEstimationContent = (votesRevealed: boolean): React.ReactNode => {
+    if (votesRevealed) {
+        return <ResultsPanel />;
+    }
+    return <CardDeck />;
+};
+
+/**
+ * Resolves the reveal-button suffix shown once every voter has voted.
+ */
+const getAllVotedSuffix = (votedCount: number, activeVoterCount: number): string => {
+    if (votedCount === activeVoterCount && activeVoterCount > 0) {
+        return '(All voted!)';
+    }
+    return '';
+};
+
+/**
+ * Renders the reveal/reset/waiting actions for the current voting state.
+ */
+const renderVoteActions = ({
+    activeVoterCount,
+    isAdmin,
+    onResetVotes,
+    onRevealVotes,
+    votedCount,
+    votesRevealed,
+}: VoteActionsArgs): React.ReactNode => {
+    if (!votesRevealed) {
+        if (!isAdmin) {
+            return (
+                <Chip
+                    icon={<VisibilityIcon />}
+                    label="Waiting for Host to reveal"
+                    sx={{ fontWeight: 700, py: 2, px: 1 }}
+                />
+            );
+        }
+        return (
+            <Button
+                color="primary"
+                disabled={activeVoterCount === 0}
+                onClick={onRevealVotes}
+                startIcon={<VisibilityIcon />}
+                sx={{
+                    borderRadius: '24px',
+                    fontWeight: 800,
+                    px: 4,
+                    py: 1,
+                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
+                }}
+                variant="contained"
+            >
+                Reveal Votes {getAllVotedSuffix(votedCount, activeVoterCount)}
+            </Button>
+        );
+    }
+    if (!isAdmin) {
+        return null;
+    }
+    return (
+        <Button
+            color="secondary"
+            onClick={onResetVotes}
+            startIcon={<RefreshIcon />}
+            sx={{
+                borderRadius: '24px',
+                fontWeight: 800,
+                px: 4,
+                py: 1,
+            }}
+            variant="outlined"
+        >
+            Reset Votes (Admin)
+        </Button>
+    );
+};
 
 export const EstimationPanel: React.FC = () => {
     const { isAdmin, pauseTimer, resetTimer, resetVotes, revealVotes, roomState, startTimer } =
@@ -40,7 +230,8 @@ export const EstimationPanel: React.FC = () => {
     const votingProgress = activeVoters.length > 0 ? (votedCount / activeVoters.length) * 100 : 0;
 
     const timer = roomState.timer;
-    const isTimerEnding = timer && timer.remaining <= 10 && timer.remaining > 0;
+    const timerEnding = isTimerEnding(timer);
+    const isTimerRunning = timer?.isRunning === true;
 
     const handleOpenTimerMenu = (event: React.MouseEvent<HTMLElement>) => {
         setTimerMenuAnchor(event.currentTarget);
@@ -84,16 +275,12 @@ export const EstimationPanel: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                     {/* Synchronized Countdown Timer */}
                     <Paper
-                        elevation={timer?.isRunning ? 2 : 0}
+                        elevation={getTimerElevation(timer)}
                         sx={{
                             alignItems: 'center',
-                            bgcolor: isTimerEnding
-                                ? 'error.dark'
-                                : timer?.isRunning
-                                  ? 'action.selected'
-                                  : 'background.default',
+                            bgcolor: getTimerBackground(timerEnding, isTimerRunning),
                             borderRadius: '16px',
-                            color: isTimerEnding ? '#fff' : 'text.primary',
+                            color: getTimerTextColor(timerEnding),
                             display: 'flex',
                             gap: 1,
                             px: 1.5,
@@ -104,34 +291,26 @@ export const EstimationPanel: React.FC = () => {
                         }}
                     >
                         <AccessTimeIcon
-                            color={
-                                isTimerEnding ? 'inherit' : timer?.isRunning ? 'primary' : 'action'
-                            }
+                            color={getTimerIconColor(timerEnding, isTimerRunning)}
                             fontSize="small"
                         />
                         <Typography
                             sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 800 }}
                             variant="body2"
                         >
-                            {timer
-                                ? `${Math.floor(timer.remaining / 60)}:${String(timer.remaining % 60).padStart(2, '0')}`
-                                : 'Timer: Off'}
+                            {formatTimerDisplay(timer)}
                         </Typography>
 
                         {isAdmin && (
                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Tooltip title={timer?.isRunning ? 'Pause Timer' : 'Start Timer'}>
+                                <Tooltip title={getTimerTooltip(isTimerRunning)}>
                                     <IconButton
                                         color="inherit"
                                         onClick={timer ? pauseTimer : handleOpenTimerMenu}
                                         size="small"
                                         sx={{ p: 0.5 }}
                                     >
-                                        {timer?.isRunning ? (
-                                            <PauseIcon fontSize="small" />
-                                        ) : (
-                                            <PlayArrowIcon fontSize="small" />
-                                        )}
+                                        {renderTimerIcon(isTimerRunning)}
                                     </IconButton>
                                 </Tooltip>
                                 {timer && (
@@ -205,7 +384,7 @@ export const EstimationPanel: React.FC = () => {
                     <StyleIcon fontSize="small" /> Current Story
                 </Typography>
                 <Typography variant="h6" sx={{ fontWeight: 700, wordBreak: 'break-word' }}>
-                    {currentStory ? currentStory.title : 'No active story selected'}
+                    {getCurrentStoryTitle(currentStory)}
                 </Typography>
                 {currentStory?.description && (
                     <Typography
@@ -229,7 +408,7 @@ export const EstimationPanel: React.FC = () => {
                     mb: 3,
                 }}
             >
-                {roomState.votesRevealed ? <ResultsPanel /> : <CardDeck />}
+                {renderEstimationContent(roomState.votesRevealed)}
             </Box>
 
             {/* Voting Progress & Actions */}
@@ -249,52 +428,14 @@ export const EstimationPanel: React.FC = () => {
                 />
 
                 <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                    {!roomState.votesRevealed ? (
-                        isAdmin ? (
-                            <Button
-                                color="primary"
-                                disabled={activeVoters.length === 0}
-                                onClick={revealVotes}
-                                startIcon={<VisibilityIcon />}
-                                sx={{
-                                    borderRadius: '24px',
-                                    fontWeight: 800,
-                                    px: 4,
-                                    py: 1,
-                                    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-                                }}
-                                variant="contained"
-                            >
-                                Reveal Votes{' '}
-                                {votedCount === activeVoters.length && activeVoters.length > 0
-                                    ? '(All voted!)'
-                                    : ''}
-                            </Button>
-                        ) : (
-                            <Chip
-                                icon={<VisibilityIcon />}
-                                label="Waiting for Host to reveal"
-                                sx={{ fontWeight: 700, py: 2, px: 1 }}
-                            />
-                        )
-                    ) : (
-                        isAdmin && (
-                            <Button
-                                color="secondary"
-                                onClick={resetVotes}
-                                startIcon={<RefreshIcon />}
-                                sx={{
-                                    borderRadius: '24px',
-                                    fontWeight: 800,
-                                    px: 4,
-                                    py: 1,
-                                }}
-                                variant="outlined"
-                            >
-                                Reset Votes (Admin)
-                            </Button>
-                        )
-                    )}
+                    {renderVoteActions({
+                        activeVoterCount: activeVoters.length,
+                        isAdmin,
+                        onResetVotes: resetVotes,
+                        onRevealVotes: revealVotes,
+                        votedCount,
+                        votesRevealed: roomState.votesRevealed,
+                    })}
                 </Box>
             </Box>
 
