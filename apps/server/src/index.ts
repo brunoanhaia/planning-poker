@@ -12,7 +12,7 @@ app.use(
     cors({
         origin: ALLOWED_ORIGINS,
         credentials: true,
-    }),
+    })
 );
 app.use(express.json());
 
