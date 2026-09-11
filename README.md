@@ -135,18 +135,27 @@ npx prettier --write .
 
 ## Deployment (Production)
 
-This project is configured for deployment using a decoupled architecture: **Vercel** for the frontend and **Render** for the backend.
+Deployment is done via **containers**: `apps/server/Dockerfile` (Node 20) and
+`apps/client/Dockerfile` (Vite build + Nginx), orchestrated by `docker-compose.yml`.
 
-### Backend (Render)
-The backend is a Node.js web service running Express and native WebSockets.
-1. Connect your repository to Render.
-2. The included `render.yaml` blueprint will automatically configure the build and start commands for the monorepo.
-3. Configure the `ALLOWED_ORIGINS` environment variable in the Render Dashboard to match your Vercel frontend URL (e.g., `https://planitpoker.vercel.app`).
+Build context is always the repository root.
 
-### Frontend (Vercel)
-The frontend is a React/Vite SPA.
-1. Import the repository into Vercel and select the `apps/client` root directory.
-2. In Vercel Project Settings > General, enable **Include source files outside of the Root Directory**.
-3. Set the Build Command to: `cd ../.. && npm install && npm run build:shared && npm --workspace=@planitpoker/client run build`
-4. Configure the `VITE_WS_URL` environment variable to point to your Render backend WebSocket URL (e.g., `wss://planitpoker-server.onrender.com`).
+```bash
+cp .env.example .env   # adjust ALLOWED_ORIGINS / ports if needed
+docker compose up --build
+```
 
+- Client: `http://localhost` (Nginx serves the SPA, proxies `/api/*` and `/ws` to `server`).
+- Server: `http://localhost:5000` (health at `GET /api/health`).
+- Same-origin by default: leave `VITE_WS_URL` empty and the browser uses
+  `window.location.host` through the Nginx `/ws` proxy (no CORS setup needed).
+- External backend: `VITE_WS_URL=wss://api.exemplo.com docker compose up --build`
+  bakes the URL into the client bundle so the browser dials it directly.
+
+Individual images:
+
+```bash
+docker build -f apps/server/Dockerfile -t planitpoker-server .
+docker build -f apps/client/Dockerfile -t planitpoker-client .
+docker build -f apps/client/Dockerfile --build-arg VITE_WS_URL=wss://api.exemplo.com -t planitpoker-client .
+```

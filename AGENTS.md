@@ -62,12 +62,20 @@ npm run format           # prettier across repo
 ## Environment Variables
 
 - Server: `PORT`, `ALLOWED_ORIGINS` (comma-separated)
-- Client: `VITE_WS_URL` (production WebSocket URL, e.g. `wss://...`)
+- Client: `VITE_WS_URL` (production WebSocket URL, e.g. `wss://...`; empty = same-origin via Nginx `/ws` proxy). Baked at build time (`--build-arg VITE_WS_URL=...`).
+- Compose: `SERVER_PORT`, `CLIENT_PORT` (host port mappings). See `.env.example`.
 
 ## Deployment
 
-- **Render (backend)**: `render.yaml` builds from `apps/server` with `cd ../.. && npm install && npm run build:shared && npm --workspace=@planitpoker/server run build`, then `npm start`.
-- **Vercel (frontend)**: use `apps/client` as root. Build command: `cd ../.. && npm install && npm run build:shared && npm --workspace=@planitpoker/client run build`. Enable "Include source files outside of the Root Directory".
+Primary path is **containers** (build context = repo root):
+
+```bash
+cp .env.example .env
+docker compose up --build   # client :80, server :5000
+```
+
+- **Server image**: `apps/server/Dockerfile` (Node 20 multi-stage, `HEALTHCHECK` on `/api/health`, runs `node dist/index.js` as `node` user).
+- **Client image**: `apps/client/Dockerfile` (Vite build + `nginxinc/nginx-unprivileged:1.27-alpine` as `nginx` user on `:8080`, config in `apps/client/nginx.conf`). Nginx serves the SPA with fallback to `index.html` and proxies `/api/*` + `/ws` (with `Upgrade`) to the `server` service.
 
 ## Style & Conventions
 

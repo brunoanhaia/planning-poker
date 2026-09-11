@@ -1,0 +1,34 @@
+# Keep Docker build context lean (applies to both Dockerfiles, context = repo root).
+node_modules
+npm-debug.log*
+**/node_modules
+**/dist
+**/build
+**/out
+*.tsbuildinfo
+coverage
+.vitest
+test-results
+playwright-report
+blob-report
+playwright/.cache
+.git
+.gitattributes
+.github
+.vscode
+.idea
+.DS_Store
+*.log
+logs
+.env
+.env.local
+.env.*.local
+# E2E suite is test-only (Playwright) — never ship it in production images.
+apps/e2e
+# Unit/integration test artifacts — never part of the build or final image.
+apps/server/tests
+apps/client/src/tests
+apps/client/src/setupTests.ts
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
