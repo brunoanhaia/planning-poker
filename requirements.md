@@ -26,5 +26,6 @@
 6. **Testing**: Comprehensive unit, integration, and end‑to‑end tests using Vitest, Playwright, and Axe‑core covering functional flows and accessibility.
 7. **Maintainability**: Modular architecture with separate client, server, and shared packages; custom skills (`realtime‑websocket‑manager`, `react‑clean‑architecture`, etc.) enforce separation of concerns.
 8. **Documentation**: Up‑to‑date README, AGENTS.md, and requirements file reflecting the native WebSocket stack.
+9. **Deployability**: Shippable as containers — versioned `apps/server/Dockerfile` (Node 20) and `apps/client/Dockerfile` (Nginx + SPA fallback, `/api` + `/ws` reverse proxy) composed via `docker-compose.yml` with healthchecks and env-driven ports/origins.
 
 _This file should be updated whenever new functional or non‑functional requirements are added._
