@@ -136,7 +136,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         ]);
 
         const room = rm.getRoom(roomId)!;
-        expect(room.stories.length).toBe(4); // 1 initial + 3 bulk
+        expect(room.stories).toHaveLength(4); // 1 initial + 3 bulk
 
         const targetStoryId = room.stories[1].id;
         rm.updateStoryEstimate(roomId, hostId, targetStoryId, 13);

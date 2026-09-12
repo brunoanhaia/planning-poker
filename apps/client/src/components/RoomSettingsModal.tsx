@@ -56,7 +56,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                 .split(',')
                 .map((s) => s.trim())
                 .filter((s) => s.length > 0)
-                .map((s) => (!isNaN(Number(s)) ? Number(s) : s));
+                .map((s) => (!Number.isNaN(Number(s)) ? Number(s) : s));
 
             changeDeck('custom', parsed.length > 0 ? parsed : [1, 2, 3, 5, 8]);
         } else {

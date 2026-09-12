@@ -30,7 +30,7 @@ export const Home: React.FC = () => {
             typeof window !== 'undefined'
                 ? window.location.hash.replace('#', '').toUpperCase()
                 : '';
-        return hash && hash.length === 6 ? 1 : 0;
+        return hash?.length === 6 ? 1 : 0;
     });
     const [userName, setUserName] = useState(() => localStorage.getItem('planit_name') || '');
     const [avatar, setAvatar] = useState(() => localStorage.getItem('planit_avatar') || AVATARS[0]);
@@ -48,7 +48,7 @@ export const Home: React.FC = () => {
             typeof window !== 'undefined'
                 ? window.location.hash.replace('#', '').toUpperCase()
                 : '';
-        return hash && hash.length === 6 ? hash : '';
+        return hash?.length === 6 ? hash : '';
     });
 
     const savePreferences = () => {

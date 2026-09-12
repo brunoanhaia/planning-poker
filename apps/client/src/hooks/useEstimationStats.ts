@@ -40,7 +40,7 @@ export const useEstimationStats = (roomState: RoomState | null): EstimationStats
             counts[voteKey] = (counts[voteKey] || 0) + 1;
 
             const num = Number(p.vote);
-            if (!isNaN(num) && typeof p.vote !== 'symbol') {
+            if (!Number.isNaN(num) && typeof p.vote !== 'symbol') {
                 numericVotes.push(num);
             }
         });
@@ -56,7 +56,7 @@ export const useEstimationStats = (roomState: RoomState | null): EstimationStats
 
         const mode =
             Object.keys(counts).length > 0
-                ? Object.keys(counts).reduce((a, b) => (counts[a] > counts[b] ? a : b))
+                ? Object.keys(counts).reduce((a, b) => (counts[a] > counts[b] ? a : b), '')
                 : '-';
 
         return {

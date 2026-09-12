@@ -32,10 +32,50 @@ interface ExtendedWebSocket extends WebSocket {
     userId?: string;
 }
 
+interface RoomSession {
+    roomId: string;
+    userId: string;
+}
+
+type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
+
 /**
  * Handles real-time WebSocket connections, message routing, and room state broadcasting.
  */
 export class WebSocketHandler {
+    private readonly messageHandlers: Partial<Record<WSMessageType, MessageHandler>> = {
+        ADD_STORY: (ws, payload) => this.handleAddStory(ws, payload as AddStoryPayload),
+        BULK_ADD_STORIES: (ws, payload) =>
+            this.handleBulkAddStories(ws, payload as BulkAddStoriesPayload),
+        CHANGE_DECK: (ws, payload) => this.handleChangeDeck(ws, payload as ChangeDeckPayload),
+        CREATE_ROOM: (ws, payload) => this.handleCreateRoom(ws, payload as CreateRoomPayload),
+        DELETE_STORY: (ws, payload) => this.handleDeleteStory(ws, payload as DeleteStoryPayload),
+        END_SESSION: (ws) => this.handleEndSession(ws),
+        JOIN_ROOM: (ws, payload) => this.handleJoinRoom(ws, payload as JoinRoomPayload),
+        KICK_PARTICIPANT: (ws, payload) =>
+            this.handleKickParticipant(ws, payload as TargetUserPayload),
+        PAUSE_TIMER: (ws) => this.handlePauseTimer(ws),
+        PROMOTE_COADMIN: (ws, payload) =>
+            this.handlePromoteCoAdmin(ws, payload as TargetUserPayload),
+        RESET_TIMER: (ws) => this.handleResetTimer(ws),
+        RESET_VOTES: (ws) => this.handleResetVotes(ws),
+        REVEAL_VOTES: (ws) => this.handleRevealVotes(ws),
+        SET_CURRENT_STORY: (ws, payload) =>
+            this.handleSetCurrentStory(ws, payload as SetCurrentStoryPayload),
+        START_TIMER: (ws, payload) => this.handleStartTimer(ws, payload as StartTimerPayload),
+        TOGGLE_AUTO_REVEAL: (ws) => this.handleToggleAutoReveal(ws),
+        TOGGLE_LOCK_ROOM: (ws) => this.handleToggleLockRoom(ws),
+        TOGGLE_SPECTATOR: (ws) => this.handleToggleSpectator(ws),
+        TOGGLE_USER_ROLE: (ws, payload) =>
+            this.handleToggleUserRole(ws, payload as TargetUserPayload),
+        TRANSFER_ADMIN: (ws, payload) => this.handleTransferAdmin(ws, payload as TargetUserPayload),
+        UPDATE_ROOM_TITLE: (ws, payload) =>
+            this.handleUpdateRoomTitle(ws, payload as UpdateRoomTitlePayload),
+        UPDATE_STORY_ESTIMATE: (ws, payload) =>
+            this.handleUpdateStoryEstimate(ws, payload as UpdateStoryEstimatePayload),
+        VOTE: (ws, payload) => this.handleVote(ws, payload as VotePayload),
+    };
+    private heartbeatInterval: NodeJS.Timeout | null = null;
     private timerInterval: NodeJS.Timeout | null = null;
     private readonly wss: WebSocketServer;
 
@@ -77,7 +117,7 @@ export class WebSocketHandler {
             });
         });
 
-        setInterval(() => {
+        this.heartbeatInterval = setInterval(() => {
             this.wss.clients.forEach((client) => {
                 const ws = client as ExtendedWebSocket;
                 if (ws.isAlive === false) {
@@ -118,370 +158,530 @@ export class WebSocketHandler {
      * @param msg - The parsed incoming message.
      */
     private handleMessage(ws: ExtendedWebSocket, msg: WSMessage): void {
-        const { payload, type } = msg;
-
-        switch (type) {
-            case 'CREATE_ROOM': {
-                const { avatar, color, customDeck, deckType, name, title } =
-                    payload as CreateRoomPayload;
-                const { hostId, roomId, roomState } = roomManager.createRoom(
-                    name,
-                    avatar || DEFAULT_AVATAR,
-                    color || DEFAULT_HOST_COLOR,
-                    title,
-                    deckType,
-                    customDeck
-                );
-
-                ws.roomId = roomId;
-                ws.userId = hostId;
-
-                this.send(ws, 'ROOM_STATE', {
-                    currentUserId: hostId,
-                    roomState: roomManager.sanitizeStateForUser(roomState, hostId),
-                });
-                break;
-            }
-
-            case 'JOIN_ROOM': {
-                const { avatar, color, name, roomId, userId } = payload as JoinRoomPayload;
-                const result = roomManager.joinRoom(
-                    roomId,
-                    name,
-                    avatar || DEFAULT_AVATAR,
-                    color || DEFAULT_PARTICIPANT_COLOR,
-                    userId || undefined
-                );
-
-                if (!result) {
-                    return this.sendError(
-                        ws,
-                        `Room "${roomId}" not found. Please check room code.`
-                    );
-                }
-
-                if (result.error) {
-                    return this.sendError(ws, result.error);
-                }
-
-                const { participant, roomState } = result;
-                if (!participant || !roomState) {
-                    return this.sendError(ws, 'Unable to join room.');
-                }
-
-                ws.roomId = roomState.id;
-                ws.userId = participant.id;
-
-                this.broadcastRoomState(roomState.id);
-                break;
-            }
-
-            case 'UPDATE_ROOM_TITLE': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { title } = payload as UpdateRoomTitlePayload;
-                const updated = roomManager.updateRoomTitle(ws.roomId, ws.userId, title);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can rename the room.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'TOGGLE_LOCK_ROOM': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.toggleLockRoom(ws.roomId, ws.userId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can lock/unlock the room.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'TOGGLE_AUTO_REVEAL': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.toggleAutoReveal(ws.roomId, ws.userId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can toggle auto-reveal.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'START_TIMER': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { duration } = (payload as StartTimerPayload) || {};
-                const updated = roomManager.startTimer(
-                    ws.roomId,
-                    ws.userId,
-                    duration || DEFAULT_TIMER_DURATION_SECONDS
-                );
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can start the timer.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'PAUSE_TIMER': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.pauseTimer(ws.roomId, ws.userId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can pause/resume the timer.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'RESET_TIMER': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.resetTimer(ws.roomId, ws.userId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can reset the timer.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'VOTE': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { vote } = payload as VotePayload;
-                const updated = roomManager.submitVote(ws.roomId, ws.userId, vote);
-                if (updated) {
-                    this.broadcastRoomState(ws.roomId);
-                }
-                break;
-            }
-
-            case 'REVEAL_VOTES': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.revealVotes(ws.roomId, ws.userId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators or co-hosts can reveal votes.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'RESET_VOTES': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.resetVotes(ws.roomId, ws.userId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can reset votes.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'TOGGLE_SPECTATOR': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.toggleSpectator(ws.roomId, ws.userId);
-                if (updated) {
-                    this.broadcastRoomState(ws.roomId);
-                }
-                break;
-            }
-
-            case 'TOGGLE_USER_ROLE': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { targetUserId } = payload as TargetUserPayload;
-                const updated = roomManager.toggleUserRole(ws.roomId, ws.userId, targetUserId);
-                if (!updated) {
-                    return this.sendError(
-                        ws,
-                        'Only administrators can change other participants roles.'
-                    );
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'KICK_PARTICIPANT': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { targetUserId } = payload as TargetUserPayload;
-                const updated = roomManager.kickParticipant(ws.roomId, ws.userId, targetUserId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can remove participants.');
-                }
-
-                this.wss.clients.forEach((client) => {
-                    const clientWs = client as ExtendedWebSocket;
-                    if (clientWs.roomId === ws.roomId && clientWs.userId === targetUserId) {
-                        this.send(clientWs, 'KICKED', {
-                            message: 'You have been removed from the session by an administrator.',
-                        });
-                        clientWs.roomId = undefined;
-                        clientWs.userId = undefined;
-                    }
-                });
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'PROMOTE_COADMIN': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { targetUserId } = payload as TargetUserPayload;
-                const updated = roomManager.promoteCoAdmin(ws.roomId, ws.userId, targetUserId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can promote co-administrators.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'TRANSFER_ADMIN': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { targetUserId } = payload as TargetUserPayload;
-                const updated = roomManager.transferAdmin(ws.roomId, ws.userId, targetUserId);
-                if (!updated) {
-                    return this.sendError(
-                        ws,
-                        'Only the primary room host can transfer administration.'
-                    );
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'ADD_STORY': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { description, title } = payload as AddStoryPayload;
-                const updated = roomManager.addStory(ws.roomId, ws.userId, title, description);
-                if (!updated) {
-                    return this.sendError(
-                        ws,
-                        'Only administrators can add stories to the backlog.'
-                    );
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'BULK_ADD_STORIES': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { stories } = payload as BulkAddStoriesPayload;
-                const updated = roomManager.bulkAddStories(ws.roomId, ws.userId, stories);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can bulk import stories.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'SET_CURRENT_STORY': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { storyIndex } = payload as SetCurrentStoryPayload;
-                const updated = roomManager.setCurrentStory(ws.roomId, ws.userId, storyIndex);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can change the active story.');
-                }
-
-                roomManager.resetTimer(ws.roomId, ws.userId);
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'UPDATE_STORY_ESTIMATE': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { estimate, storyId } = payload as UpdateStoryEstimatePayload;
-                const updated = roomManager.updateStoryEstimate(
-                    ws.roomId,
-                    ws.userId,
-                    storyId,
-                    estimate
-                );
-                if (!updated) {
-                    return this.sendError(
-                        ws,
-                        'Only administrators can finalize and accept story estimates.'
-                    );
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'DELETE_STORY': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { storyId } = payload as DeleteStoryPayload;
-                const updated = roomManager.deleteStory(ws.roomId, ws.userId, storyId);
-                if (!updated) {
-                    return this.sendError(
-                        ws,
-                        'Only administrators can delete stories from the backlog.'
-                    );
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'CHANGE_DECK': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const { customDeck, deckType } = payload as ChangeDeckPayload;
-                const updated = roomManager.changeDeck(ws.roomId, ws.userId, deckType, customDeck);
-                if (!updated) {
-                    return this.sendError(
-                        ws,
-                        'Only administrators can change the estimation deck.'
-                    );
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            case 'END_SESSION': {
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-                const updated = roomManager.endSession(ws.roomId, ws.userId);
-                if (!updated) {
-                    return this.sendError(ws, 'Only administrators can end the session.');
-                }
-                this.broadcastRoomState(ws.roomId);
-                break;
-            }
-
-            default:
-                this.sendError(ws, `Unknown action type: ${type}`);
+        const handler = this.messageHandlers[msg.type];
+        if (!handler) {
+            this.sendError(ws, `Unknown action type: ${msg.type}`);
+            return;
         }
+        handler(ws, msg.payload);
+    }
+
+    /**
+     * Returns the room session bound to a connection, if any.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @returns The room/user identifiers, or null when not in a room.
+     */
+    private getSession(ws: ExtendedWebSocket): RoomSession | null {
+        if (!ws.roomId || !ws.userId) {
+            return null;
+        }
+        return { roomId: ws.roomId, userId: ws.userId };
+    }
+
+    /**
+     * Broadcasts the room state when an operation succeeds, otherwise notifies the sender.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param roomId - The room identifier.
+     * @param updated - Whether the domain operation succeeded.
+     * @param errorMessage - Message sent to the requester when the operation fails.
+     */
+    private broadcastOrError(
+        ws: ExtendedWebSocket,
+        roomId: string,
+        updated: unknown,
+        errorMessage: string
+    ): void {
+        if (!updated) {
+            this.sendError(ws, errorMessage);
+            return;
+        }
+        this.broadcastRoomState(roomId);
+    }
+
+    /**
+     * Handles room creation and binds the new session to the connection.
+     */
+    private handleCreateRoom(ws: ExtendedWebSocket, payload: CreateRoomPayload): void {
+        const { avatar, color, customDeck, deckType, name, title } = payload;
+        const { hostId, roomId, roomState } = roomManager.createRoom(
+            name,
+            avatar || DEFAULT_AVATAR,
+            color || DEFAULT_HOST_COLOR,
+            title,
+            deckType,
+            customDeck
+        );
+
+        ws.roomId = roomId;
+        ws.userId = hostId;
+
+        this.send(ws, 'ROOM_STATE', {
+            currentUserId: hostId,
+            roomState: roomManager.sanitizeStateForUser(roomState, hostId),
+        });
+    }
+
+    /**
+     * Handles joining an existing room and binds the session to the connection.
+     */
+    private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
+        const { avatar, color, name, roomId, userId } = payload;
+        const result = roomManager.joinRoom(
+            roomId,
+            name,
+            avatar || DEFAULT_AVATAR,
+            color || DEFAULT_PARTICIPANT_COLOR,
+            userId || undefined
+        );
+
+        if (!result) {
+            this.sendError(ws, `Room "${roomId}" not found. Please check room code.`);
+            return;
+        }
+
+        if (result.error) {
+            this.sendError(ws, result.error);
+            return;
+        }
+
+        const { participant, roomState } = result;
+        if (!participant || !roomState) {
+            this.sendError(ws, 'Unable to join room.');
+            return;
+        }
+
+        ws.roomId = roomState.id;
+        ws.userId = participant.id;
+
+        this.broadcastRoomState(roomState.id);
+    }
+
+    /**
+     * Handles room title updates.
+     */
+    private handleUpdateRoomTitle(ws: ExtendedWebSocket, payload: UpdateRoomTitlePayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.updateRoomTitle(session.roomId, session.userId, payload.title);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can rename the room.'
+        );
+    }
+
+    /**
+     * Handles locking/unlocking the room.
+     */
+    private handleToggleLockRoom(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.toggleLockRoom(session.roomId, session.userId);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can lock/unlock the room.'
+        );
+    }
+
+    /**
+     * Handles toggling automatic vote reveal.
+     */
+    private handleToggleAutoReveal(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.toggleAutoReveal(session.roomId, session.userId);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can toggle auto-reveal.'
+        );
+    }
+
+    /**
+     * Handles starting the countdown timer.
+     */
+    private handleStartTimer(ws: ExtendedWebSocket, payload: StartTimerPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const { duration } = payload || {};
+        const updated = roomManager.startTimer(
+            session.roomId,
+            session.userId,
+            duration || DEFAULT_TIMER_DURATION_SECONDS
+        );
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can start the timer.'
+        );
+    }
+
+    /**
+     * Handles pausing/resuming the countdown timer.
+     */
+    private handlePauseTimer(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.pauseTimer(session.roomId, session.userId);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can pause/resume the timer.'
+        );
+    }
+
+    /**
+     * Handles resetting the countdown timer.
+     */
+    private handleResetTimer(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.resetTimer(session.roomId, session.userId);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can reset the timer.'
+        );
+    }
+
+    /**
+     * Handles vote submission.
+     */
+    private handleVote(ws: ExtendedWebSocket, payload: VotePayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.submitVote(session.roomId, session.userId, payload.vote);
+        if (updated) {
+            this.broadcastRoomState(session.roomId);
+        }
+    }
+
+    /**
+     * Handles revealing all submitted votes.
+     */
+    private handleRevealVotes(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.revealVotes(session.roomId, session.userId);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators or co-hosts can reveal votes.'
+        );
+    }
+
+    /**
+     * Handles clearing all submitted votes.
+     */
+    private handleResetVotes(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.resetVotes(session.roomId, session.userId);
+        this.broadcastOrError(ws, session.roomId, updated, 'Only administrators can reset votes.');
+    }
+
+    /**
+     * Handles toggling spectator mode for the sender.
+     */
+    private handleToggleSpectator(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.toggleSpectator(session.roomId, session.userId);
+        if (updated) {
+            this.broadcastRoomState(session.roomId);
+        }
+    }
+
+    /**
+     * Handles toggling another participant's role.
+     */
+    private handleToggleUserRole(ws: ExtendedWebSocket, payload: TargetUserPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.toggleUserRole(
+            session.roomId,
+            session.userId,
+            payload.targetUserId
+        );
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can change other participants roles.'
+        );
+    }
+
+    /**
+     * Handles removing a participant and notifying their connection.
+     */
+    private handleKickParticipant(ws: ExtendedWebSocket, payload: TargetUserPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.kickParticipant(
+            session.roomId,
+            session.userId,
+            payload.targetUserId
+        );
+        if (!updated) {
+            this.sendError(ws, 'Only administrators can remove participants.');
+            return;
+        }
+
+        this.notifyKickedClient(session.roomId, payload.targetUserId);
+        this.broadcastRoomState(session.roomId);
+    }
+
+    /**
+     * Notifies and detaches the kicked participant's connection.
+     *
+     * @param roomId - The room identifier.
+     * @param targetUserId - The kicked participant identifier.
+     */
+    private notifyKickedClient(roomId: string, targetUserId: string): void {
+        this.wss.clients.forEach((client) => {
+            const clientWs = client as ExtendedWebSocket;
+            if (clientWs.roomId === roomId && clientWs.userId === targetUserId) {
+                this.send(clientWs, 'KICKED', {
+                    message: 'You have been removed from the session by an administrator.',
+                });
+                clientWs.roomId = undefined;
+                clientWs.userId = undefined;
+            }
+        });
+    }
+
+    /**
+     * Handles promoting a participant to co-administrator.
+     */
+    private handlePromoteCoAdmin(ws: ExtendedWebSocket, payload: TargetUserPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.promoteCoAdmin(
+            session.roomId,
+            session.userId,
+            payload.targetUserId
+        );
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can promote co-administrators.'
+        );
+    }
+
+    /**
+     * Handles transferring primary administration to another participant.
+     */
+    private handleTransferAdmin(ws: ExtendedWebSocket, payload: TargetUserPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.transferAdmin(
+            session.roomId,
+            session.userId,
+            payload.targetUserId
+        );
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only the primary room host can transfer administration.'
+        );
+    }
+
+    /**
+     * Handles adding a story to the backlog.
+     */
+    private handleAddStory(ws: ExtendedWebSocket, payload: AddStoryPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.addStory(
+            session.roomId,
+            session.userId,
+            payload.title,
+            payload.description
+        );
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can add stories to the backlog.'
+        );
+    }
+
+    /**
+     * Handles bulk importing stories into the backlog.
+     */
+    private handleBulkAddStories(ws: ExtendedWebSocket, payload: BulkAddStoriesPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.bulkAddStories(session.roomId, session.userId, payload.stories);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can bulk import stories.'
+        );
+    }
+
+    /**
+     * Handles changing the active story and resetting the timer.
+     */
+    private handleSetCurrentStory(ws: ExtendedWebSocket, payload: SetCurrentStoryPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.setCurrentStory(
+            session.roomId,
+            session.userId,
+            payload.storyIndex
+        );
+        if (!updated) {
+            this.sendError(ws, 'Only administrators can change the active story.');
+            return;
+        }
+
+        roomManager.resetTimer(session.roomId, session.userId);
+        this.broadcastRoomState(session.roomId);
+    }
+
+    /**
+     * Handles finalizing a story estimate.
+     */
+    private handleUpdateStoryEstimate(
+        ws: ExtendedWebSocket,
+        payload: UpdateStoryEstimatePayload
+    ): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.updateStoryEstimate(
+            session.roomId,
+            session.userId,
+            payload.storyId,
+            payload.estimate
+        );
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can finalize and accept story estimates.'
+        );
+    }
+
+    /**
+     * Handles deleting a story from the backlog.
+     */
+    private handleDeleteStory(ws: ExtendedWebSocket, payload: DeleteStoryPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.deleteStory(session.roomId, session.userId, payload.storyId);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can delete stories from the backlog.'
+        );
+    }
+
+    /**
+     * Handles changing the estimation deck.
+     */
+    private handleChangeDeck(ws: ExtendedWebSocket, payload: ChangeDeckPayload): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.changeDeck(
+            session.roomId,
+            session.userId,
+            payload.deckType,
+            payload.customDeck
+        );
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can change the estimation deck.'
+        );
+    }
+
+    /**
+     * Handles ending the estimation session.
+     */
+    private handleEndSession(ws: ExtendedWebSocket): void {
+        const session = this.getSession(ws);
+        if (!session) {
+            return;
+        }
+        const updated = roomManager.endSession(session.roomId, session.userId);
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can end the session.'
+        );
+    }
+
+    /**
+     * Stops the heartbeat and timer tickers and closes all WebSocket connections.
+     * Used for graceful shutdown on process termination signals.
+     */
+    public shutdown(): void {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+        this.wss.close();
     }
 
     /**

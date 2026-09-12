@@ -26,7 +26,7 @@ export const AVATARS = [
     '🥷',
 ] as const;
 
-export type Avatar = (typeof AVATARS)[number] | string;
+export type Avatar = (typeof AVATARS)[number] | (string & {});
 
 export const AVATAR_COLORS = [
     '#6366f1',
@@ -39,7 +39,7 @@ export const AVATAR_COLORS = [
     '#14b8a6',
 ] as const;
 
-export type AvatarColor = (typeof AVATAR_COLORS)[number] | string;
+export type AvatarColor = (typeof AVATAR_COLORS)[number] | (string & {});
 
 export interface Participant {
     avatar: Avatar;

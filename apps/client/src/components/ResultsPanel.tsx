@@ -44,7 +44,7 @@ export const ResultsPanel: React.FC = () => {
     } = useEstimationStats(roomState);
     const currentStory = roomState?.stories[roomState?.currentStoryIndex ?? 0];
 
-    if (!roomState || !roomState.votesRevealed) {
+    if (!roomState?.votesRevealed) {
         return null;
     }
 
@@ -61,7 +61,7 @@ export const ResultsPanel: React.FC = () => {
     const computeFinalEstimate = (customEstimate?: number | string): number | string => {
         if (customEstimate !== undefined && customEstimate !== '') {
             const parsedNum = Number(customEstimate);
-            return !isNaN(parsedNum) ? parsedNum : customEstimate;
+            return !Number.isNaN(parsedNum) ? parsedNum : customEstimate;
         }
         return hasNumeric ? Number(average) : modeVote;
     };

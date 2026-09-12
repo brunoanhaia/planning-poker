@@ -1,5 +1,13 @@
 import { DeckType, RoomState } from '@planitpoker/shared';
-import React, { createContext, use, useEffect, useRef, useState } from 'react';
+import React, {
+    createContext,
+    use,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 
 interface SocketContextValue {
     addStory: (title: string, description?: string) => void;
@@ -144,172 +152,245 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
     }, []);
 
-    const send = (type: string, payload: any) => {
-        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+    const send = useCallback((type: string, payload: any) => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ payload, type }));
         } else {
             setError('Connection to server lost. Retrying...');
         }
-    };
+    }, []);
 
-    const createRoom = (
-        name: string,
-        avatar: string,
-        color: string,
-        title?: string,
-        deckType: DeckType = 'fibonacci',
-        customDeck?: (number | string)[]
-    ) => {
-        send('CREATE_ROOM', { avatar, color, customDeck, deckType, name, title });
-    };
+    const createRoom = useCallback(
+        (
+            name: string,
+            avatar: string,
+            color: string,
+            title?: string,
+            deckType: DeckType = 'fibonacci',
+            customDeck?: (number | string)[]
+        ) => {
+            send('CREATE_ROOM', { avatar, color, customDeck, deckType, name, title });
+        },
+        [send]
+    );
 
-    const joinRoom = (roomId: string, name: string, avatar: string, color: string) => {
-        send('JOIN_ROOM', {
-            avatar,
-            color,
-            name,
-            roomId,
-            userId: currentUserId,
-        });
-    };
+    const joinRoom = useCallback(
+        (roomId: string, name: string, avatar: string, color: string) => {
+            send('JOIN_ROOM', {
+                avatar,
+                color,
+                name,
+                roomId,
+                userId: currentUserId,
+            });
+        },
+        [currentUserId, send]
+    );
 
-    const updateRoomTitle = (title: string) => {
-        send('UPDATE_ROOM_TITLE', { title });
-    };
+    const updateRoomTitle = useCallback(
+        (title: string) => {
+            send('UPDATE_ROOM_TITLE', { title });
+        },
+        [send]
+    );
 
-    const toggleLockRoom = () => {
+    const toggleLockRoom = useCallback(() => {
         send('TOGGLE_LOCK_ROOM', {});
-    };
+    }, [send]);
 
-    const toggleAutoReveal = () => {
+    const toggleAutoReveal = useCallback(() => {
         send('TOGGLE_AUTO_REVEAL', {});
-    };
+    }, [send]);
 
-    const startTimer = (duration = 60) => {
-        send('START_TIMER', { duration });
-    };
+    const startTimer = useCallback(
+        (duration = 60) => {
+            send('START_TIMER', { duration });
+        },
+        [send]
+    );
 
-    const pauseTimer = () => {
+    const pauseTimer = useCallback(() => {
         send('PAUSE_TIMER', {});
-    };
+    }, [send]);
 
-    const resetTimer = () => {
+    const resetTimer = useCallback(() => {
         send('RESET_TIMER', {});
-    };
+    }, [send]);
 
-    const submitVote = (vote: number | string) => {
-        send('VOTE', { vote });
-    };
+    const submitVote = useCallback(
+        (vote: number | string) => {
+            send('VOTE', { vote });
+        },
+        [send]
+    );
 
-    const revealVotes = () => {
+    const revealVotes = useCallback(() => {
         send('REVEAL_VOTES', {});
-    };
+    }, [send]);
 
-    const resetVotes = () => {
+    const resetVotes = useCallback(() => {
         send('RESET_VOTES', {});
-    };
+    }, [send]);
 
-    const toggleSpectator = () => {
+    const toggleSpectator = useCallback(() => {
         send('TOGGLE_SPECTATOR', {});
-    };
+    }, [send]);
 
-    const toggleUserRole = (targetUserId: string) => {
-        send('TOGGLE_USER_ROLE', { targetUserId });
-    };
+    const toggleUserRole = useCallback(
+        (targetUserId: string) => {
+            send('TOGGLE_USER_ROLE', { targetUserId });
+        },
+        [send]
+    );
 
-    const kickParticipant = (targetUserId: string) => {
-        send('KICK_PARTICIPANT', { targetUserId });
-    };
+    const kickParticipant = useCallback(
+        (targetUserId: string) => {
+            send('KICK_PARTICIPANT', { targetUserId });
+        },
+        [send]
+    );
 
-    const promoteCoAdmin = (targetUserId: string) => {
-        send('PROMOTE_COADMIN', { targetUserId });
-    };
+    const promoteCoAdmin = useCallback(
+        (targetUserId: string) => {
+            send('PROMOTE_COADMIN', { targetUserId });
+        },
+        [send]
+    );
 
-    const transferAdmin = (targetUserId: string) => {
-        send('TRANSFER_ADMIN', { targetUserId });
-    };
+    const transferAdmin = useCallback(
+        (targetUserId: string) => {
+            send('TRANSFER_ADMIN', { targetUserId });
+        },
+        [send]
+    );
 
-    const addStory = (title: string, description?: string) => {
-        send('ADD_STORY', { description, title });
-    };
+    const addStory = useCallback(
+        (title: string, description?: string) => {
+            send('ADD_STORY', { description, title });
+        },
+        [send]
+    );
 
-    const bulkAddStories = (stories: { description?: string; title: string }[]) => {
-        send('BULK_ADD_STORIES', { stories });
-    };
+    const bulkAddStories = useCallback(
+        (stories: { description?: string; title: string }[]) => {
+            send('BULK_ADD_STORIES', { stories });
+        },
+        [send]
+    );
 
-    const setCurrentStory = (storyIndex: number) => {
-        send('SET_CURRENT_STORY', { storyIndex });
-    };
+    const setCurrentStory = useCallback(
+        (storyIndex: number) => {
+            send('SET_CURRENT_STORY', { storyIndex });
+        },
+        [send]
+    );
 
-    const updateStoryEstimate = (storyId: string, estimate: number | string | null) => {
-        send('UPDATE_STORY_ESTIMATE', { estimate, storyId });
-    };
+    const updateStoryEstimate = useCallback(
+        (storyId: string, estimate: number | string | null) => {
+            send('UPDATE_STORY_ESTIMATE', { estimate, storyId });
+        },
+        [send]
+    );
 
-    const deleteStory = (storyId: string) => {
-        send('DELETE_STORY', { storyId });
-    };
+    const deleteStory = useCallback(
+        (storyId: string) => {
+            send('DELETE_STORY', { storyId });
+        },
+        [send]
+    );
 
-    const changeDeck = (deckType: DeckType, customDeck?: (number | string)[]) => {
-        send('CHANGE_DECK', { customDeck, deckType });
-    };
+    const changeDeck = useCallback(
+        (deckType: DeckType, customDeck?: (number | string)[]) => {
+            send('CHANGE_DECK', { customDeck, deckType });
+        },
+        [send]
+    );
 
-    const endSession = () => {
+    const endSession = useCallback(() => {
         send('END_SESSION', {});
-    };
+    }, [send]);
 
-    const leaveRoom = () => {
+    const leaveRoom = useCallback(() => {
         setRoomState(null);
         window.location.hash = '';
-    };
+    }, []);
 
-    const clearError = () => setError(null);
-    const clearKickedMessage = () => setKickedMessage(null);
+    const clearError = useCallback(() => setError(null), []);
+    const clearKickedMessage = useCallback(() => setKickedMessage(null), []);
 
-    const isHost = roomState?.hostId === currentUserId;
-    const currentParticipant = roomState?.participants.find((p) => p.id === currentUserId);
-    const isAdmin = isHost || !!currentParticipant?.isAdmin;
+    const contextValue = useMemo<SocketContextValue>(() => {
+        const host = roomState?.hostId === currentUserId;
+        const currentParticipant = roomState?.participants.find((p) => p.id === currentUserId);
+        return {
+            addStory,
+            bulkAddStories,
+            changeDeck,
+            clearError,
+            clearKickedMessage,
+            createRoom,
+            currentUserId,
+            deleteStory,
+            endSession,
+            error,
+            isAdmin: host || !!currentParticipant?.isAdmin,
+            isConnected,
+            isHost: host,
+            joinRoom,
+            kickedMessage,
+            kickParticipant,
+            leaveRoom,
+            pauseTimer,
+            promoteCoAdmin,
+            resetTimer,
+            resetVotes,
+            revealVotes,
+            roomState,
+            setCurrentStory,
+            startTimer,
+            submitVote,
+            toggleAutoReveal,
+            toggleLockRoom,
+            toggleSpectator,
+            toggleUserRole,
+            transferAdmin,
+            updateRoomTitle,
+            updateStoryEstimate,
+        };
+    }, [
+        addStory,
+        bulkAddStories,
+        changeDeck,
+        clearError,
+        clearKickedMessage,
+        createRoom,
+        currentUserId,
+        deleteStory,
+        endSession,
+        error,
+        isConnected,
+        joinRoom,
+        kickedMessage,
+        kickParticipant,
+        leaveRoom,
+        pauseTimer,
+        promoteCoAdmin,
+        resetTimer,
+        resetVotes,
+        revealVotes,
+        roomState,
+        setCurrentStory,
+        startTimer,
+        submitVote,
+        toggleAutoReveal,
+        toggleLockRoom,
+        toggleSpectator,
+        toggleUserRole,
+        transferAdmin,
+        updateRoomTitle,
+        updateStoryEstimate,
+    ]);
 
-    return (
-        <SocketContext
-            value={{
-                addStory,
-                bulkAddStories,
-                changeDeck,
-                clearError,
-                clearKickedMessage,
-                createRoom,
-                currentUserId,
-                deleteStory,
-                endSession,
-                error,
-                isAdmin,
-                isConnected,
-                isHost,
-                joinRoom,
-                kickedMessage,
-                kickParticipant,
-                leaveRoom,
-                pauseTimer,
-                promoteCoAdmin,
-                resetTimer,
-                resetVotes,
-                revealVotes,
-                roomState,
-                setCurrentStory,
-                startTimer,
-                submitVote,
-                toggleAutoReveal,
-                toggleLockRoom,
-                toggleSpectator,
-                toggleUserRole,
-                transferAdmin,
-                updateRoomTitle,
-                updateStoryEstimate,
-            }}
-        >
-            {children}
-        </SocketContext>
-    );
+    return <SocketContext value={contextValue}>{children}</SocketContext>;
 };
 
 export const useSocket = () => {

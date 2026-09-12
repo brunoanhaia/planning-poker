@@ -26,6 +26,86 @@ interface ParticipantCardProps {
     votesRevealed: boolean;
 }
 
+/**
+ * Resolves the avatar ring background for the participant state.
+ */
+const getAvatarRingBackground = (participant: Participant): string => {
+    if (participant.hasVoted) {
+        return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+    }
+    if (participant.isSpectator) {
+        return 'transparent';
+    }
+    return `linear-gradient(135deg, ${participant.color} 0%, #6366f1 100%)`;
+};
+
+/**
+ * Resolves the avatar ring glow for the participant state.
+ */
+const getAvatarBoxShadow = (participant: Participant): string => {
+    if (participant.hasVoted) {
+        return '0 0 16px rgba(16, 185, 129, 0.6)';
+    }
+    return '0 4px 12px rgba(0,0,0,0.15)';
+};
+
+/**
+ * Resolves the card front background for the participant state.
+ */
+const getCardFrontBackground = (participant: Participant): string => {
+    if (participant.hasVoted) {
+        return 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+    }
+    if (participant.isSpectator) {
+        return 'rgba(148, 163, 184, 0.1)';
+    }
+    return 'rgba(255, 255, 255, 0.05)';
+};
+
+/**
+ * Resolves the card front border for the participant state.
+ */
+const getCardFrontBorder = (participant: Participant): string => {
+    if (participant.hasVoted) {
+        return '2px solid #10b981';
+    }
+    return '2px dashed rgba(148, 163, 184, 0.4)';
+};
+
+/**
+ * Resolves the card front glow for the participant state.
+ */
+const getCardFrontBoxShadow = (participant: Participant): string => {
+    if (participant.hasVoted) {
+        return '0 4px 12px rgba(16, 185, 129, 0.25)';
+    }
+    return 'none';
+};
+
+/**
+ * Renders the card face matching the participant state (spectator, voted, waiting).
+ */
+const renderCardFaceContent = (participant: Participant): React.ReactNode => {
+    if (participant.isSpectator) {
+        return <VisibilityOffIcon sx={{ color: 'text.secondary', fontSize: 20 }} />;
+    }
+    if (participant.hasVoted) {
+        return (
+            <Typography sx={{ fontSize: '20px' }} variant="body2">
+                🃏
+            </Typography>
+        );
+    }
+    return (
+        <Typography
+            sx={{ color: 'text.secondary', fontSize: '11px', fontWeight: 600 }}
+            variant="caption"
+        >
+            ...
+        </Typography>
+    );
+};
+
 export const ParticipantCard: React.FC<ParticipantCardProps> = ({
     isSelf,
     participant,
@@ -76,15 +156,9 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
             {/* Avatar Ring */}
             <Box
                 sx={{
-                    background: participant.hasVoted
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                        : participant.isSpectator
-                          ? 'transparent'
-                          : `linear-gradient(135deg, ${participant.color} 0%, #6366f1 100%)`,
+                    background: getAvatarRingBackground(participant),
                     borderRadius: '50%',
-                    boxShadow: participant.hasVoted
-                        ? '0 0 16px rgba(16, 185, 129, 0.6)'
-                        : '0 4px 12px rgba(0,0,0,0.15)',
+                    boxShadow: getAvatarBoxShadow(participant),
                     p: '3px',
                     position: 'relative',
                 }}
@@ -242,18 +316,10 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
                         sx={{
                             alignItems: 'center',
                             backfaceVisibility: 'hidden',
-                            background: participant.hasVoted
-                                ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
-                                : participant.isSpectator
-                                  ? 'rgba(148, 163, 184, 0.1)'
-                                  : 'rgba(255, 255, 255, 0.05)',
-                            border: participant.hasVoted
-                                ? '2px solid #10b981'
-                                : '2px dashed rgba(148, 163, 184, 0.4)',
+                            background: getCardFrontBackground(participant),
+                            border: getCardFrontBorder(participant),
                             borderRadius: '10px',
-                            boxShadow: participant.hasVoted
-                                ? '0 4px 12px rgba(16, 185, 129, 0.25)'
-                                : 'none',
+                            boxShadow: getCardFrontBoxShadow(participant),
                             display: 'flex',
                             flexDirection: 'column',
                             height: '100%',
@@ -262,20 +328,7 @@ export const ParticipantCard: React.FC<ParticipantCardProps> = ({
                             width: '100%',
                         }}
                     >
-                        {participant.isSpectator ? (
-                            <VisibilityOffIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                        ) : participant.hasVoted ? (
-                            <Typography sx={{ fontSize: '20px' }} variant="body2">
-                                🃏
-                            </Typography>
-                        ) : (
-                            <Typography
-                                sx={{ color: 'text.secondary', fontSize: '11px', fontWeight: 600 }}
-                                variant="caption"
-                            >
-                                ...
-                            </Typography>
-                        )}
+                        {renderCardFaceContent(participant)}
                     </Box>
 
                     {/* Card Back (Revealed vote value) */}
