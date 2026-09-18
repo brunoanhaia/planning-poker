@@ -1,0 +1,9 @@
+# Build context for `.devcontainer/Dockerfile` only.
+# Overrides the root `.dockerignore` so the devcontainer image can read
+# workspace package files while keeping the context lean.
+node_modules
+**/node_modules
+**/dist
+**/.git
+.env
+.env.*

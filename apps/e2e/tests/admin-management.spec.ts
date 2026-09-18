@@ -18,11 +18,9 @@ test.describe('Admin Management', () => {
         const dialog = adminPage.getByRole('dialog');
         await expect(dialog).toBeVisible();
 
-        // Toggle lock room
-        const lockSwitch = adminPage.getByRole('checkbox', { name: /Lock Room/i });
-        if ((await lockSwitch.count()) > 0) {
-            await lockSwitch.click();
-        }
+        // Toggle lock room (MUI Switch exposes role="switch", not "checkbox")
+        const lockSwitch = adminPage.getByRole('switch', { name: /Lock Room/i });
+        await lockSwitch.click();
 
         // Save settings
         await adminPage.getByRole('button', { name: /Apply Settings/i }).click();

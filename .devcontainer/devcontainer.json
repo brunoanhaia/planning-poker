@@ -1,0 +1,39 @@
+{
+    // PlanItPoker — reproducible dev environment (VS Code / Codespaces / JetBrains).
+    // Node 24 LTS: matches prod Dockerfiles; client vitest (jsdom + undici 8) is
+    // broken on Node 20.19 worker threads (`markAsUncloneable`).
+    // Playwright Chromium OS deps are baked into the image; browser binaries are
+    // downloaded during postCreateCommand to stay locked to @playwright/test version.
+    "name": "PlanItPoker",
+    "build": { "dockerfile": "Dockerfile" },
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "ms-playwright.playwright",
+                "sonarsource.sonarlint-vscode",
+                "vitest.explorer"
+            ]
+        }
+    },
+    "forwardPorts": [5000, 5173],
+    "portsAttributes": {
+        "5000": {
+            "label": "API + WebSocket",
+            "onAutoForward": "notify"
+        },
+        "5173": {
+            "label": "Vite client",
+            "onAutoForward": "openPreview"
+        }
+    },
+    // Full monorepo install (npm ci keeps package-lock.json untouched),
+    // shared package build (consumed from dist/),
+    // and Playwright Chromium binaries (OS deps are baked into the image).
+    "postCreateCommand": "npm ci && npm run build:shared && npm exec --workspace=@planitpoker/e2e -- playwright install chromium",
+    "remoteUser": "node"
+}
