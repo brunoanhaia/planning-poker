@@ -3,7 +3,7 @@
 #   docker build -f apps/client/Dockerfile -t planitpoker-client .
 #   docker build -f apps/client/Dockerfile --build-arg VITE_WS_URL=wss://api.exemplo.com -t planitpoker-client .
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 

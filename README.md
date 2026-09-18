@@ -88,6 +88,10 @@ npm run dev
 - The client will be available at `http://localhost:5173`.
 - The server will run on `http://localhost:3000`.
 
+### Dev Containers
+
+The repository ships a ready-to-use devcontainer defined in `.devcontainer/devcontainer.json` and `.devcontainer/Dockerfile`. Open the folder in VS Code and choose **Reopen in Container** (or use GitHub Codespaces). You get Node 24 LTS, the `github-cli` extension pack (ESLint, Prettier, Playwright, SonarLint, Vitest), forwarded ports `5000`/`5173`, a deterministic `npm ci` install, the shared package build, and Playwright Chromium — with OS dependencies baked into the image so container creation is faster and browser binaries stay locked to the workspace's `@playwright/test` version.
+
 ### Testing
 
 The project uses Vitest for unit/integration testing and Playwright + Axe-core for E2E and visual validation.
@@ -135,7 +139,7 @@ npx prettier --write .
 
 ## Deployment (Production)
 
-Deployment is done via **containers**: `apps/server/Dockerfile` (Node 20) and
+Deployment is done via **containers**: `apps/server/Dockerfile` (Node 24) and
 `apps/client/Dockerfile` (Vite build + Nginx), orchestrated by `docker-compose.yml`.
 
 Build context is always the repository root.

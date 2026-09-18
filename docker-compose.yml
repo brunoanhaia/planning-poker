@@ -5,7 +5,7 @@
 #   VITE_WS_URL=wss://api.exemplo.com docker compose up --build   # client dials an external backend directly
 #
 # Services:
-# - server: Node 20 + Express + ws. Health at GET /api/health.
+# - server: Node 24 + Express + ws. Health at GET /api/health.
 # - client: Nginx serving the Vite SPA. Proxies /api/* and /ws to `server`,
 #   so an empty VITE_WS_URL (default) uses window.location.host with no CORS setup.
 

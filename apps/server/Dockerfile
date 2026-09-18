@@ -1,11 +1,11 @@
-# PlanItPoker — Server (Node 20 + Express + ws)
+# PlanItPoker — Server (Node 24 + Express + ws)
 # Build context: repository root
 #   docker build -f apps/server/Dockerfile -t planitpoker-server .
 #
 # Final image contains ONLY: prod node_modules + shared/dist + server/dist.
 # No src/*.ts, no tests, no e2e, no devDependencies.
 
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ COPY apps/server/tsconfig.json ./apps/server/
 COPY tsconfig.base.json ./
 RUN npm run build:shared && npm --workspace=@planitpoker/server run build
 
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 ENV NODE_ENV=production
 ENV PORT=5000

@@ -25,6 +25,7 @@ npm run dev:client   # Vite on http://localhost:5173
 - Client proxies `/ws` to `ws://localhost:5000` in dev via `apps/client/vite.config.ts`.
 - Server default port is `5000`, not `3000` (`process.env.PORT || 5000`).
 - Server CORS origins come from `ALLOWED_ORIGINS` env var; default allows `http://localhost:5173`.
+- Devcontainer (`.devcontainer/devcontainer.json` + `.devcontainer/Dockerfile`): Node 24 LTS image (same major as prod Dockerfiles; client vitest/jsdom+undici is broken on Node 20.19 workers). Chromium OS deps are baked into the image so `postCreateCommand` only runs `npm ci` + `build:shared` + Playwright browser download; ports 5000/5173 forwarded.
 
 ## Build
 
@@ -74,7 +75,7 @@ cp .env.example .env
 docker compose up --build   # client :80, server :5000
 ```
 
-- **Server image**: `apps/server/Dockerfile` (Node 20 multi-stage, `HEALTHCHECK` on `/api/health`, runs `node dist/index.js` as `node` user).
+- **Server image**: `apps/server/Dockerfile` (Node 24 multi-stage, `HEALTHCHECK` on `/api/health`, runs `node dist/index.js` as `node` user).
 - **Client image**: `apps/client/Dockerfile` (Vite build + `nginxinc/nginx-unprivileged:1.27-alpine` as `nginx` user on `:8080`, config in `apps/client/nginx.conf`). Nginx serves the SPA with fallback to `index.html` and proxies `/api/*` + `/ws` (with `Upgrade`) to the `server` service.
 
 ## Style & Conventions
