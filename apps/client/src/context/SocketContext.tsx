@@ -56,13 +56,16 @@ const SocketContext = createContext<SocketContextValue | undefined>(undefined);
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [roomState, setRoomState] = useState<null | RoomState>(null);
-    const [currentUserId, setCurrentUserId] = useState<null | string>(() =>
-        localStorage.getItem('planit_user_id')
-    );
+    const [currentUserId, setCurrentUserId] = useState<null | string>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<null | string>(null);
     const [kickedMessage, setKickedMessage] = useState<null | string>(null);
     const socketRef = useRef<null | WebSocket>(null);
+    const sessionTokenRef = useRef<null | string>(null);
+
+    useEffect(() => {
+        sessionTokenRef.current = sessionStorage.getItem('planit_session_token');
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -102,10 +105,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         setRoomState(payload.roomState);
                         if (payload.currentUserId) {
                             setCurrentUserId(payload.currentUserId);
-                            localStorage.setItem('planit_user_id', payload.currentUserId);
                         }
+                    } else if (type === 'SESSION') {
+                        sessionTokenRef.current = payload.sessionToken;
+                        sessionStorage.setItem('planit_session_token', payload.sessionToken);
                     } else if (type === 'KICKED') {
                         setRoomState(null);
+                        sessionTokenRef.current = null;
+                        sessionStorage.removeItem('planit_session_token');
                         setKickedMessage(
                             payload.message || 'You have been removed from the session.'
                         );
@@ -181,6 +188,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 color,
                 name,
                 roomId,
+                sessionToken: sessionTokenRef.current,
                 userId: currentUserId,
             });
         },

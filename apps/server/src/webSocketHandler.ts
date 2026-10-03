@@ -25,6 +25,8 @@ import {
     TIMER_TICK_INTERVAL_MS,
 } from './constants.js';
 import { roomManager } from './roomManager.js';
+import { sessionService } from './sessionService.js';
+import { validatePayload } from './validation.js';
 
 interface ExtendedWebSocket extends WebSocket {
     isAlive?: boolean;
@@ -163,6 +165,13 @@ export class WebSocketHandler {
             this.sendError(ws, `Unknown action type: ${msg.type}`);
             return;
         }
+
+        const validation = validatePayload(msg.type, msg.payload);
+        if (!validation.success) {
+            this.sendError(ws, validation.error || `Invalid ${msg.type} payload.`);
+            return;
+        }
+
         handler(ws, msg.payload);
     }
 
@@ -217,6 +226,9 @@ export class WebSocketHandler {
         ws.roomId = roomId;
         ws.userId = hostId;
 
+        const sessionToken = sessionService.issue(roomId, hostId);
+        this.send(ws, 'SESSION', { sessionToken, userId: hostId });
+
         this.send(ws, 'ROOM_STATE', {
             currentUserId: hostId,
             roomState: roomManager.sanitizeStateForUser(roomState, hostId),
@@ -227,13 +239,20 @@ export class WebSocketHandler {
      * Handles joining an existing room and binds the session to the connection.
      */
     private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
-        const { avatar, color, name, roomId, userId } = payload;
+        const { avatar, color, name, roomId, sessionToken, userId } = payload;
+
+        const binding = sessionService.resolve(sessionToken);
+        const provenUserId =
+            binding && binding.roomId === roomId && binding.userId === userId
+                ? binding.userId
+                : undefined;
+
         const result = roomManager.joinRoom(
             roomId,
             name,
             avatar || DEFAULT_AVATAR,
             color || DEFAULT_PARTICIPANT_COLOR,
-            userId || undefined
+            provenUserId
         );
 
         if (!result) {
@@ -254,6 +273,9 @@ export class WebSocketHandler {
 
         ws.roomId = roomState.id;
         ws.userId = participant.id;
+
+        const issuedToken = sessionService.issue(roomState.id, participant.id);
+        this.send(ws, 'SESSION', { sessionToken: issuedToken, userId: participant.id });
 
         this.broadcastRoomState(roomState.id);
     }
@@ -321,7 +343,7 @@ export class WebSocketHandler {
         const updated = roomManager.startTimer(
             session.roomId,
             session.userId,
-            duration || DEFAULT_TIMER_DURATION_SECONDS
+            duration ?? DEFAULT_TIMER_DURATION_SECONDS
         );
         this.broadcastOrError(
             ws,
@@ -373,6 +395,13 @@ export class WebSocketHandler {
         if (!session) {
             return;
         }
+
+        const room = roomManager.getRoom(session.roomId);
+        if (!room || !room.activeDeck.includes(payload.vote)) {
+            this.sendError(ws, 'Vote value is not part of the active deck.');
+            return;
+        }
+
         const updated = roomManager.submitVote(session.roomId, session.userId, payload.vote);
         if (updated) {
             this.broadcastRoomState(session.roomId);
@@ -461,6 +490,7 @@ export class WebSocketHandler {
             return;
         }
 
+        sessionService.revokeByUser(session.roomId, payload.targetUserId);
         this.notifyKickedClient(session.roomId, payload.targetUserId);
         this.broadcastRoomState(session.roomId);
     }

@@ -4,6 +4,42 @@ export type CardValue = string | number;
 export type EstimateValue = string | number | null;
 export type StoryStatus = 'pending' | 'estimating' | 'completed';
 
+/** All supported deck identifiers, including the custom deck. */
+export const DECK_TYPES = [
+    'fibonacci',
+    'modified_fibonacci',
+    'tshirt',
+    'powers_of_2',
+    'custom',
+] as const satisfies readonly DeckType[];
+
+/** Maximum length (in characters) for a participant display name. */
+export const MAX_NAME_LENGTH = 50;
+
+/** Maximum length (in characters) for a room title. */
+export const MAX_TITLE_LENGTH = 120;
+
+/** Maximum length (in characters) for a story description. */
+export const MAX_DESCRIPTION_LENGTH = 2000;
+
+/** Maximum number of stories accepted in a single bulk import. */
+export const MAX_BULK_STORIES = 50;
+
+/** Minimum number of cards required for a custom deck. */
+export const MIN_CUSTOM_DECK_SIZE = 2;
+
+/** Maximum number of cards allowed in a custom deck. */
+export const MAX_CUSTOM_DECK_SIZE = 30;
+
+/** Minimum allowed countdown timer duration, in seconds. */
+export const MIN_TIMER_DURATION_SECONDS = 5;
+
+/** Maximum allowed countdown timer duration, in seconds. */
+export const MAX_TIMER_DURATION_SECONDS = 3600;
+
+/** Default countdown timer duration, in seconds. */
+export const DEFAULT_TIMER_DURATION_SECONDS = 60;
+
 export const PRESET_DECKS: Record<Exclude<DeckType, 'custom'>, readonly CardValue[]> = {
     fibonacci: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'] as const,
     modified_fibonacci: [0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'] as const,
@@ -113,6 +149,7 @@ export type WSMessageType =
     | 'RESET_TIMER'
     | 'END_SESSION'
     | 'ROOM_STATE'
+    | 'SESSION'
     | 'ERROR';
 
 export interface CreateRoomPayload {
@@ -129,6 +166,7 @@ export interface JoinRoomPayload {
     color?: AvatarColor;
     name: string;
     roomId: string;
+    sessionToken?: string | null;
     userId?: string | null;
 }
 
@@ -178,6 +216,11 @@ export interface StartTimerPayload {
 export interface RoomStatePayload {
     currentUserId?: string;
     roomState: RoomState;
+}
+
+export interface SessionPayload {
+    sessionToken: string;
+    userId: string;
 }
 
 export interface KickedPayload {

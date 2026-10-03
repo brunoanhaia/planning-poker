@@ -25,6 +25,7 @@ import {
 import React, { useState } from 'react';
 
 import { useSocket } from '../context/SocketContext';
+import { buildBacklogCsvFilename, escapeCsvCell } from '../utils/csv';
 
 export const StoryBacklog: React.FC = () => {
     const {
@@ -96,22 +97,20 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const handleExportCSV = () => {
-        const csvContent =
-            'data:text/csv;charset=utf-8,' +
-            'ID,Title,Description,Status,Final Estimate\n' +
-            roomState.stories
-                .map(
-                    (s, idx) =>
-                        `"${idx + 1}","${s.title.replace(/"/g, '""')}","${(
-                            s.description || ''
-                        ).replace(/"/g, '""')}","${s.status}","${s.finalEstimate ?? ''}"`
-                )
-                .join('\n');
+        const header = ['ID', 'Title', 'Description', 'Status', 'Final Estimate']
+            .map(escapeCsvCell)
+            .join(',');
+        const rows = roomState.stories.map((s, idx) =>
+            [idx + 1, s.title, s.description || '', s.status, s.finalEstimate ?? '']
+                .map(escapeCsvCell)
+                .join(',')
+        );
+        const csvContent = ['data:text/csv;charset=utf-8,', header, ...rows].join('\n');
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `${roomState.title}_Backlog_Estimates.csv`);
+        link.setAttribute('download', buildBacklogCsvFilename(roomState.title));
         document.body.appendChild(link);
         link.click();
         link.remove();

@@ -15,13 +15,17 @@
 8. **Timer**: Synchronized countdown timer that can be started, stopped, and reset by Admin/Co‑host.
 9. **Responsive UI**: The client UI must adapt fluidly from 320 px mobile screens up to desktop/4K displays without horizontal scrolling or component overlap.
 10. **Accessibility**: All interactive elements must be WAI‑ARIA compliant, keyboard navigable, and meet WCAG AA contrast requirements.
+11. **Session identity**: Reconnection must be proven by an opaque, server‑issued session token. A client‑supplied `userId` alone must never grant access to an existing participant (prevents impersonation and admin takeover).
+12. **Input validation**: Every inbound WebSocket payload must be validated against a schema before reaching domain logic; invalid payloads are rejected with an `ERROR` and never broadcast.
+13. **Input limits**: Participant names (≤50), room titles (≤120), story titles (≤120), story descriptions (≤2000), bulk imports (≤50 stories), custom decks (2–30 unique cards), and timer durations (5–3600 s) are enforced server‑side.
+14. **Safe export**: CSV exports must neutralize spreadsheet formula injection (`=`, `+`, `-`, `@`, tab, CR) and derive the download filename from a sanitized slug with a fixed `.csv` extension.
 
 ## Non‑Functional Requirements
 
-1. **Performance**: UI interactions and WebSocket message latency should be perceptible under 200 ms for a smooth planning experience.
+1. **Performance**: UI interactions and WebSocket message latency should be perceptible under 200 ms for a smooth planning experience.
 2. **Scalability**: The server must handle multiple concurrent rooms and hundreds of participants using the lightweight `ws` library.
 3. **Reliability**: Heartbeat/ping‑pong mechanism ensures detection of dead connections and automatic cleanup of stale participants.
-4. **Security**: Input validation on all inbound messages, sandboxed server logic, and protection against injection attacks.
+4. **Security**: Input validation on all inbound messages, sandboxed server logic, and protection against injection attacks. Runtime validation is implemented with `zod` schemas in `apps/server/src/validation.ts`, and session tokens are issued/revoked by `apps/server/src/sessionService.ts`.
 5. **Code Quality**: Strict TypeScript typing via `@planitpoker/shared`, ESLint/Prettier compliance, and clean‑code conventions (no magic values, early returns, explicit blocks).
 6. **Testing**: Comprehensive unit, integration, and end‑to‑end tests using Vitest, Playwright, and Axe‑core covering functional flows and accessibility.
 7. **Maintainability**: Modular architecture with separate client, server, and shared packages; custom skills (`realtime‑websocket‑manager`, `react‑clean‑architecture`, etc.) enforce separation of concerns.

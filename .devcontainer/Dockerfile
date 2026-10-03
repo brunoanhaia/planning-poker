@@ -10,11 +10,11 @@ USER root
 # Install Playwright Chromium OS dependencies once in the image. Browser binaries
 # are still fetched during postCreateCommand so they always match the workspace's
 # @playwright/test version.
-COPY apps/e2e/package.json /tmp/e2e-package.json
-RUN PLAYWRIGHT_VERSION=$(node -p "require('/tmp/e2e-package.json').devDependencies['@playwright/test']") \
+COPY package-lock.json /tmp/package-lock.json
+RUN PLAYWRIGHT_VERSION=$(node -p "require('/tmp/package-lock.json').packages['node_modules/@playwright/test'].version") \
     && npm install -g @playwright/test@${PLAYWRIGHT_VERSION} --ignore-scripts \
     && playwright install-deps chromium \
     && npm uninstall -g @playwright/test \
-    && rm /tmp/e2e-package.json
+    && rm /tmp/package-lock.json
 
 USER node

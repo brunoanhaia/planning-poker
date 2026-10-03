@@ -16,7 +16,8 @@ export interface JoinParticipantResult {
  * @param userName - The display name of the participant.
  * @param avatar - Optional avatar emoji.
  * @param color - Optional avatar background color.
- * @param existingUserId - Optional user ID for reconnection.
+ * @param existingUserId - Optional user ID for reconnection. Only honored when it
+ *   matches the identity proven by a valid session token (see `WebSocketHandler`).
  * @returns An object containing participant and roomState, or an error message.
  */
 export const joinParticipant = (

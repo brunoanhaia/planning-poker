@@ -2,7 +2,13 @@ import {
     Avatar,
     AvatarColor,
     CardValue,
+    DECK_TYPES,
     DeckType,
+    MAX_CUSTOM_DECK_SIZE,
+    MAX_TIMER_DURATION_SECONDS,
+    MAX_TITLE_LENGTH,
+    MIN_CUSTOM_DECK_SIZE,
+    MIN_TIMER_DURATION_SECONDS,
     Participant,
     PRESET_DECKS,
     RoomState,
@@ -218,7 +224,7 @@ export class RoomManager {
             return null;
         }
 
-        room.title = newTitle.trim() || room.title;
+        room.title = newTitle.trim().slice(0, MAX_TITLE_LENGTH) || room.title;
         return room;
     }
 
@@ -274,10 +280,17 @@ export class RoomManager {
             return null;
         }
 
+        const safeDuration = Number.isFinite(duration)
+            ? Math.min(
+                  Math.max(Math.trunc(duration), MIN_TIMER_DURATION_SECONDS),
+                  MAX_TIMER_DURATION_SECONDS
+              )
+            : DEFAULT_TIMER_DURATION_SECONDS;
+
         room.timer = {
-            duration,
+            duration: safeDuration,
             isRunning: true,
-            remaining: duration,
+            remaining: safeDuration,
             startedAt: Date.now(),
         };
         return room;
@@ -596,21 +609,46 @@ export class RoomManager {
             return null;
         }
 
-        room.deckType = deckType;
-        room.activeDeck =
-            deckType === 'custom' && customDeck
-                ? [...customDeck]
-                : [
-                      ...(PRESET_DECKS[deckType as Exclude<DeckType, 'custom'>] ||
-                          PRESET_DECKS.fibonacci),
-                  ];
-
-        if (deckType === 'custom' && customDeck) {
-            room.customDeck = [...customDeck];
+        if (!DECK_TYPES.includes(deckType)) {
+            return null;
         }
 
+        if (deckType === 'custom') {
+            if (!this.isValidCustomDeck(customDeck)) {
+                return null;
+            }
+            room.customDeck = [...customDeck];
+            room.activeDeck = [...customDeck];
+        } else {
+            room.activeDeck = [...PRESET_DECKS[deckType]];
+        }
+
+        room.deckType = deckType;
         this.resetRoomVotes(room);
         return room;
+    }
+
+    /**
+     * Validates a custom deck: correct size, unique values, and non-empty cards.
+     *
+     * @param customDeck - The candidate custom deck.
+     * @returns True when the deck is a valid custom deck.
+     */
+    private isValidCustomDeck(customDeck?: CardValue[]): customDeck is CardValue[] {
+        if (!Array.isArray(customDeck)) {
+            return false;
+        }
+        if (customDeck.length < MIN_CUSTOM_DECK_SIZE || customDeck.length > MAX_CUSTOM_DECK_SIZE) {
+            return false;
+        }
+        const hasInvalidCard = customDeck.some(
+            (card) =>
+                (typeof card !== 'string' && typeof card !== 'number') || String(card).trim() === ''
+        );
+        if (hasInvalidCard) {
+            return false;
+        }
+        return new Set(customDeck.map(String)).size === customDeck.length;
     }
 
     /**
