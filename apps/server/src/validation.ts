@@ -1,6 +1,8 @@
 import {
     DECK_TYPES,
+    MAX_AVATAR_LENGTH,
     MAX_BULK_STORIES,
+    MAX_COLOR_LENGTH,
     MAX_CUSTOM_DECK_SIZE,
     MAX_DESCRIPTION_LENGTH,
     MAX_NAME_LENGTH,
@@ -37,6 +39,8 @@ const deckTypeSchema = z.enum(DECK_TYPES);
 const nameSchema = z.string().trim().min(1).max(MAX_NAME_LENGTH);
 const titleSchema = z.string().trim().min(1).max(MAX_TITLE_LENGTH);
 const descriptionSchema = z.string().trim().max(MAX_DESCRIPTION_LENGTH);
+const avatarSchema = z.string().trim().min(1).max(MAX_AVATAR_LENGTH);
+const colorSchema = z.string().trim().min(1).max(MAX_COLOR_LENGTH);
 
 /**
  * Validates that a custom deck is present whenever the deck type is `custom`.
@@ -51,8 +55,8 @@ const withCustomDeckRequirement = <T extends { customDeck?: unknown; deckType?: 
 
 const createRoomSchema = withCustomDeckRequirement(
     z.object({
-        avatar: z.string().optional(),
-        color: z.string().optional(),
+        avatar: avatarSchema.optional(),
+        color: colorSchema.optional(),
         customDeck: customDeckSchema.optional(),
         deckType: deckTypeSchema.optional(),
         name: nameSchema,
@@ -61,8 +65,8 @@ const createRoomSchema = withCustomDeckRequirement(
 );
 
 const joinRoomSchema = z.object({
-    avatar: z.string().optional(),
-    color: z.string().optional(),
+    avatar: avatarSchema.optional(),
+    color: colorSchema.optional(),
     name: nameSchema,
     roomId: z.string().trim().min(1).max(MAX_NAME_LENGTH),
     sessionToken: z.string().trim().min(1).optional().nullable(),
@@ -87,7 +91,7 @@ const setCurrentStorySchema = z.object({
 });
 
 const updateStoryEstimateSchema = z.object({
-    estimate: cardValueSchema,
+    estimate: cardValueSchema.nullable(),
     storyId: z.string().trim().min(1),
 });
 

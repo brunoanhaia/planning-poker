@@ -94,4 +94,44 @@ describe('WebSocket payload validation', () => {
         expect(result.success).toBe(false);
         expect(result.data).toBeUndefined();
     });
+
+    it('rejects oversized avatar and color values', () => {
+        expect(
+            validatePayload('JOIN_ROOM', {
+                avatar: 'x'.repeat(17),
+                name: 'Bob',
+                roomId: 'ABC123',
+            }).success
+        ).toBe(false);
+        expect(
+            validatePayload('JOIN_ROOM', {
+                color: 'x'.repeat(33),
+                name: 'Bob',
+                roomId: 'ABC123',
+            }).success
+        ).toBe(false);
+    });
+
+    it('accepts normal avatar and color values', () => {
+        expect(
+            validatePayload('JOIN_ROOM', {
+                avatar: '🚀',
+                color: '#6366f1',
+                name: 'Bob',
+                roomId: 'ABC123',
+            }).success
+        ).toBe(true);
+    });
+
+    it('accepts null to clear a story estimate', () => {
+        expect(
+            validatePayload('UPDATE_STORY_ESTIMATE', { estimate: null, storyId: 'story_1' }).success
+        ).toBe(true);
+    });
+
+    it('still accepts a concrete story estimate', () => {
+        expect(
+            validatePayload('UPDATE_STORY_ESTIMATE', { estimate: 5, storyId: 'story_1' }).success
+        ).toBe(true);
+    });
 });

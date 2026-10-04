@@ -22,6 +22,12 @@ export const MAX_TITLE_LENGTH = 120;
 /** Maximum length (in characters) for a story description. */
 export const MAX_DESCRIPTION_LENGTH = 2000;
 
+/** Maximum length (in characters) for an avatar emoji/string. */
+export const MAX_AVATAR_LENGTH = 16;
+
+/** Maximum length (in characters) for an avatar color value. */
+export const MAX_COLOR_LENGTH = 32;
+
 /** Maximum number of stories accepted in a single bulk import. */
 export const MAX_BULK_STORIES = 50;
 
