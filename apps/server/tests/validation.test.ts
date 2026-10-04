@@ -82,4 +82,16 @@ describe('WebSocket payload validation', () => {
     it('passes through message types without a schema', () => {
         expect(validatePayload('REVEAL_VOTES', undefined).success).toBe(true);
     });
+
+    it('returns the parsed, trimmed value on success', () => {
+        const result = validatePayload('JOIN_ROOM', { name: '  Bob  ', roomId: 'ABC123' });
+        expect(result.success).toBe(true);
+        expect((result.data as { name: string }).name).toBe('Bob');
+    });
+
+    it('does not return data when validation fails', () => {
+        const result = validatePayload('VOTE', { vote: '' });
+        expect(result.success).toBe(false);
+        expect(result.data).toBeUndefined();
+    });
 });

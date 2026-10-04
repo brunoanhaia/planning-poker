@@ -113,4 +113,21 @@ describe('SessionService', () => {
         expect(sessions.resolve(second)).toBeNull();
         expect(sessions.resolve(other)).not.toBeNull();
     });
+
+    it('replaces the previous token when re-issuing for the same participant', () => {
+        const sessions = new SessionService();
+        const first = sessions.issue('ROOM01', 'user_1');
+        const second = sessions.issue('ROOM01', 'user_1');
+
+        expect(sessions.resolve(first)).toBeNull();
+        expect(sessions.resolve(second)).toEqual({ roomId: 'ROOM01', userId: 'user_1' });
+    });
+
+    it('keeps at most one live token per participant', () => {
+        const sessions = new SessionService();
+        const tokens = Array.from({ length: 25 }, () => sessions.issue('ROOM01', 'user_1'));
+
+        const live = tokens.filter((token) => sessions.resolve(token) !== null);
+        expect(live).toHaveLength(1);
+    });
 });

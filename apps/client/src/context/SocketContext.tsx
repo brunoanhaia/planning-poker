@@ -109,6 +109,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     } else if (type === 'SESSION') {
                         sessionTokenRef.current = payload.sessionToken;
                         sessionStorage.setItem('planit_session_token', payload.sessionToken);
+                        if (payload.userId) {
+                            setCurrentUserId(payload.userId);
+                        }
                     } else if (type === 'KICKED') {
                         setRoomState(null);
                         sessionTokenRef.current = null;

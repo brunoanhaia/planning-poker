@@ -5,7 +5,7 @@
     // Playwright Chromium OS deps are baked into the image; browser binaries are
     // downloaded during postCreateCommand to stay locked to @playwright/test version.
     "name": "PlanItPoker",
-    "build": { "dockerfile": "Dockerfile" },
+    "build": { "context": "..", "dockerfile": "Dockerfile" },
     "features": {
         "ghcr.io/devcontainers/features/github-cli:1": {}
     },

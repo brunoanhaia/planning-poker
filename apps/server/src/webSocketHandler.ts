@@ -112,6 +112,7 @@ export class WebSocketHandler {
                 if (!ws.roomId || !ws.userId) {
                     return;
                 }
+                sessionService.revokeByUser(ws.roomId, ws.userId);
                 const updatedRoom = roomManager.leaveRoom(ws.roomId, ws.userId);
                 if (updatedRoom) {
                     this.broadcastRoomState(ws.roomId);
@@ -172,7 +173,7 @@ export class WebSocketHandler {
             return;
         }
 
-        handler(ws, msg.payload);
+        handler(ws, validation.data);
     }
 
     /**
@@ -241,11 +242,11 @@ export class WebSocketHandler {
     private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
         const { avatar, color, name, roomId, sessionToken, userId } = payload;
 
+        const normalizedRoomId = roomId.toUpperCase();
         const binding = sessionService.resolve(sessionToken);
-        const provenUserId =
-            binding && binding.roomId === roomId && binding.userId === userId
-                ? binding.userId
-                : undefined;
+        const isRoomBound = binding?.roomId === normalizedRoomId;
+        const isUserBound = !userId || binding?.userId === userId;
+        const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
 
         const result = roomManager.joinRoom(
             roomId,

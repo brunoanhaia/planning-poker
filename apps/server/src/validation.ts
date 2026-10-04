@@ -144,6 +144,7 @@ export const MESSAGE_SCHEMAS: Partial<Record<WSMessageType, z.ZodType>> = {
 };
 
 export interface ValidationResult {
+    data?: unknown;
     error?: string;
     success: boolean;
 }
@@ -151,19 +152,22 @@ export interface ValidationResult {
 /**
  * Validates a message payload against the schema registered for its type.
  *
+ * On success the parsed (and normalized, e.g. trimmed) value is returned so
+ * callers can dispatch sanitized data instead of the raw client payload.
+ *
  * @param type - The WebSocket message type.
  * @param payload - The raw, untrusted payload received from the client.
- * @returns A result indicating success, or a human-readable error message.
+ * @returns A result carrying the parsed data, or a human-readable error message.
  */
 export const validatePayload = (type: WSMessageType, payload: unknown): ValidationResult => {
     const schema = MESSAGE_SCHEMAS[type];
     if (!schema) {
-        return { success: true };
+        return { data: payload, success: true };
     }
 
     const result = schema.safeParse(payload);
     if (result.success) {
-        return { success: true };
+        return { data: result.data, success: true };
     }
 
     const [issue] = result.error.issues;

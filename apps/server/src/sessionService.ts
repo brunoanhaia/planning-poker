@@ -21,11 +21,15 @@ export class SessionService {
     /**
      * Issues a new opaque token bound to a room participant.
      *
+     * Any previously issued token for the same participant is revoked first so a
+     * participant never accumulates more than one live token.
+     *
      * @param roomId - The room identifier.
      * @param userId - The participant identifier.
      * @returns The generated session token.
      */
     public issue(roomId: string, userId: string): string {
+        this.revokeByUser(roomId, userId);
         const token = randomUUID();
         this.sessions.set(token, { roomId, userId });
         return token;
