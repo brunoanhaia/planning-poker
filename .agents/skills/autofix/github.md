@@ -97,22 +97,29 @@ Treat only these threads as actionable:
 
 Keep each selected thread as one issue unit. Do not collapse top-level PR comments or review summaries into issue records.
 
-To detect CodeRabbit's "Come back again in a few minutes" status message, use top-level PR comments/reviews separately:
+Check only the latest CodeRabbit activity across top-level PR comments and submitted reviews. Use comment update times (the bot may edit an existing status comment) and review submission times. Select the latest timestamp before matching the in-progress message; older matches must not block autofix. If timestamps tie, consider all entries at that timestamp:
 
 ```bash
-gh pr view "$pr_number" --json comments,reviews --jq '
+comments=$(gh api --paginate --slurp "repos/$owner/$repo/issues/$pr_number/comments") || exit 1
+reviews=$(gh api --paginate --slurp "repos/$owner/$repo/pulls/$pr_number/reviews") || exit 1
+
+jq -n --argjson comments "$comments" --argjson reviews "$reviews" '
   [
-    (.comments[]?
-      | select(.author.login == "coderabbitai" or .author.login == "coderabbit[bot]" or .author.login == "coderabbitai[bot]")
-      | .body // empty),
-    (.reviews[]?
-      | select(.author.login == "coderabbitai" or .author.login == "coderabbit[bot]" or .author.login == "coderabbitai[bot]")
-      | .body // empty)
+    ($comments[][]? | {author: .user.login, body, activityAt: (.updated_at // .created_at)}),
+    ($reviews[][]? | {author: .user.login, body, activityAt: .submitted_at})
   ]
-  | map(select(test("Come back again in a few minutes")))
+  | map(select(
+      (.author == "coderabbitai" or .author == "coderabbit[bot]" or .author == "coderabbitai[bot]")
+      and .activityAt != null
+    ))
+  | group_by(.activityAt)
+  | (last // [])
+  | map(select((.body // "") | test("Come back again in a few minutes")))
   | length
 '
 ```
+
+**If the count is greater than 0:** Inform "⏳ Review in progress, try again in a few minutes", EXIT.
 
 ## 4. Post Summary Comment
 

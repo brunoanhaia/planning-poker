@@ -51,11 +51,12 @@ Before any autofix actions, search for `AGENTS.md` in the current repository and
 
 ### Step 1: Check Code Push Status
 
-Check: `git status` + check for unpushed commits
+Check: `git status --porcelain=v1 --untracked-files=all` + check for unpushed commits
 
-**If uncommitted changes:**
-- Warn: "⚠️ Uncommitted changes won't be in CodeRabbit review"
-- Ask: "Commit and push first?" → If yes: wait for user action, then continue
+**If the status check fails or reports staged, unstaged, or untracked changes:**
+- Stop: a clean worktree and index are required before autofix can continue. Existing edits could otherwise enter the consolidated commit in Step 7.
+- Ask the user to commit or stash their changes (including untracked files). Do not discard changes or commit them as autofixes.
+- Re-run the status check after the user acts; continue only when it succeeds with no output. If the user declines, EXIT the skill.
 
 **If unpushed commits:**
 - Warn: "⚠️ N unpushed commits. CodeRabbit hasn't reviewed them"
@@ -147,19 +148,24 @@ while :; do
 done
 ```
 
-Check top-level PR comments and review bodies for the CodeRabbit in-progress message:
+Check only the latest CodeRabbit activity across top-level PR comments and submitted reviews. Use comment update times (the bot may edit an existing status comment) and review submission times. Select the latest timestamp before matching the in-progress message; older matches must not block autofix. If timestamps tie, consider all entries at that timestamp:
 
 ```bash
-gh pr view "$pr_number" --json comments,reviews --jq '
+comments=$(gh api --paginate --slurp "repos/$owner/$repo/issues/$pr_number/comments") || exit 1
+reviews=$(gh api --paginate --slurp "repos/$owner/$repo/pulls/$pr_number/reviews") || exit 1
+
+jq -n --argjson comments "$comments" --argjson reviews "$reviews" '
   [
-    (.comments[]?
-      | select(.author.login == "coderabbitai" or .author.login == "coderabbit[bot]" or .author.login == "coderabbitai[bot]")
-      | .body // empty),
-    (.reviews[]?
-      | select(.author.login == "coderabbitai" or .author.login == "coderabbit[bot]" or .author.login == "coderabbitai[bot]")
-      | .body // empty)
+    ($comments[][]? | {author: .user.login, body, activityAt: (.updated_at // .created_at)}),
+    ($reviews[][]? | {author: .user.login, body, activityAt: .submitted_at})
   ]
-  | map(select(test("Come back again in a few minutes")))
+  | map(select(
+      (.author == "coderabbitai" or .author == "coderabbit[bot]" or .author == "coderabbitai[bot]")
+      and .activityAt != null
+    ))
+  | group_by(.activityAt)
+  | (last // [])
+  | map(select((.body // "") | test("Come back again in a few minutes")))
   | length
 '
 ```
