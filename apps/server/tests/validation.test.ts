@@ -30,9 +30,9 @@ describe('WebSocket payload validation', () => {
     });
 
     it('rejects a custom deck with too few or too many cards', () => {
-        expect(validatePayload('CHANGE_DECK', { customDeck: [1], deckType: 'custom' }).success).toBe(
-            false
-        );
+        expect(
+            validatePayload('CHANGE_DECK', { customDeck: [1], deckType: 'custom' }).success
+        ).toBe(false);
         const tooMany = Array.from({ length: 31 }, (_, i) => i + 1);
         expect(
             validatePayload('CHANGE_DECK', { customDeck: tooMany, deckType: 'custom' }).success
@@ -73,9 +73,9 @@ describe('WebSocket payload validation', () => {
     });
 
     it('enforces participant name length limits', () => {
-        expect(validatePayload('JOIN_ROOM', { name: 'x'.repeat(51), roomId: 'ABC123' }).success).toBe(
-            false
-        );
+        expect(
+            validatePayload('JOIN_ROOM', { name: 'x'.repeat(51), roomId: 'ABC123' }).success
+        ).toBe(false);
         expect(validatePayload('JOIN_ROOM', { name: 'Bob', roomId: 'ABC123' }).success).toBe(true);
     });
 
