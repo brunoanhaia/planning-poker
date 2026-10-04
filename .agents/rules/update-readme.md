@@ -1,7 +1,6 @@
 ---
 name: update-readme
 description: Enforce that the README.md is always kept up to date after significant code changes.
-trigger: model_decision
 ---
 
 **CRITICAL RULE**: After EVERY feature implementation or architectural change you complete, you MUST automatically update the `README.md` file in the root of the project to reflect these changes.

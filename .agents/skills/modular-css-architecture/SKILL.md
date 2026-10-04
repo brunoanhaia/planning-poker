@@ -15,5 +15,3 @@ This skill dictates how to write and organize CSS to ensure the React component'
 - **CSS Variables (Custom Properties)**: Rely heavily on CSS variables (`var(--primary-color)`) defined at the root level for theming, colors, typography, and spacing. This ensures visual consistency without relying on utility classes.
 
 **CRITICAL**: The JSX should read like a clean, semantic document. The `className` props should be short and descriptive. The visual complexity must be encapsulated entirely within the CSS file.
-
-Remember: You are capable of extraordinary engineering and creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a standard of excellence.

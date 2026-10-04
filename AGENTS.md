@@ -60,7 +60,7 @@ npm run format           # prettier across repo
 - ESLint config is **consolidated at the repo root** (`eslint.config.mjs`, flat config). There are no per-workspace `eslint.config.mjs` files.
 - ESLint 9 requires a config at the invocation directory, so the root file is what makes root-level runs (CI, CodeRabbit, editors) work.
 - Prettier config: 4 spaces, single quotes, `printWidth: 100`, trailing commas `es5`.
-- ESLint forbids `any`: `@typescript-eslint/no-explicit-any` is an **error** in all packages. Use `unknown` and narrow it, or a precise type. (TypeScript's `strict` only blocks *implicit* `any`; the explicit form is caught by ESLint.)
+- ESLint forbids `any`: `@typescript-eslint/no-explicit-any` is an **error** in all packages. Use `unknown` and narrow it, or a precise type. (TypeScript's `strict` only blocks _implicit_ `any`; the explicit form is caught by ESLint.)
 - `vitest/no-focused-tests` is an error in client/server.
 - Imports are sorted with `perfectionist/sort-imports`.
 
@@ -101,8 +101,18 @@ Project conventions previously in GEMINI.md:
 
 ## Custom Agent Tooling
 
-- Custom skills live in `.agents/skills/` (e.g. `realtime-websocket-manager`, `react-clean-architecture`, `accessible-ui-components`, `modular-css-architecture`).
-- Custom rules live in `.agents/rules/` (e.g. `update-readme.md`, `update-requirements.md`, `update-agents.md`).
+Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. Both require YAML frontmatter (`name` + `description`) to be discoverable — a file without frontmatter is invisible to the agent.
+
+- Skills are loaded **on demand**: the `description` is matched against the request, and the full `SKILL.md` is read only on a hit. The directory name must match the frontmatter `name`.
+    - UI / architecture: `accessible-ui-components`, `isolated-component-design`, `modular-css-architecture`, `react-clean-architecture`
+    - Code quality: `clean-code-refactoring`
+    - Real-time: `realtime-websocket-manager` (native WebSockets, not Socket.IO)
+    - Efficiency: `token-usage-best-practices` (canonical source for token-saving principles)
+- Rules are **documentation-only** — they are not auto-applied unless referenced from `AGENTS.md` or converted to `.instructions.md` with `applyTo`. Treat them as binding anyway.
+    - `update-readme` — update `README.md` after every feature or architectural change
+    - `update-requirements` — update `requirements.md` when a functional/non-functional requirement is added
+    - `update-agents` — update `AGENTS.md` when a skill, rule, or workflow changes
+- Only YAML frontmatter fields that tooling actually implements should be used. `trigger: model_decision` was removed as it is non-standard and silently ignored.
 - CodeRabbit skills are vendored from `coderabbitai/skills` and pinned in `skills-lock.json`:
     - `code-review` — run CodeRabbit CLI reviews and interpret findings (default for review requests).
     - `autofix` — fetch unresolved CodeRabbit PR threads and apply validated fixes with per-change approval.

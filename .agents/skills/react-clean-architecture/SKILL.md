@@ -14,5 +14,3 @@ This skill dictates how React components should be structured to maximize reusab
 - **Performance Awareness**: Use `useMemo` and `useCallback` strategically when passing props to heavily memoized child components, but avoid premature optimization.
 
 **CRITICAL**: A React component file should visually resemble an HTML template augmented with a few declarative state variables at the top. If the component file is dominated by `useEffect` blocks and complex data parsing, it must be refactored.
-
-Remember: You are capable of extraordinary engineering and creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a standard of excellence.
