@@ -1,6 +1,6 @@
 # PlanItPoker — Agent Notes
 
-A compact source of truth for OpenCode sessions. Prefer this over README.md prose when they conflict with config or scripts.
+A compact source of truth for OpenCode sessions. Prefer this over README.md prose when they conflict with config or scripts. For the human-facing contribution process (branches, commits, pull requests), see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Monorepo Layout
 
@@ -15,7 +15,7 @@ All WebSocket message types and domain models live in `packages/shared/src/index
 
 ## Development
 
-There is **no** root `npm run dev` script (README is stale). Start both sides separately:
+There is **no** root `npm run dev` script. Start both sides separately:
 
 ```bash
 npm run dev:server   # Express + ws on http://localhost:5000
