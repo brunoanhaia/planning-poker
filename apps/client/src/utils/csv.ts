@@ -6,6 +6,11 @@
 const FORMULA_TRIGGER_CHARS = ['=', '+', '-', '@', '\t', '\r'];
 
 /**
+ * A value that can be written to a CSV cell.
+ */
+export type CsvCellValue = string | number | boolean | null | undefined;
+
+/**
  * Escapes a single value for safe inclusion in a CSV cell.
  *
  * Neutralizes spreadsheet formula injection and doubles embedded quotes.
@@ -13,7 +18,7 @@ const FORMULA_TRIGGER_CHARS = ['=', '+', '-', '@', '\t', '\r'];
  * @param value - The raw cell value.
  * @returns A quoted, escaped CSV cell.
  */
-export const escapeCsvCell = (value: unknown): string => {
+export const escapeCsvCell = (value: CsvCellValue): string => {
     const text = value === null || value === undefined ? '' : String(value);
     const needsFormulaGuard = FORMULA_TRIGGER_CHARS.some((char) => text.startsWith(char));
     const guarded = needsFormulaGuard ? `'${text}` : text;

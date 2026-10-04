@@ -432,7 +432,7 @@ export class WebSocketHandler {
         }
 
         const room = roomManager.getRoom(session.roomId);
-        if (!room || !room.activeDeck.includes(payload.vote)) {
+        if (!room?.activeDeck.includes(payload.vote)) {
             this.sendError(ws, 'Vote value is not part of the active deck.');
             return;
         }
