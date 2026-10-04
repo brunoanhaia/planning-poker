@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
 import { SessionService } from '../src/sessionService.js';
-import { shouldCleanupOnClose, socketKey } from '../src/webSocketHandler.js';
+import { isActiveOwner, shouldCleanupOnClose, socketKey } from '../src/webSocketHandler.js';
 
 describe('RoomManager security hardening', () => {
     it('clamps a negative timer duration to the minimum', () => {
@@ -170,5 +170,19 @@ describe('Reconnection ownership on socket close', () => {
 
         sessions.revokeByUser('ROOM01', 'user_1');
         expect(sessions.resolve(token)).toBeNull();
+    });
+});
+
+describe('Superseded socket ownership', () => {
+    it('treats a socket that is not the active owner as having no session', () => {
+        const newer = { id: 'socket-b' };
+        const stale = { id: 'socket-a' };
+
+        expect(isActiveOwner(newer, stale)).toBe(false);
+        expect(isActiveOwner(newer, newer)).toBe(true);
+    });
+
+    it('treats a socket as owner when no active socket is registered', () => {
+        expect(isActiveOwner(undefined, { id: 'socket-a' })).toBe(true);
     });
 });

@@ -49,17 +49,28 @@ interface RoomSession {
 export const socketKey = (roomId: string, userId: string): string => `${roomId}:${userId}`;
 
 /**
- * Decides whether a closing socket should tear down its participant session.
+ * Decides whether a socket is the active owner of a participant connection.
  *
  * A socket that has been superseded by a newer connection for the same
- * participant is stale and must not mark the active participant offline.
+ * participant is stale: it must not issue room-scoped commands, and its close
+ * must not tear down the active session.
+ *
+ * @param activeSocket - The socket currently registered for the participant, if any.
+ * @param candidate - The socket being checked.
+ * @returns True when the candidate is the active owner (or none is registered).
+ */
+export const isActiveOwner = (activeSocket: unknown, candidate: unknown): boolean =>
+    !activeSocket || activeSocket === candidate;
+
+/**
+ * Decides whether a closing socket should tear down its participant session.
  *
  * @param activeSocket - The socket currently registered for the participant, if any.
  * @param closingSocket - The socket that is closing.
  * @returns True when the closing socket still owns the active connection.
  */
 export const shouldCleanupOnClose = (activeSocket: unknown, closingSocket: unknown): boolean =>
-    !activeSocket || activeSocket === closingSocket;
+    isActiveOwner(activeSocket, closingSocket);
 
 type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
 
@@ -211,14 +222,40 @@ export class WebSocketHandler {
     /**
      * Returns the room session bound to a connection, if any.
      *
+     * A socket that has been superseded by a newer connection for the same
+     * participant is no longer the active owner and is treated as having no
+     * session, so it cannot issue room-scoped commands.
+     *
      * @param ws - The sender's WebSocket connection.
-     * @returns The room/user identifiers, or null when not in a room.
+     * @returns The room/user identifiers, or null when not in an active room session.
      */
     private getSession(ws: ExtendedWebSocket): RoomSession | null {
         if (!ws.roomId || !ws.userId) {
             return null;
         }
+        const activeSocket = this.activeSockets.get(socketKey(ws.roomId, ws.userId));
+        if (!isActiveOwner(activeSocket, ws)) {
+            return null;
+        }
         return { roomId: ws.roomId, userId: ws.userId };
+    }
+
+    /**
+     * Registers a socket as the active connection for a participant, detaching any
+     * socket it replaces so the superseded connection can no longer act.
+     *
+     * @param ws - The newly active socket.
+     * @param roomId - The room identifier.
+     * @param userId - The participant identifier.
+     */
+    private bindActiveSocket(ws: ExtendedWebSocket, roomId: string, userId: string): void {
+        const key = socketKey(roomId, userId);
+        const previous = this.activeSockets.get(key);
+        if (previous && !isActiveOwner(previous, ws)) {
+            previous.roomId = undefined;
+            previous.userId = undefined;
+        }
+        this.activeSockets.set(key, ws);
     }
 
     /**
@@ -258,7 +295,7 @@ export class WebSocketHandler {
 
         ws.roomId = roomId;
         ws.userId = hostId;
-        this.activeSockets.set(socketKey(roomId, hostId), ws);
+        this.bindActiveSocket(ws, roomId, hostId);
 
         const sessionToken = sessionService.issue(roomId, hostId);
         this.send(ws, 'SESSION', { sessionToken, userId: hostId });
@@ -307,7 +344,7 @@ export class WebSocketHandler {
 
         ws.roomId = roomState.id;
         ws.userId = participant.id;
-        this.activeSockets.set(socketKey(roomState.id, participant.id), ws);
+        this.bindActiveSocket(ws, roomState.id, participant.id);
 
         const issuedToken = sessionService.issue(roomState.id, participant.id);
         this.send(ws, 'SESSION', { sessionToken: issuedToken, userId: participant.id });
