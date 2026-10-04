@@ -1,0 +1,6 @@
+# CodeRabbit skills are vendored from coderabbitai/skills and pinned by
+# `computedHash` in skills-lock.json. Running `npm run format` over them would
+# rewrite the upstream content, change the pinned hash, and desync the local
+# copy from its source. Format them upstream, not here.
+.agents/skills/autofix/
+.agents/skills/code-review/

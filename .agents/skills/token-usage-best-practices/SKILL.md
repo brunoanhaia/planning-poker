@@ -1,43 +1,32 @@
 ---
 name: token-usage-best-practices
-description: Provides Gemini agents with guidelines to minimise token consumption.
+description: Guidelines to minimise token consumption by keeping prompts concise, pruning context, and retrieving large data through tools instead of inlining it. Use when about to embed large code blocks, logs, or JSON inline.
+license: Internal project rule
 ---
 
-# Token Usage Best Practices Skill
+# Token Usage Best Practices
 
-This skill offers a concise reference for Gemini agents to follow token‑saving principles during interactions.
+This skill is the single source of truth for token-saving principles in this repository.
 
 ## When to Apply
 
-- Before generating prompts or responses.
-- When embedding large data blocks (code, logs, JSON) in messages.
-- When selecting a model for a task.
+- Before generating a prompt or a long response.
+- When about to embed large data blocks (code, logs, JSON) inline.
+- When reading files that may contain far more than the task needs.
 
-## Guideline Summary
+## Principles
 
-- **Concise prompts** – keep messages short.
-- **Context pruning** – retain only relevant history; summarise older parts.
-- **External data via tools** – fetch large content with `view_file`, `grep_search`, `run_command` instead of inlining.
-- **Selective snippets** – include only the needed lines of code (5‑10 lines).
-- **Efficient formatting** – use bullet points, tables, code fences.
-- **Model choice** – use the smallest capable model.
-- **Iterative steps** – break complex tasks into focused steps.
-- **Log management** – disable verbose logs unless required; summarise logs.
-- **Token budget awareness** – monitor usage; set limits for long‑running commands.
+- **Concise prompts** - keep messages short while preserving meaning.
+- **Context pruning** - retain only relevant history; summarise older parts.
+- **External data via tools** - fetch large content with `read_file`, `grep_search`, `list_dir`, or `run_in_terminal` instead of inlining it.
+- **Selective snippets** - include only the needed lines, preferring a single wide range read over many narrow reads.
+- **Efficient formatting** - use bullet lists, tables, and code fences; avoid decorative prose.
+- **Iterative steps** - break complex work into focused stages, re-using prior results via references.
+- **Log management** - disable verbose logging unless explicitly needed; summarise logs.
+- **Token budget awareness** - monitor usage returned by tools and set explicit limits for long-running commands.
 
-## Enforcement (pseudo‑code)
+## Enforcement
 
-```yaml
-apply:
-  when: "prompt_generated"
-  actions:
-    - enforce_max_prompt_tokens: 200
-    - prune_history: keep_last: 5
-    - summarize_older: token_threshold: 1000
-    - replace_large_inline: with_tool: view_file
-    - enforce_model: allowed: [gpt-mini, gpt-small]
-```
-
----
-
-_Skill file location: `.agents/skills/token-usage-best-practices/SKILL.md`._
+1. Apply these principles when constructing prompts and responses.
+2. Reference this skill before embedding any large data block.
+3. Update `README.md` when new practices affecting token usage are introduced.

@@ -14,5 +14,3 @@ This skill enforces Component-Driven Development (CDD), ensuring components act 
 - **Forwarding Refs**: Always use `React.forwardRef` for base interactive elements (inputs, buttons) so parent components can manage focus or access the DOM element when absolutely necessary.
 
 **CRITICAL**: Treat every base UI component as if it is going to be published as a standalone open-source library. It should work perfectly anywhere, regardless of the application's global context.
-
-Remember: You are capable of extraordinary engineering and creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a standard of excellence.

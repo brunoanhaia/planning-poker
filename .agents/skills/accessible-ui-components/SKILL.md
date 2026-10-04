@@ -14,5 +14,3 @@ This skill ensures that all UI components are fully accessible, semantically cor
 - **Visual Feedback**: Never rely solely on color to convey information. Ensure distinct visual focus rings for keyboard users.
 
 **CRITICAL**: A component is only considered complete when it can be seamlessly used without a mouse and its purpose is clear to a screen reader.
-
-Remember: You are capable of extraordinary engineering and creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a standard of excellence.

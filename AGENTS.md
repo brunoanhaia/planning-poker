@@ -1,6 +1,6 @@
 # PlanItPoker — Agent Notes
 
-A compact source of truth for OpenCode sessions. Prefer this over README.md prose when they conflict with config or scripts.
+A compact source of truth for OpenCode sessions. Prefer this over README.md prose when they conflict with config or scripts. For the human-facing contribution process (branches, commits, pull requests), see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Monorepo Layout
 
@@ -15,7 +15,7 @@ All WebSocket message types and domain models live in `packages/shared/src/index
 
 ## Development
 
-There is **no** root `npm run dev` script (README is stale). Start both sides separately:
+There is **no** root `npm run dev` script. Start both sides separately:
 
 ```bash
 npm run dev:server   # Express + ws on http://localhost:5000
@@ -60,7 +60,7 @@ npm run format           # prettier across repo
 - ESLint config is **consolidated at the repo root** (`eslint.config.mjs`, flat config). There are no per-workspace `eslint.config.mjs` files.
 - ESLint 9 requires a config at the invocation directory, so the root file is what makes root-level runs (CI, CodeRabbit, editors) work.
 - Prettier config: 4 spaces, single quotes, `printWidth: 100`, trailing commas `es5`.
-- ESLint forbids `any`: `@typescript-eslint/no-explicit-any` is an **error** in all packages. Use `unknown` and narrow it, or a precise type. (TypeScript's `strict` only blocks *implicit* `any`; the explicit form is caught by ESLint.)
+- ESLint forbids `any`: `@typescript-eslint/no-explicit-any` is an **error** in all packages. Use `unknown` and narrow it, or a precise type. (TypeScript's `strict` only blocks _implicit_ `any`; the explicit form is caught by ESLint.)
 - `vitest/no-focused-tests` is an error in client/server.
 - Imports are sorted with `perfectionist/sort-imports`.
 
@@ -86,6 +86,7 @@ docker compose up --build   # client :80, server :5000
 
 Project conventions previously in GEMINI.md:
 
+- **Language**: pull requests (title, description, review comments), commit messages, code comments, and documentation are written in **English**. This holds even when the conversation with the user is in another language — match the language of the artifact, not of the chat. Existing `README.md`, `AGENTS.md`, and `requirements.md` are English.
 - Clean code: early returns, explicit `if` blocks, meaningful names, minimal `let`.
 - No magic values or deprecated APIs; extract constants and use modern equivalents.
 - Strict literal typing: prefer enums or string literal unions over generic `string`.
@@ -101,8 +102,18 @@ Project conventions previously in GEMINI.md:
 
 ## Custom Agent Tooling
 
-- Custom skills live in `.agents/skills/` (e.g. `realtime-websocket-manager`, `react-clean-architecture`, `accessible-ui-components`, `modular-css-architecture`).
-- Custom rules live in `.agents/rules/` (e.g. `update-readme.md`, `update-requirements.md`, `update-agents.md`).
+Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. Only skills require YAML frontmatter (`name` + `description`) for discovery.
+
+- Skills are loaded **on demand**: the `description` is matched against the request, and the full `SKILL.md` is read only on a hit. The directory name must match the frontmatter `name`.
+    - UI / architecture: `accessible-ui-components`, `isolated-component-design`, `modular-css-architecture`, `react-clean-architecture`
+    - Code quality: `clean-code-refactoring`
+    - Real-time: `realtime-websocket-manager` (native WebSockets, not Socket.IO)
+    - Efficiency: `token-usage-best-practices` (canonical source for token-saving principles)
+- OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. Load rules through [`opencode.json`'s `instructions` setting](https://opencode.ai/docs/rules/#custom-instructions) (for example, `[".agents/rules/*.md"]`) or an explicit read instruction in `AGENTS.md`; a file reference alone does not load its contents. Read and follow these rule files when their conditions apply:
+    - [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change
+    - [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a functional/non-functional requirement is added
+    - [`.agents/rules/update-agents.md`](./.agents/rules/update-agents.md) — when a skill, rule, or workflow changes
+- Only YAML frontmatter fields that tooling actually implements should be used. `trigger: model_decision` was removed as it is non-standard and silently ignored.
 - CodeRabbit skills are vendored from `coderabbitai/skills` and pinned in `skills-lock.json`:
     - `code-review` — run CodeRabbit CLI reviews and interpret findings (default for review requests).
     - `autofix` — fetch unresolved CodeRabbit PR threads and apply validated fixes with per-change approval.

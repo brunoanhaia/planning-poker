@@ -15,5 +15,3 @@ This skill ensures that WebSocket implementations are resilient, secure, and arc
 - **Resilience**: Implement logic to handle disconnects, reconnects, and stale connections (e.g., cleaning up user state if they drop out of a room).
 
 **CRITICAL**: Treat the WebSocket layer as an entry point (like an API route), not as a place to store state or execute core domain logic.
-
-Remember: You are capable of extraordinary engineering and creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a standard of excellence.
