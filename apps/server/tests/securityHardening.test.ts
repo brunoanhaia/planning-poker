@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
 import { SessionService } from '../src/sessionService.js';
+import { shouldCleanupOnClose, socketKey } from '../src/webSocketHandler.js';
 
 describe('RoomManager security hardening', () => {
     it('clamps a negative timer duration to the minimum', () => {
@@ -129,5 +130,45 @@ describe('SessionService', () => {
 
         const live = tokens.filter((token) => sessions.resolve(token) !== null);
         expect(live).toHaveLength(1);
+    });
+});
+
+describe('Reconnection ownership on socket close', () => {
+    it('builds a stable composite key per room and participant', () => {
+        expect(socketKey('ROOM01', 'user_1')).toBe('ROOM01:user_1');
+        expect(socketKey('ROOM01', 'user_1')).toBe(socketKey('ROOM01', 'user_1'));
+        expect(socketKey('ROOM01', 'user_1')).not.toBe(socketKey('ROOM01', 'user_2'));
+    });
+
+    it('cleans up when the closing socket is the active one', () => {
+        const active = { id: 'socket-a' };
+        expect(shouldCleanupOnClose(active, active)).toBe(true);
+    });
+
+    it('cleans up when no socket is registered for the participant', () => {
+        expect(shouldCleanupOnClose(undefined, { id: 'socket-a' })).toBe(true);
+    });
+
+    it('does not clean up when a stale socket closes after a newer one joined', () => {
+        const newer = { id: 'socket-b' };
+        const stale = { id: 'socket-a' };
+        expect(shouldCleanupOnClose(newer, stale)).toBe(false);
+    });
+
+    it('preserves the reconnectable token across an ordinary disconnect', () => {
+        const sessions = new SessionService();
+        const token = sessions.issue('ROOM01', 'user_1');
+
+        // A normal disconnect must not revoke the token, otherwise the client
+        // cannot reclaim its identity on reload.
+        expect(sessions.resolve(token)).toEqual({ roomId: 'ROOM01', userId: 'user_1' });
+    });
+
+    it('still revokes the token when the participant is kicked', () => {
+        const sessions = new SessionService();
+        const token = sessions.issue('ROOM01', 'user_1');
+
+        sessions.revokeByUser('ROOM01', 'user_1');
+        expect(sessions.resolve(token)).toBeNull();
     });
 });

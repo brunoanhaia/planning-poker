@@ -39,6 +39,28 @@ interface RoomSession {
     userId: string;
 }
 
+/**
+ * Builds the lookup key used to track a participant's active socket.
+ *
+ * @param roomId - The room identifier.
+ * @param userId - The participant identifier.
+ * @returns A stable composite key.
+ */
+export const socketKey = (roomId: string, userId: string): string => `${roomId}:${userId}`;
+
+/**
+ * Decides whether a closing socket should tear down its participant session.
+ *
+ * A socket that has been superseded by a newer connection for the same
+ * participant is stale and must not mark the active participant offline.
+ *
+ * @param activeSocket - The socket currently registered for the participant, if any.
+ * @param closingSocket - The socket that is closing.
+ * @returns True when the closing socket still owns the active connection.
+ */
+export const shouldCleanupOnClose = (activeSocket: unknown, closingSocket: unknown): boolean =>
+    !activeSocket || activeSocket === closingSocket;
+
 type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
 
 /**
@@ -80,6 +102,8 @@ export class WebSocketHandler {
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private timerInterval: NodeJS.Timeout | null = null;
     private readonly wss: WebSocketServer;
+    /** Tracks the live socket per `roomId:userId` so stale sockets cannot tear down a newer session. */
+    private readonly activeSockets: Map<string, ExtendedWebSocket> = new Map();
 
     constructor(wss: WebSocketServer) {
         this.wss = wss;
@@ -112,7 +136,15 @@ export class WebSocketHandler {
                 if (!ws.roomId || !ws.userId) {
                     return;
                 }
-                sessionService.revokeByUser(ws.roomId, ws.userId);
+
+                // A stale socket (superseded by a newer connection for the same
+                // participant) must not tear down the active session.
+                const key = socketKey(ws.roomId, ws.userId);
+                if (!shouldCleanupOnClose(this.activeSockets.get(key), ws)) {
+                    return;
+                }
+                this.activeSockets.delete(key);
+
                 const updatedRoom = roomManager.leaveRoom(ws.roomId, ws.userId);
                 if (updatedRoom) {
                     this.broadcastRoomState(ws.roomId);
@@ -226,6 +258,7 @@ export class WebSocketHandler {
 
         ws.roomId = roomId;
         ws.userId = hostId;
+        this.activeSockets.set(socketKey(roomId, hostId), ws);
 
         const sessionToken = sessionService.issue(roomId, hostId);
         this.send(ws, 'SESSION', { sessionToken, userId: hostId });
@@ -274,6 +307,7 @@ export class WebSocketHandler {
 
         ws.roomId = roomState.id;
         ws.userId = participant.id;
+        this.activeSockets.set(socketKey(roomState.id, participant.id), ws);
 
         const issuedToken = sessionService.issue(roomState.id, participant.id);
         this.send(ws, 'SESSION', { sessionToken: issuedToken, userId: participant.id });
