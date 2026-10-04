@@ -86,6 +86,7 @@ docker compose up --build   # client :80, server :5000
 
 Project conventions previously in GEMINI.md:
 
+- **Language**: pull requests (title, description, review comments), commit messages, code comments, and documentation are written in **English**. This holds even when the conversation with the user is in another language — match the language of the artifact, not of the chat. Existing `README.md`, `AGENTS.md`, and `requirements.md` are English.
 - Clean code: early returns, explicit `if` blocks, meaningful names, minimal `let`.
 - No magic values or deprecated APIs; extract constants and use modern equivalents.
 - Strict literal typing: prefer enums or string literal unions over generic `string`.
