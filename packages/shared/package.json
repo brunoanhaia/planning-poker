@@ -13,8 +13,7 @@
     },
     "scripts": {
         "build": "tsc",
-        "dev": "tsc --watch",
-        "lint": "eslint src"
+        "dev": "tsc --watch"
     },
     "devDependencies": {
         "@typescript-eslint/eslint-plugin": "^8.68.0",

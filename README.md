@@ -8,9 +8,16 @@ The application uses a client-server model communicating over WebSockets for rea
 
 ### Monorepo Structure
 
-- **`apps/client`**: The frontend application. Built with React, Vite, and Tailwind CSS. It uses native WebSocket to connect to the backend.
+- **`apps/client`**: The frontend application. Built with React, Vite, and MUI. It uses native WebSocket to connect to the backend.
 - **`apps/server`**: The backend server. Built with Node.js, Express, and native WebSocket (`ws`). It manages the state of all active rooms and handles WebSocket connections.
 - **`packages/shared`**: A shared library containing TypeScript interfaces, enums, and constants used by both the client and server.
+
+### Security Model
+
+- **Session tokens**: On create/join the server issues an opaque token (`apps/server/src/sessionService.ts`) bound to the room participant. Reconnection is only honored when the token proves ownership of the `userId`; a client-supplied `userId` alone is never trusted. Tokens are revoked on kick.
+- **Payload validation**: Every inbound WebSocket message is validated against a `zod` schema (`apps/server/src/validation.ts`) before reaching domain logic. Invalid payloads receive an `ERROR` and are never broadcast.
+- **Input limits**: Names (≤50), room titles (≤120), story titles (≤120), descriptions (≤2000), bulk imports (≤50), custom decks (2–30 unique cards), and timer durations (5–3600 s) are enforced server-side. Limits are shared constants in `packages/shared`.
+- **Safe export**: CSV export neutralizes spreadsheet formula injection and sanitizes the download filename (`apps/client/src/utils/csv.ts`).
 
 ### System Diagram
 
@@ -77,16 +84,24 @@ The application supports multiple users connecting to a single room to vote on t
 npm install
 ```
 
-### Development
-
-To start both the client and server in development mode, run the following command from the root directory:
+4.  Build the shared package (consumed from `dist/` by the apps):
 
 ```bash
-npm run dev
+npm run build:shared
+```
+
+### Development
+
+There is no root `npm run dev` script. Start both sides separately from the root directory:
+
+```bash
+npm run dev:server   # Express + ws on http://localhost:5000
+npm run dev:client   # Vite on http://localhost:5173
 ```
 
 - The client will be available at `http://localhost:5173`.
-- The server will run on `http://localhost:3000`.
+- The server will run on `http://localhost:5000` (override with the `PORT` env var).
+- In development the client proxies `/ws` to `ws://localhost:5000` via `apps/client/vite.config.ts`.
 
 ### Dev Containers
 
@@ -105,7 +120,8 @@ npm run test
 To run tests in a specific workspace:
 
 ```bash
-npm run test --workspace=apps/server
+npm --workspace=@planitpoker/server run test
+npm --workspace=@planitpoker/client run test
 ```
 
 #### End-to-End & Exploratory Visual Testing
@@ -131,10 +147,19 @@ npm --workspace=@planitpoker/e2e run test tests/overlap-axe.spec.ts
 
 The project uses ESLint for code quality and Prettier for code formatting. The configurations are integrated so that Prettier handles all stylistic rules without conflicting with ESLint.
 
+ESLint is configured once at the repository root (`eslint.config.mjs`) and driven by the root `package.json`; individual workspaces have no lint script.
+
+To lint the whole monorepo:
+
+```bash
+npm run lint       # report issues
+npm run lint:fix   # auto-fix
+```
+
 To format all files in the repository:
 
 ```bash
-npx prettier --write .
+npm run format
 ```
 
 ## Deployment (Production)

@@ -1,4 +1,10 @@
-import { CardValue, RoomState, Story } from '@planitpoker/shared';
+import {
+    CardValue,
+    MAX_DESCRIPTION_LENGTH,
+    MAX_TITLE_LENGTH,
+    RoomState,
+    Story,
+} from '@planitpoker/shared';
 
 import { generateStoryId } from './idGenerator.js';
 
@@ -11,11 +17,16 @@ import { generateStoryId } from './idGenerator.js';
  * @returns The updated RoomState.
  */
 export const addStoryToRoom = (room: RoomState, title: string, description?: string): RoomState => {
+    const trimmedTitle = title.trim().slice(0, MAX_TITLE_LENGTH);
+    if (!trimmedTitle) {
+        return room;
+    }
+
     const newStory: Story = {
-        description,
+        description: description?.trim().slice(0, MAX_DESCRIPTION_LENGTH),
         id: generateStoryId(),
         status: 'pending',
-        title,
+        title: trimmedTitle,
     };
 
     room.stories.push(newStory);
@@ -38,10 +49,10 @@ export const bulkAddStoriesToRoom = (
     }
 
     storiesList.forEach((item) => {
-        const trimmedTitle = item.title?.trim();
+        const trimmedTitle = item.title?.trim().slice(0, MAX_TITLE_LENGTH);
         if (trimmedTitle) {
             room.stories.push({
-                description: item.description?.trim(),
+                description: item.description?.trim().slice(0, MAX_DESCRIPTION_LENGTH),
                 id: generateStoryId(),
                 status: 'pending',
                 title: trimmedTitle,
