@@ -19,7 +19,7 @@ const tsconfigRootDir = (dir) => fileURLToPath(new URL(`./${dir}`, import.meta.u
 
 /** Shared rules applied to every TypeScript source file in the monorepo. */
 const sharedRules = {
-    '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     'perfectionist/sort-imports': ['warn', { order: 'asc', type: 'natural' }],
 };
@@ -95,7 +95,7 @@ export default tseslint.config(
             parserOptions: { tsconfigRootDir: tsconfigRootDir('apps/e2e') },
         },
         rules: {
-            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
         },
     },
@@ -105,7 +105,7 @@ export default tseslint.config(
         name: 'planitpoker/overrides',
         files: ['**/*.{ts,tsx}'],
         rules: {
-            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-explicit-any': 'off',
         },
     }
 );

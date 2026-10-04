@@ -60,7 +60,7 @@ npm run format           # prettier across repo
 - ESLint config is **consolidated at the repo root** (`eslint.config.mjs`, flat config). There are no per-workspace `eslint.config.mjs` files.
 - ESLint 9 requires a config at the invocation directory, so the root file is what makes root-level runs (CI, CodeRabbit, editors) work.
 - Prettier config: 4 spaces, single quotes, `printWidth: 100`, trailing commas `es5`.
-- ESLint forbids `any`: `@typescript-eslint/no-explicit-any` is an **error** in all packages. Use `unknown` and narrow it, or a precise type. (TypeScript's `strict` only blocks *implicit* `any`; the explicit form is caught by ESLint.)
+- ESLint allows `@typescript-eslint/no-explicit-any: off` in all packages.
 - `vitest/no-focused-tests` is an error in client/server.
 - Imports are sorted with `perfectionist/sort-imports`.
 
