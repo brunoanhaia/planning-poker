@@ -14,9 +14,8 @@
         "test:server": "npm --workspace=@planitpoker/server run test",
         "test:client": "npm --workspace=@planitpoker/client run test",
         "test": "npm run test --workspaces --if-present",
-        "lint:server": "npm --workspace=@planitpoker/server run lint",
-        "lint:client": "npm --workspace=@planitpoker/client run lint",
-        "lint": "npm run lint --workspaces --if-present",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix",
         "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
     },
     "devDependencies": {

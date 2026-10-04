@@ -51,12 +51,13 @@ npm --workspace=@planitpoker/e2e run test
 ## Lint / Format
 
 ```bash
-npm run lint             # all workspaces
-npx eslint .             # whole monorepo from the root
+npm run lint             # whole monorepo (eslint .)
+npm run lint:fix         # whole monorepo with --fix
 npm run format           # prettier across repo
 ```
 
-- ESLint config is **consolidated at the repo root** (`eslint.config.mjs`, flat config). There are no per-workspace `eslint.config.mjs` files; workspace `lint` scripts pass `--config ../../eslint.config.mjs`.
+- ESLint is **owned by the root `package.json`** (`lint` / `lint:fix` run `eslint .`). Workspaces have **no** `lint` script — do not add one.
+- ESLint config is **consolidated at the repo root** (`eslint.config.mjs`, flat config). There are no per-workspace `eslint.config.mjs` files.
 - ESLint 9 requires a config at the invocation directory, so the root file is what makes root-level runs (CI, CodeRabbit, editors) work.
 - Prettier config: 4 spaces, single quotes, `printWidth: 100`, trailing commas `es5`.
 - ESLint allows `@typescript-eslint/no-explicit-any: off` in all packages.

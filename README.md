@@ -147,10 +147,19 @@ npm --workspace=@planitpoker/e2e run test tests/overlap-axe.spec.ts
 
 The project uses ESLint for code quality and Prettier for code formatting. The configurations are integrated so that Prettier handles all stylistic rules without conflicting with ESLint.
 
+ESLint is configured once at the repository root (`eslint.config.mjs`) and driven by the root `package.json`; individual workspaces have no lint script.
+
+To lint the whole monorepo:
+
+```bash
+npm run lint       # report issues
+npm run lint:fix   # auto-fix
+```
+
 To format all files in the repository:
 
 ```bash
-npx prettier --write .
+npm run format
 ```
 
 ## Deployment (Production)
