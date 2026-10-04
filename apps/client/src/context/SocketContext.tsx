@@ -1,4 +1,4 @@
-import { DeckType, RoomState } from '@planitpoker/shared';
+import { DeckType, RoomState, WSMessageType } from '@planitpoker/shared';
 import React, {
     createContext,
     use,
@@ -162,7 +162,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
     }, []);
 
-    const send = useCallback((type: string, payload: any) => {
+    const send = useCallback((type: WSMessageType, payload: unknown) => {
         if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ payload, type }));
         } else {
