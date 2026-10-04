@@ -44,6 +44,21 @@ describe('RoomManager security hardening', () => {
         expect(rm.changeDeck(roomId, hostId, 'custom', [1, 1, 2])).toBeNull();
     });
 
+    it('rejects a custom deck containing non-finite numbers', () => {
+        const rm = new RoomManager();
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+
+        expect(rm.changeDeck(roomId, hostId, 'custom', [1, Number.NaN])).toBeNull();
+        expect(rm.changeDeck(roomId, hostId, 'custom', [1, Number.POSITIVE_INFINITY])).toBeNull();
+    });
+
+    it('rejects a custom deck containing blank strings', () => {
+        const rm = new RoomManager();
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+
+        expect(rm.changeDeck(roomId, hostId, 'custom', [1, '   '])).toBeNull();
+    });
+
     it('accepts a valid custom deck and updates the active deck', () => {
         const rm = new RoomManager();
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');

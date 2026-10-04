@@ -641,10 +641,15 @@ export class RoomManager {
         if (customDeck.length < MIN_CUSTOM_DECK_SIZE || customDeck.length > MAX_CUSTOM_DECK_SIZE) {
             return false;
         }
-        const hasInvalidCard = customDeck.some(
-            (card) =>
-                (typeof card !== 'string' && typeof card !== 'number') || String(card).trim() === ''
-        );
+        const hasInvalidCard = customDeck.some((card) => {
+            if (typeof card === 'number') {
+                return !Number.isFinite(card);
+            }
+            if (typeof card !== 'string') {
+                return true;
+            }
+            return card.trim() === '';
+        });
         if (hasInvalidCard) {
             return false;
         }
