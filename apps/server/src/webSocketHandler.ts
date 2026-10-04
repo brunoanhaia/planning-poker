@@ -14,6 +14,7 @@ import {
     WSMessage,
     WSMessageType,
 } from '@planitpoker/shared';
+import http from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import {
@@ -32,6 +33,8 @@ interface ExtendedWebSocket extends WebSocket {
     isAlive?: boolean;
     roomId?: string;
     userId?: string;
+    /** True when the handshake carried an `Origin` header (i.e. a browser client). */
+    hasOrigin?: boolean;
 }
 
 interface RoomSession {
@@ -126,8 +129,9 @@ export class WebSocketHandler {
      * Initializes WebSocket listeners and client heartbeat interval.
      */
     private init(): void {
-        this.wss.on('connection', (ws: ExtendedWebSocket) => {
+        this.wss.on('connection', (ws: ExtendedWebSocket, request: http.IncomingMessage) => {
             ws.isAlive = true;
+            ws.hasOrigin = Boolean(request.headers.origin);
 
             ws.on('pong', () => {
                 ws.isAlive = true;
@@ -317,6 +321,16 @@ export class WebSocketHandler {
         const isRoomBound = binding?.roomId === normalizedRoomId;
         const isUserBound = !userId || binding?.userId === userId;
         const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
+
+        // Non-browser clients (no Origin) bypass the handshake origin check, so
+        // they must prove identity with a valid session token bound to this room.
+        if (!ws.hasOrigin && !provenUserId) {
+            this.sendError(
+                ws,
+                'A valid session token is required to join from a non-browser client.'
+            );
+            return;
+        }
 
         const result = roomManager.joinRoom(
             roomId,
