@@ -102,17 +102,17 @@ Project conventions previously in GEMINI.md:
 
 ## Custom Agent Tooling
 
-Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. Both require YAML frontmatter (`name` + `description`) to be discoverable — a file without frontmatter is invisible to the agent.
+Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. Only skills require YAML frontmatter (`name` + `description`) for discovery.
 
 - Skills are loaded **on demand**: the `description` is matched against the request, and the full `SKILL.md` is read only on a hit. The directory name must match the frontmatter `name`.
     - UI / architecture: `accessible-ui-components`, `isolated-component-design`, `modular-css-architecture`, `react-clean-architecture`
     - Code quality: `clean-code-refactoring`
     - Real-time: `realtime-websocket-manager` (native WebSockets, not Socket.IO)
     - Efficiency: `token-usage-best-practices` (canonical source for token-saving principles)
-- Rules are **documentation-only** — they are not auto-applied unless referenced from `AGENTS.md` or converted to `.instructions.md` with `applyTo`. Treat them as binding anyway.
-    - `update-readme` — update `README.md` after every feature or architectural change
-    - `update-requirements` — update `requirements.md` when a functional/non-functional requirement is added
-    - `update-agents` — update `AGENTS.md` when a skill, rule, or workflow changes
+- OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. Load rules through [`opencode.json`'s `instructions` setting](https://opencode.ai/docs/rules/#custom-instructions) (for example, `[".agents/rules/*.md"]`) or an explicit read instruction in `AGENTS.md`; a file reference alone does not load its contents. Read and follow these rule files when their conditions apply:
+    - [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change
+    - [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a functional/non-functional requirement is added
+    - [`.agents/rules/update-agents.md`](./.agents/rules/update-agents.md) — when a skill, rule, or workflow changes
 - Only YAML frontmatter fields that tooling actually implements should be used. `trigger: model_decision` was removed as it is non-standard and silently ignored.
 - CodeRabbit skills are vendored from `coderabbitai/skills` and pinned in `skills-lock.json`:
     - `code-review` — run CodeRabbit CLI reviews and interpret findings (default for review requests).

@@ -2,7 +2,7 @@
 
 Thanks for taking the time to contribute.
 
-This document covers **process**: branches, commits, pull requests, and review. It deliberately does not repeat setup, build, or test commands. Those already exist in one place each, and duplicating them is how they drift apart.
+This document covers **process**: branches, commits, pull requests, and review. It also includes setup, build, and test commands used when contributing. For full development and tooling documentation, see the references below.
 
 | For                                                   | See                        |
 | ----------------------------------------------------- | -------------------------- |
