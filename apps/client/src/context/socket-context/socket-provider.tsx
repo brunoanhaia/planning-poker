@@ -1,58 +1,13 @@
 import { DeckType, RoomState, WSMessageType } from '@planitpoker/shared';
-import React, {
-    createContext,
-    use,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-interface SocketContextValue {
-    addStory: (title: string, description?: string) => void;
-    bulkAddStories: (stories: { description?: string; title: string }[]) => void;
-    changeDeck: (deckType: DeckType, customDeck?: (number | string)[]) => void;
-    clearError: () => void;
-    clearKickedMessage: () => void;
-    createRoom: (
-        name: string,
-        avatar: string,
-        color: string,
-        title?: string,
-        deckType?: DeckType,
-        customDeck?: (number | string)[]
-    ) => void;
-    currentUserId: null | string;
-    deleteStory: (storyId: string) => void;
-    endSession: () => void;
-    error: null | string;
-    isAdmin: boolean;
-    isConnected: boolean;
-    isHost: boolean;
-    joinRoom: (roomId: string, name: string, avatar: string, color: string) => void;
-    kickedMessage: null | string;
-    kickParticipant: (targetUserId: string) => void;
-    leaveRoom: () => void;
-    pauseTimer: () => void;
-    promoteCoAdmin: (targetUserId: string) => void;
-    resetTimer: () => void;
-    resetVotes: () => void;
-    revealVotes: () => void;
-    roomState: null | RoomState;
-    setCurrentStory: (index: number) => void;
-    startTimer: (duration?: number) => void;
-    submitVote: (vote: number | string) => void;
-    toggleAutoReveal: () => void;
-    toggleLockRoom: () => void;
-    toggleSpectator: () => void;
-    toggleUserRole: (targetUserId: string) => void;
-    transferAdmin: (targetUserId: string) => void;
-    updateRoomTitle: (title: string) => void;
-    updateStoryEstimate: (storyId: string, estimate: number | string | null) => void;
-}
+import { SocketContext, SocketContextValue } from './socket-context';
 
-const SocketContext = createContext<SocketContextValue | undefined>(undefined);
+/** Reconnection delay applied whenever the socket drops. */
+const RECONNECT_DELAY_MS = 2000;
+
+/** Session storage key holding the token that survives a page reload. */
+const SESSION_TOKEN_STORAGE_KEY = 'planit_session_token';
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [roomState, setRoomState] = useState<null | RoomState>(null);
@@ -64,7 +19,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const sessionTokenRef = useRef<null | string>(null);
 
     useEffect(() => {
-        sessionTokenRef.current = sessionStorage.getItem('planit_session_token');
+        sessionTokenRef.current = sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
     }, []);
 
     useEffect(() => {
@@ -108,14 +63,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         }
                     } else if (type === 'SESSION') {
                         sessionTokenRef.current = payload.sessionToken;
-                        sessionStorage.setItem('planit_session_token', payload.sessionToken);
+                        sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, payload.sessionToken);
                         if (payload.userId) {
                             setCurrentUserId(payload.userId);
                         }
                     } else if (type === 'KICKED') {
                         setRoomState(null);
                         sessionTokenRef.current = null;
-                        sessionStorage.removeItem('planit_session_token');
+                        sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
                         setKickedMessage(
                             payload.message || 'You have been removed from the session.'
                         );
@@ -136,7 +91,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     if (isMounted) {
                         connect();
                     }
-                }, 2000);
+                }, RECONNECT_DELAY_MS);
             };
 
             ws.onerror = (err) => {
@@ -402,12 +357,4 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ]);
 
     return <SocketContext value={contextValue}>{children}</SocketContext>;
-};
-
-export const useSocket = () => {
-    const context = use(SocketContext);
-    if (!context) {
-        throw new Error('useSocket must be used within a SocketProvider');
-    }
-    return context;
 };

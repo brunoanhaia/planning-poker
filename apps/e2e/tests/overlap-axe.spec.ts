@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 interface ViewportConfig {
@@ -7,142 +7,185 @@ interface ViewportConfig {
     height: number;
 }
 
+interface OverlapIssue {
+    element1: string;
+    element2: string;
+    text1: string;
+    text2: string;
+    overlapArea: number;
+}
+
 const VIEWPORTS: ViewportConfig[] = [
     { name: 'Mobile (320px)', width: 320, height: 640 },
     { name: 'Tablet (768px)', width: 768, height: 1024 },
     { name: 'Desktop (1280px)', width: 1280, height: 800 },
+    { name: 'Wide (1920px)', width: 1920, height: 1080 },
 ];
 
+/** Both design-token schemes the application ships, exercised on every viewport. */
+const COLOR_MODES = ['dark', 'light'] as const;
+
+/** Ant Design's form item wrapper, whose label is defined to sit with its control. */
+const FORM_ITEM_SELECTOR = '.ant-form-item';
+
 /**
- * Custom rule in axe-core & DOM collision analysis to ensure no rendered text node
- * or interactive element is obscured by unintended overlapping sibling or parent elements.
+ * Collects every pair of visible, text-bearing or interactive elements whose
+ * bounding boxes intersect.
+ *
+ * Runs inside the page so it can use the real layout engine. Parent/child pairs
+ * and label/control pairs are skipped because overlapping is their contract.
+ *
+ * @param formItemSelector - Wrapper class that pairs a field label with its control.
+ * @returns The overlapping pairs, each with the intersection area in px².
  */
-test.describe('Lobby Exploratory UI Overlap & Text Visibility Validation', () => {
-    for (const vp of VIEWPORTS) {
-        test(`validates no elements overlap and all text is visible on ${vp.name} viewport`, async ({
-            page,
-        }) => {
-            await page.setViewportSize({ width: vp.width, height: vp.height });
-            await page.goto('/');
+const collectOverlapIssues = (formItemSelector: string): OverlapIssue[] => {
+    const issues: OverlapIssue[] = [];
 
-            // Wait for initial render
-            await expect(page.getByText('Planit Poker Real-Time')).toBeVisible({ timeout: 10000 });
+    const isVisible = (element: Element): boolean => {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            return false;
+        }
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    };
 
-            // Run Axe accessibility scan for standard a11y & contrast/visibility rules
-            const accessibilityScanResults = await new AxeBuilder({ page })
-                .withTags(['wcag2a', 'wcag2aa'])
-                .analyze();
+    const hasDirectText = (element: Element): boolean =>
+        Array.from(element.childNodes).some(
+            (node) =>
+                node.nodeType === Node.TEXT_NODE &&
+                Boolean(node.textContent && node.textContent.trim().length > 0)
+        );
 
-            expect(accessibilityScanResults.violations).toEqual([]);
+    const isInteractive = (element: Element): boolean =>
+        ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName);
 
-            // Deep DOM bounding-rect collision and text occlusion check
-            const overlapIssues = await page.evaluate(() => {
-                const results: Array<{
-                    element1: string;
-                    element2: string;
-                    text1: string;
-                    text2: string;
-                    overlapArea: number;
-                }> = [];
+    const describe = (element: Element): string => {
+        const classes = Array.from(element.classList).join('.');
+        return classes
+            ? `${element.tagName.toLowerCase()}.${classes}`
+            : element.tagName.toLowerCase();
+    };
 
-                const isVisible = (el: Element): boolean => {
-                    const style = window.getComputedStyle(el);
-                    if (
-                        style.display === 'none' ||
-                        style.visibility === 'hidden' ||
-                        style.opacity === '0'
-                    ) {
-                        return false;
-                    }
-                    const rect = el.getBoundingClientRect();
-                    return rect.width > 0 && rect.height > 0;
-                };
+    const belongsToSameFormItem = (a: Element, b: Element): boolean => {
+        const itemA = a.closest(formItemSelector);
+        return Boolean(itemA) && itemA === b.closest(formItemSelector);
+    };
 
-                const elements: HTMLElement[] = [];
-                const all = document.querySelectorAll<HTMLElement>('*');
-                for (let i = 0; i < all.length; i++) {
-                    const el = all[i];
-                    if (!isVisible(el)) {
-                        continue;
-                    }
+    const candidates: HTMLElement[] = Array.from(
+        document.querySelectorAll<HTMLElement>('*')
+    ).filter(
+        (element) =>
+            isVisible(element) &&
+            !element.closest('[aria-hidden="true"]') &&
+            (hasDirectText(element) || isInteractive(element))
+    );
 
-                    // Exclude form labels (floating outlined field labels that inherently overlap input outlines by MUI design)
-                    if (
-                        el.tagName === 'LABEL' ||
-                        el.classList.contains('MuiFormLabel-root') ||
-                        el.classList.contains('MuiFormLabel-asterisk') ||
-                        el.classList.contains('MuiInputLabel-root')
-                    ) {
-                        continue;
-                    }
+    for (let i = 0; i < candidates.length; i += 1) {
+        for (let j = i + 1; j < candidates.length; j += 1) {
+            const elementA = candidates[i];
+            const elementB = candidates[j];
 
-                    // Check if element has non-empty direct text content or is interactive control
-                    const hasDirectText = Array.from(el.childNodes).some(
-                        (node) =>
-                            node.nodeType === Node.TEXT_NODE &&
-                            Boolean(node.textContent && node.textContent.trim().length > 0)
-                    );
+            if (
+                elementA.contains(elementB) ||
+                elementB.contains(elementA) ||
+                belongsToSameFormItem(elementA, elementB)
+            ) {
+                continue;
+            }
 
-                    const isInteractive = ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'].includes(
-                        el.tagName
-                    );
+            const rectA = elementA.getBoundingClientRect();
+            const rectB = elementB.getBoundingClientRect();
 
-                    if (hasDirectText || isInteractive) {
-                        elements.push(el);
-                    }
-                }
+            const overlapWidth = Math.max(
+                0,
+                Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left)
+            );
+            const overlapHeight = Math.max(
+                0,
+                Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top)
+            );
+            const overlapArea = overlapWidth * overlapHeight;
 
-                // Check pairwise for unintended overlap / occlusion
-                for (let i = 0; i < elements.length; i++) {
-                    for (let j = i + 1; j < elements.length; j++) {
-                        const elA = elements[i];
-                        const elB = elements[j];
+            if (overlapArea <= 0) {
+                continue;
+            }
 
-                        // Skip parent-child / ancestor relationships or same form control container
-                        if (
-                            elA.contains(elB) ||
-                            elB.contains(elA) ||
-                            (elA.closest('.MuiFormControl-root') &&
-                                elA.closest('.MuiFormControl-root') ===
-                                    elB.closest('.MuiFormControl-root'))
-                        ) {
-                            continue;
-                        }
-
-                        const rectA = elA.getBoundingClientRect();
-                        const rectB = elB.getBoundingClientRect();
-
-                        // Calculate rectangle intersection
-                        const xOverlap = Math.max(
-                            0,
-                            Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left)
-                        );
-                        const yOverlap = Math.max(
-                            0,
-                            Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top)
-                        );
-                        const overlapArea = xOverlap * yOverlap;
-
-                        if (overlapArea > 0) {
-                            // Elements are overlapping each other
-                            results.push({
-                                element1: `${elA.tagName.toLowerCase()}.${Array.from(elA.classList).join('.')}`,
-                                element2: `${elB.tagName.toLowerCase()}.${Array.from(elB.classList).join('.')}`,
-                                text1: elA.innerText || elA.getAttribute('aria-label') || '',
-                                text2: elB.innerText || elB.getAttribute('aria-label') || '',
-                                overlapArea,
-                            });
-                        }
-                    }
-                }
-
-                return results;
+            issues.push({
+                element1: describe(elementA),
+                element2: describe(elementB),
+                overlapArea,
+                text1: elementA.innerText || elementA.getAttribute('aria-label') || '',
+                text2: elementB.innerText || elementB.getAttribute('aria-label') || '',
             });
+        }
+    }
 
-            expect(
-                overlapIssues,
-                `Found overlapping elements on ${vp.name} that may hide text:\n${JSON.stringify(overlapIssues, null, 2)}`
-            ).toEqual([]);
-        });
+    return issues;
+};
+
+/**
+ * Asserts the current page has no axe violations and no overlapping content.
+ *
+ * @param page - The page under test.
+ * @param viewportName - Human readable viewport label used in failure messages.
+ * @param state - Which screen is on display, used in failure messages.
+ */
+const expectCleanLayout = async (page: Page, viewportName: string, state: string) => {
+    const accessibilityScanResults = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa'])
+        .analyze();
+
+    expect(
+        accessibilityScanResults.violations,
+        `Accessibility violations in the ${state} state on ${viewportName}`
+    ).toEqual([]);
+
+    const overlapIssues = await page.evaluate(collectOverlapIssues, FORM_ITEM_SELECTOR);
+
+    expect(
+        overlapIssues,
+        `Found overlapping elements in the ${state} state on ${viewportName}:\n${JSON.stringify(
+            overlapIssues,
+            null,
+            2
+        )}`
+    ).toEqual([]);
+};
+
+test.describe('UI Overlap & Text Visibility Validation', () => {
+    for (const viewport of VIEWPORTS) {
+        for (const colorMode of COLOR_MODES) {
+            test(`validates the ${colorMode} lobby, room and results on ${viewport.name}`, async ({
+                page,
+            }) => {
+                await page.setViewportSize({ width: viewport.width, height: viewport.height });
+                await page.addInitScript(
+                    (mode) => localStorage.setItem('planit_theme', mode),
+                    colorMode
+                );
+                await page.goto('/');
+
+                await expect(page.getByText('Planit Poker Real-Time')).toBeVisible({
+                    timeout: 10000,
+                });
+                await expectCleanLayout(page, viewport.name, `${colorMode} lobby`);
+
+                await page.getByLabel(/Your Display Name/i).fill('Overlap Tester');
+                await page
+                    .getByRole('button', { name: /Start Session & Generate Room Code/i })
+                    .click();
+
+                await expect(page.getByText('👑 Admin')).toBeVisible({ timeout: 10000 });
+                await expect(page.getByText('Voting Progress')).toBeVisible();
+                await expectCleanLayout(page, viewport.name, `${colorMode} room`);
+
+                await page.getByRole('button', { name: 'Select estimate 5', exact: true }).click();
+                await page.getByRole('button', { name: /Reveal Votes/i }).click();
+
+                await expect(page.getByText('Estimation Results')).toBeVisible({ timeout: 10000 });
+                await expectCleanLayout(page, viewport.name, `${colorMode} results`);
+            });
+        }
     }
 });

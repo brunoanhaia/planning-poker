@@ -8,7 +8,7 @@ The application uses a client-server model communicating over WebSockets for rea
 
 ### Monorepo Structure
 
-- **`apps/client`**: The frontend application. Built with React, Vite, and MUI. It uses native WebSocket to connect to the backend.
+- **`apps/client`**: The frontend application. Built with React, Vite, and Ant Design. It uses native WebSocket to connect to the backend.
 - **`apps/server`**: The backend server. Built with Node.js, Express, and native WebSocket (`ws`). It manages the state of all active rooms and handles WebSocket connections.
 - **`packages/shared`**: A shared library containing TypeScript interfaces, enums, and constants used by both the client and server.
 
@@ -17,7 +17,16 @@ The application uses a client-server model communicating over WebSockets for rea
 - **Session tokens**: On create/join the server issues an opaque token (`apps/server/src/sessionService.ts`) bound to the room participant. Reconnection is only honored when the token proves ownership of the `userId`; a client-supplied `userId` alone is never trusted. Tokens are revoked on kick.
 - **Payload validation**: Every inbound WebSocket message is validated against a `zod` schema (`apps/server/src/validation.ts`) before reaching domain logic. Invalid payloads receive an `ERROR` and are never broadcast.
 - **Input limits**: Names (≤50), room titles (≤120), story titles (≤120), descriptions (≤2000), bulk imports (≤50), custom decks (2–30 unique cards), and timer durations (5–3600 s) are enforced server-side. Limits are shared constants in `packages/shared`.
-- **Safe export**: CSV export neutralizes spreadsheet formula injection and sanitizes the download filename (`apps/client/src/utils/csv.ts`).
+- **Safe export**: CSV export neutralizes spreadsheet formula injection and sanitizes the download filename (`apps/client/src/components/story-backlog/story-backlog.utils.ts`).
+
+### Styling
+
+The client renders entirely with [Ant Design](https://ant.design) 6 components — no CSS files, CSS modules, or CSS-in-JS layers.
+
+- **Global theme**: `apps/client/src/theme/app-theme.ts` is the single `ConfigProvider` configuration. It switches the design-token algorithm per colour scheme and carries the only token overrides in the project, each a documented WCAG AA contrast correction.
+- **Per-component tokens**: components consume the active theme through `theme.useToken()` rather than hard-coded colours.
+- **Component layout**: one component per folder, kebab-case, under `apps/client/src/components/`. Logic lives in colocated hooks or `.utils.ts` files; only the component itself lives in the `.tsx`.
+- **Accessibility**: `apps/e2e/tests/overlap-axe.spec.ts` scans the lobby, the room and the revealed results on four viewports in both colour schemes, asserting zero axe violations and zero overlapping text or interactive elements.
 
 ### System Diagram
 

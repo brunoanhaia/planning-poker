@@ -18,7 +18,7 @@ test.describe('Admin Management', () => {
         const dialog = adminPage.getByRole('dialog');
         await expect(dialog).toBeVisible();
 
-        // Toggle lock room (MUI Switch exposes role="switch", not "checkbox")
+        // Ant Design's Switch exposes role="switch", not "checkbox"
         const lockSwitch = adminPage.getByRole('switch', { name: /Lock Room/i });
         await lockSwitch.click();
 

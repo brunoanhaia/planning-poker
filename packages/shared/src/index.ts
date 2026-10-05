@@ -53,6 +53,15 @@ export const PRESET_DECKS: Record<Exclude<DeckType, 'custom'>, readonly CardValu
     tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'] as const,
 };
 
+/** Human readable label and card preview for every selectable deck. */
+export const DECK_TYPE_LABELS: Record<DeckType, string> = {
+    custom: 'Custom Deck',
+    fibonacci: 'Fibonacci',
+    modified_fibonacci: 'Modified Fibonacci',
+    powers_of_2: 'Powers of 2',
+    tshirt: 'T-Shirt Sizes',
+};
+
 export const AVATARS = [
     '🚀',
     '🦊',

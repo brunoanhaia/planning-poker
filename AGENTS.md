@@ -6,7 +6,7 @@ A compact source of truth for OpenCode sessions. Prefer this over README.md pros
 
 npm workspaces monorepo:
 
-- `apps/client` — React 19 + Vite + MUI, package name `@planitpoker/client`
+- `apps/client` — React 19 + Vite + Ant Design 6, package name `@planitpoker/client`
 - `apps/server` — Node + Express + native `ws`, package name `@planitpoker/server`
 - `apps/e2e` — Playwright + Axe-core, package name `@planitpoker/e2e`
 - `packages/shared` — TypeScript types, enums, constants, package name `@planitpoker/shared`
@@ -98,6 +98,42 @@ Project conventions previously in GEMINI.md:
 - Real-time: never put core business logic inside socket event listeners.
 - Accessibility: WAI-ARIA compliant, keyboard navigable.
 - Responsive: support 320px to 4K without horizontal scrolling, clipping, or overlaps.
+
+## Styling (Ant Design only)
+
+The client is styled exclusively with [Ant Design](https://ant.design) 6 components. There are no CSS files, CSS Modules, `*.theme.ts` files, or CSS-in-JS layers, and no `styled()` wrappers.
+
+### Structure
+
+```
+apps/client/src/
+├── app/app.tsx                     # ConfigProvider + AntApp + SocketProvider
+├── theme/app-theme.ts              # the only ConfigProvider config in the repo
+├── context/socket-context/         # socket-context.ts, socket-provider.tsx, use-socket.ts
+└── components/<kebab-case-name>/   # one folder per component, one component per .tsx
+```
+
+- A component folder holds exactly one `<name>.tsx`, plus optional colocated `<name>.hooks.ts`, `<name>.utils.ts` and `<name>.test.tsx`. No barrel files.
+- Names are kebab-case and one component per file — a second component gets its own folder (e.g. `home/` composes `participant-profile/`, `create-session-form/`, `join-session-form/`).
+
+### Rules
+
+1. **All theming goes through `theme/app-theme.ts`.** It is the single `ConfigProvider` configuration and the only place `ThemeConfig` is authored.
+2. **Component-scoped overrides must not leak.** A `theme.components.<Name>` entry is only allowed when the fix applies to every instance of that Ant Design component, and must be documented at the config site.
+3. **Read the active theme in components with `theme.useToken()`** — never hard-code a colour. Tokens like `colorBgContainer`, `colorSplit` and `colorPrimary` are how a component adapts to the light/dark scheme.
+4. **Prefer Ant Design primitives over hand-rolled markup**: `Flex`/`Space`/`Row`+`Col` for layout, `Card`, `Typography`, `Tag`, `Badge`, `Statistic`, `Progress`, `Modal`, `Tabs`, `Select`, `Switch`, `Empty`.
+5. **`style` is for layout only** — padding, gaps, min-width, flex. Colour and decoration come from components and tokens.
+6. **Never absolutely position sibling content.** Columns are real grid/flex tracks; long text uses `Typography.Text ellipsis` so it truncates instead of pushing or covering a neighbour. `Layout.Header` is not used for the app bar because its fixed 64px height overflows once the bar wraps.
+7. **Colour contrast must clear WCAG AA (4.5:1).** Ant Design's stock dark and light palettes do not, in four places: the dark description text (`4.42:1`), the selected tab label (`3.55:1` / `4.10:1`), white text on the light primary button (`4.10:1`), and every coloured `Tag` in light mode (`2.20:1`–`3.37:1`). The overrides in `app-theme.ts` and the use of `Badge status` instead of coloured tags exist for exactly this reason — do not "restore" the stock values.
+8. **No deprecated Ant Design APIs.** antd 6.6 deprecates `List` (use `Listy` or flex rows), `Space.direction` (use `orientation`), `Alert.message` (use `title`), `Progress.trailColor` and `Dropdown.dropdownRender`. `List` is deliberately not used: `Listy` is a virtual list and the rosters are 2–20 rows.
+9. **`create_file` may be unavailable**; scaffold new files with a terminal heredoc when needed.
+10. **Icons** come from `@ant-design/icons`. Decorative icons inside an interactive control need `aria-hidden` (or the control needs an explicit `aria-label`) so they stay out of the accessible name.
+
+### Verification
+
+- `apps/e2e/tests/overlap-axe.spec.ts` is the styling safety net: 4 viewports × 2 colour schemes × 3 states (lobby, room, revealed results), asserting **zero** axe `wcag2a`/`wcag2aa` violations and **zero** overlapping text or interactive elements.
+- Run it after any layout or colour change: `npm --workspace=@planitpoker/e2e run test`.
+- Restart the Vite dev server after moving or recreating files — a long-lived server can hold a stale module graph and serve a blank page to tests.
 
 ## Custom Agent Tooling
 

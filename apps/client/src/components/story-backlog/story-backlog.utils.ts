@@ -8,7 +8,7 @@ const FORMULA_TRIGGER_CHARS = ['=', '+', '-', '@', '\t', '\r'];
 /**
  * A value that can be written to a CSV cell.
  */
-export type CsvCellValue = string | number | boolean | null | undefined;
+export type CsvCellValue = boolean | null | number | string | undefined;
 
 /**
  * Escapes a single value for safe inclusion in a CSV cell.
@@ -34,7 +34,7 @@ export const escapeCsvCell = (value: CsvCellValue): string => {
  * @param roomTitle - The (untrusted) room title.
  * @returns A filesystem-safe filename ending in `.csv`.
  */
-export const buildBacklogCsvFilename = (roomTitle: string | null | undefined): string => {
+export const buildBacklogCsvFilename = (roomTitle: null | string | undefined): string => {
     const slug = (roomTitle || '')
         .normalize('NFKD')
         .replace(/[^\w\s-]/g, '')
@@ -44,3 +44,24 @@ export const buildBacklogCsvFilename = (roomTitle: string | null | undefined): s
 
     return `${slug || 'backlog'}_Backlog_Estimates.csv`;
 };
+
+/**
+ * Parses pasted bulk-import text into stories.
+ *
+ * Each line is one story; a `;`, `,` or `|` separates the title from the
+ * description. Blank lines are ignored.
+ *
+ * @param bulkText - The raw pasted text.
+ * @returns The parsed stories, in input order.
+ */
+export const parseBulkStories = (bulkText: string): { description?: string; title: string }[] =>
+    bulkText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => {
+            const [title, ...rest] = line.split(/[;,|]/);
+            const trimmedTitle = title.trim();
+            const description = rest.join(' - ').trim();
+            return description ? { description, title: trimmedTitle } : { title: trimmedTitle };
+        });
