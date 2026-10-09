@@ -1,4 +1,4 @@
-import { AVATAR_COLORS, AVATARS } from '@planitpoker/shared';
+import { AVATAR_COLORS, AVATARS, DeckType } from '@planitpoker/shared';
 import { Alert, Card, Col, Flex, Row, Space, Tabs, Typography } from 'antd';
 import React, { useState } from 'react';
 
@@ -50,12 +50,12 @@ export const Home: React.FC = () => {
         localStorage.setItem(COLOR_STORAGE_KEY, color);
     };
 
-    const handleCreate = (title: string) => {
+    const handleCreate = (title: string, deckType: DeckType) => {
         if (!hasDisplayName) {
             return;
         }
         persistProfile();
-        createRoom(displayName.trim(), avatar, color, title || undefined);
+        createRoom(displayName.trim(), avatar, color, title || undefined, deckType);
     };
 
     const handleJoin = (roomCode: string) => {

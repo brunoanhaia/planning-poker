@@ -44,6 +44,18 @@ describe('parseBulkStories', () => {
         expect(parseBulkStories('Just a title')).toEqual([{ title: 'Just a title' }]);
     });
 
+    it('keeps commas inside a title', () => {
+        expect(parseBulkStories('Fix login, logout and signup')).toEqual([
+            { title: 'Fix login, logout and signup' },
+        ]);
+    });
+
+    it('drops lines that carry a description but no title', () => {
+        expect(parseBulkStories('; description only\nLogin API; full flow')).toEqual([
+            { description: 'full flow', title: 'Login API' },
+        ]);
+    });
+
     it('returns nothing for blank input', () => {
         expect(parseBulkStories('   \n  ')).toEqual([]);
     });

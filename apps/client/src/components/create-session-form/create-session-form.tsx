@@ -19,8 +19,8 @@ const renderDeckPreview = (deckType: DeckType): string => {
 export interface CreateSessionFormProps {
     /** Disables the submit button until a display name has been captured. */
     disabled: boolean;
-    /** Called with the trimmed session title, which may be empty. */
-    onSubmit: (title: string) => void;
+    /** Called with the trimmed session title (possibly empty) and the selected deck. */
+    onSubmit: (title: string, deckType: DeckType) => void;
 }
 
 /**
@@ -32,7 +32,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
-        onSubmit(roomTitle.trim());
+        onSubmit(roomTitle.trim(), deckType);
     };
 
     return (

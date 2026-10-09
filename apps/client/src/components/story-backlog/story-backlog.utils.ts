@@ -48,8 +48,9 @@ export const buildBacklogCsvFilename = (roomTitle: null | string | undefined): s
 /**
  * Parses pasted bulk-import text into stories.
  *
- * Each line is one story; a `;`, `,` or `|` separates the title from the
- * description. Blank lines are ignored.
+ * Each line is one story; a `;` or `|` separates the title from the
+ * description. Commas stay inside the title, and blank lines as well as lines
+ * without a title are ignored.
  *
  * @param bulkText - The raw pasted text.
  * @returns The parsed stories, in input order.
@@ -60,8 +61,9 @@ export const parseBulkStories = (bulkText: string): { description?: string; titl
         .map((line) => line.trim())
         .filter((line) => line.length > 0)
         .map((line) => {
-            const [title, ...rest] = line.split(/[;,|]/);
+            const [title, ...rest] = line.split(/[;|]/);
             const trimmedTitle = title.trim();
             const description = rest.join(' - ').trim();
             return description ? { description, title: trimmedTitle } : { title: trimmedTitle };
-        });
+        })
+        .filter(({ title }) => title.length > 0);

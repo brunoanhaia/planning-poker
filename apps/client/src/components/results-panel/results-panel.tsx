@@ -1,6 +1,7 @@
-import { CheckCircleOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined } from '@ant-design/icons';
 import {
     App as AntApp,
+    Badge,
     Button,
     Card,
     Col,
@@ -110,11 +111,7 @@ export const ResultsPanel: React.FC = () => {
             <Card
                 className="results-panel"
                 extra={
-                    isFullConsensus ? (
-                        <Tag color="success" icon={<CheckCircleOutlined />}>
-                            100% Consensus
-                        </Tag>
-                    ) : undefined
+                    isFullConsensus ? <Badge status="success" text="100% Consensus" /> : undefined
                 }
                 title="Estimation Results"
             >
