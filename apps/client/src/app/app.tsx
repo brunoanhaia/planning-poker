@@ -1,6 +1,6 @@
 import { App as AntApp, ConfigProvider } from 'antd';
 import enUS from 'antd/locale/en_US';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { MainContent } from '../components/main-content/main-content';
 import { SocketProvider } from '../context/socket-context/socket-provider';
@@ -15,12 +15,14 @@ import { ColorMode, getAppTheme, readStoredColorMode, storeColorMode } from '../
 export const App: React.FC = () => {
     const [colorMode, setColorMode] = useState<ColorMode>(readStoredColorMode);
 
+    // The updater itself stays pure: persisting happens once per committed
+    // change, which also survives StrictMode's double invocation.
+    useEffect(() => {
+        storeColorMode(colorMode);
+    }, [colorMode]);
+
     const toggleColorMode = () => {
-        setColorMode((previous) => {
-            const next: ColorMode = previous === 'dark' ? 'light' : 'dark';
-            storeColorMode(next);
-            return next;
-        });
+        setColorMode((previous) => (previous === 'dark' ? 'light' : 'dark'));
     };
 
     const appTheme = useMemo(() => getAppTheme(colorMode), [colorMode]);

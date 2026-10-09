@@ -1,10 +1,10 @@
+import { COLOR_MODE_STORAGE_KEY } from '@planitpoker/shared';
 import { ThemeConfig, theme } from 'antd';
 
 /** The colour schemes the application can be rendered in. */
 export type ColorMode = 'dark' | 'light';
 
-/** `ConfigProvider` keys used to persist the chosen scheme in local storage. */
-export const COLOR_MODE_STORAGE_KEY = 'planit_theme';
+export { COLOR_MODE_STORAGE_KEY };
 
 const DARK_MODE_ALGORITHM = theme.darkAlgorithm;
 const LIGHT_MODE_ALGORITHM = theme.defaultAlgorithm;

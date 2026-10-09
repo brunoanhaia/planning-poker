@@ -22,6 +22,9 @@ export const MAX_TITLE_LENGTH = 120;
 /** Maximum length (in characters) for a story description. */
 export const MAX_DESCRIPTION_LENGTH = 2000;
 
+/** Local-storage key that persists the chosen colour scheme. */
+export const COLOR_MODE_STORAGE_KEY = 'planit_theme';
+
 /** Maximum length (in characters) for an avatar emoji/string. */
 export const MAX_AVATAR_LENGTH = 16;
 

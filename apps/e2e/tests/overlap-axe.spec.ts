@@ -1,3 +1,4 @@
+import { COLOR_MODE_STORAGE_KEY } from '@planitpoker/shared';
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -160,10 +161,10 @@ test.describe('UI Overlap & Text Visibility Validation', () => {
                 page,
             }) => {
                 await page.setViewportSize({ width: viewport.width, height: viewport.height });
-                await page.addInitScript(
-                    (mode) => localStorage.setItem('planit_theme', mode),
-                    colorMode
-                );
+                await page.addInitScript(([key, mode]) => localStorage.setItem(key, mode), [
+                    COLOR_MODE_STORAGE_KEY,
+                    colorMode,
+                ] as const);
                 await page.goto('/');
 
                 await expect(page.getByText('Planit Poker Real-Time')).toBeVisible({
