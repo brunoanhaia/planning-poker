@@ -26,6 +26,7 @@ const renderRow = (overrides?: {
     canManage?: boolean;
     canTransferHost?: boolean;
     participant?: Participant;
+    showSeparator?: boolean;
 }) => {
     const socket = createMockSocketValue();
     vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
@@ -35,6 +36,7 @@ const renderRow = (overrides?: {
             canTransferHost={overrides?.canTransferHost ?? false}
             isSelf={false}
             participant={overrides?.participant ?? participant}
+            showSeparator={overrides?.showSeparator ?? false}
         />
     );
     return { socket, view };
@@ -98,6 +100,17 @@ describe('ParticipantRosterRow', () => {
 
         expect(view.getByText('Bob Voter')).toBeInTheDocument();
         expect(view.getByText('Voted')).toBeInTheDocument();
+    });
+
+    it('draws the separator rule only when the row follows another one', () => {
+        const { view: plain } = renderRow();
+        const { view: separated } = renderRow({ showSeparator: true });
+
+        expect(plain.container.querySelector('li')).not.toHaveStyle({ borderTopStyle: 'solid' });
+        expect(separated.container.querySelector('li')).toHaveStyle({
+            borderTopStyle: 'solid',
+            borderTopWidth: '1px',
+        });
     });
 
     it('hides the management menu for non-administrators', () => {

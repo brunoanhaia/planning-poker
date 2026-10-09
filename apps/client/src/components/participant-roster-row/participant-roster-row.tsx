@@ -9,6 +9,7 @@ import {
     MenuProps,
     Space,
     Tag,
+    theme,
     Tooltip,
     Typography,
 } from 'antd';
@@ -40,6 +41,8 @@ export interface ParticipantRosterRowProps {
     canManage: boolean;
     /** `true` when the current user may hand over the primary host role. */
     canTransferHost: boolean;
+    /** `true` when a rule must be drawn above the row to separate it from the previous one. */
+    showSeparator: boolean;
     /** `true` when the row shows the current user. */
     isSelf: boolean;
     /** Participant to display. */
@@ -58,8 +61,10 @@ export const ParticipantRosterRow: React.FC<ParticipantRosterRowProps> = ({
     canTransferHost,
     isSelf,
     participant,
+    showSeparator,
 }) => {
     const runAction = useParticipantMenuAction();
+    const { token } = theme.useToken();
 
     const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
         if (isParticipantMenuAction(key)) {
@@ -73,7 +78,10 @@ export const ParticipantRosterRow: React.FC<ParticipantRosterRowProps> = ({
             component="li"
             gap={8}
             justify="space-between"
-            style={{ padding: ROW_PADDING }}
+            style={{
+                borderTop: showSeparator ? `1px solid ${token.colorSplit}` : undefined,
+                padding: ROW_PADDING,
+            }}
             wrap
         >
             <Flex align="center" gap={8} style={{ minWidth: 0 }}>
