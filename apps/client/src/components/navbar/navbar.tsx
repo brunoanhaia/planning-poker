@@ -77,6 +77,12 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
         if (!roomState) {
             return;
         }
+        // An insecure context or a browser without the Clipboard API throws on the
+        // property access itself, which would bypass the rejection handler below.
+        if (!navigator.clipboard) {
+            void message.error('Could not copy the invite link. Copy it from the address bar.');
+            return;
+        }
         navigator.clipboard
             .writeText(buildInviteLink(roomState.id))
             .then(() => {
