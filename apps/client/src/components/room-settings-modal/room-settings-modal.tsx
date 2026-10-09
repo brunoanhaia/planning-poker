@@ -1,5 +1,5 @@
 import { DECK_TYPES, DECK_TYPE_LABELS, DeckType, PRESET_DECKS } from '@planitpoker/shared';
-import { Button, Divider, Flex, Input, Modal, Select, Space, Switch, Typography } from 'antd';
+import { Button, Divider, Flex, Input, Modal, Popconfirm, Select, Switch, Typography } from 'antd';
 import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
@@ -45,11 +45,22 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         updateRoomTitle,
     } = useSocket();
 
-    const [title, setTitle] = useState(roomState?.title || '');
-    const [deckType, setDeckType] = useState<DeckType>(roomState?.deckType || 'fibonacci');
-    const [customDeck, setCustomDeck] = useState(
-        () => roomState?.customDeck?.join(', ') ?? FALLBACK_CUSTOM_DECK.join(', ')
-    );
+    const [titleDraft, setTitleDraft] = useState<null | string>(null);
+    const [deckTypeDraft, setDeckTypeDraft] = useState<null | DeckType>(null);
+    const [customDeckDraft, setCustomDeckDraft] = useState<null | string>(null);
+
+    if (!roomState || !isAdmin) {
+        return null;
+    }
+
+    // The fields fall back to the live room, so a value changed elsewhere — a
+    // room renamed from the navbar, a deck switched by another administrator —
+    // is picked up instead of being overwritten by a draft from an earlier
+    // room. Only an actual edit enters the drafts.
+    const title = titleDraft ?? roomState.title;
+    const deckType = deckTypeDraft ?? roomState.deckType;
+    const customDeck =
+        customDeckDraft ?? roomState.customDeck?.join(', ') ?? FALLBACK_CUSTOM_DECK.join(', ');
 
     if (!roomState || !isAdmin) {
         return null;
@@ -75,9 +86,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
     };
 
     const handleEndSession = () => {
-        if (!window.confirm(END_SESSION_CONFIRMATION)) {
-            return;
-        }
         endSession();
         onClose();
     };
@@ -105,7 +113,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <label htmlFor="room-settings-title">Room / Sprint Title</label>
                     <Input
                         id="room-settings-title"
-                        onChange={(event) => setTitle(event.target.value)}
+                        onChange={(event) => setTitleDraft(event.target.value)}
                         value={title}
                     />
                 </div>
@@ -114,7 +122,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <label htmlFor="room-settings-deck">Estimation Deck Type</label>
                     <Select<DeckType>
                         id="room-settings-deck"
-                        onChange={setDeckType}
+                        onChange={setDeckTypeDraft}
                         options={DECK_TYPES.map((option) => ({
                             label: DECK_TYPE_LABELS[option],
                             value: option,
@@ -131,7 +139,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                         </label>
                         <Input
                             id="room-settings-custom-deck"
-                            onChange={(event) => setCustomDeck(event.target.value)}
+                            onChange={(event) => setCustomDeckDraft(event.target.value)}
                             placeholder="e.g. 1, 2, 3, 5, 8, 10, ?, ☕"
                             value={customDeck}
                         />
@@ -175,11 +183,14 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                 <Divider style={{ margin: 0 }} />
 
                 {!roomState.isEnded && (
-                    <Space>
-                        <Button danger onClick={handleEndSession}>
-                            End Planning Session
-                        </Button>
-                    </Space>
+                    <Popconfirm
+                        onConfirm={handleEndSession}
+                        okButtonProps={{ danger: true }}
+                        okText="End Session"
+                        title={END_SESSION_CONFIRMATION}
+                    >
+                        <Button danger>End Planning Session</Button>
+                    </Popconfirm>
                 )}
             </Flex>
         </Modal>
