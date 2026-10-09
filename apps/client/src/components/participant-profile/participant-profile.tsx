@@ -1,5 +1,4 @@
-import { MAX_NAME_LENGTH } from '@planitpoker/shared';
-import { AVATAR_COLORS, AVATARS } from '@planitpoker/shared';
+import { AVATAR_COLORS, AVATARS, MAX_NAME_LENGTH } from '@planitpoker/shared';
 import { Badge, Button, Flex, Input, Typography } from 'antd';
 import React from 'react';
 

@@ -27,14 +27,6 @@ const toFinalEstimate = (value: number | string): number | string => {
 };
 
 /**
- * Renders a statistic verbatim.
- *
- * Without this, Ant Design splits `5.0` into separate integer and decimal spans
- * and groups thousands, which is wrong for poker estimates.
- */
-const renderVerbatim = (value: number | string): string => String(value);
-
-/**
  * Revealed votes for the active story, with the actions the host can take next.
  *
  * The statistic grid uses real grid columns so the four figures never overlap
@@ -148,31 +140,28 @@ export const ResultsPanel: React.FC = () => {
                         </Flex>
                     )}
 
+                    {/*
+                     * `String` renders each statistic verbatim: without a formatter
+                     * Ant Design splits `5.0` into integer and decimal spans and
+                     * groups thousands, which is wrong for poker estimates.
+                     */}
                     <Row gutter={[16, 16]}>
                         <Col xs={12} md={6}>
-                            <Statistic formatter={renderVerbatim} title="Average" value={average} />
+                            <Statistic formatter={String} title="Average" value={average} />
                         </Col>
                         <Col xs={12} md={6}>
                             <Statistic
-                                formatter={renderVerbatim}
+                                formatter={String}
                                 suffix="%"
                                 title="Consensus"
                                 value={consensusPercentage}
                             />
                         </Col>
                         <Col xs={12} md={6}>
-                            <Statistic
-                                formatter={renderVerbatim}
-                                title="Top Vote"
-                                value={modeVote}
-                            />
+                            <Statistic formatter={String} title="Top Vote" value={modeVote} />
                         </Col>
                         <Col xs={12} md={6}>
-                            <Statistic
-                                formatter={renderVerbatim}
-                                title="Voters"
-                                value={totalVotes}
-                            />
+                            <Statistic formatter={String} title="Voters" value={totalVotes} />
                         </Col>
                     </Row>
 

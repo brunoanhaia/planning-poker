@@ -61,6 +61,20 @@ const formatTimerDisplay = (timer: null | TimerState | undefined): string => {
     return `${minutes}:${seconds}`;
 };
 
+/**
+ * Colour of the countdown tag: red in the final seconds, blue while the
+ * countdown runs, and no colour once it is paused or switched off.
+ */
+const getTimerTagColor = (timer: null | TimerState | undefined): 'blue' | 'red' | undefined => {
+    if (isTimerEnding(timer)) {
+        return 'red';
+    }
+    if (timer?.isRunning === true) {
+        return 'blue';
+    }
+    return undefined;
+};
+
 /** Renders the reveal/reset/waiting affordance for the current voting state. */
 const renderVoteActions = ({
     activeVoterCount,
@@ -130,12 +144,7 @@ export const EstimationPanel: React.FC = () => {
                     </Typography.Title>
 
                     <Space size={8} wrap>
-                        <Tag
-                            color={
-                                isTimerEnding(timer) ? 'red' : isTimerRunning ? 'blue' : undefined
-                            }
-                            icon={<ClockCircleOutlined />}
-                        >
+                        <Tag color={getTimerTagColor(timer)} icon={<ClockCircleOutlined />}>
                             {formatTimerDisplay(timer)}
                         </Tag>
 

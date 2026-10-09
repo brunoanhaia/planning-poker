@@ -30,9 +30,15 @@ if (!window.ResizeObserver) {
     Object.defineProperty(window, 'ResizeObserver', {
         writable: true,
         value: class {
-            observe() {}
-            unobserve() {}
-            disconnect() {}
+            observe() {
+                // jsdom has no layout, so a resize is never observed.
+            }
+            unobserve() {
+                // jsdom has no layout, so nothing can be unobserved.
+            }
+            disconnect() {
+                // jsdom has no layout, so there are no observers to release.
+            }
         },
     });
 }

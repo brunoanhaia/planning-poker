@@ -77,8 +77,14 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
         if (!roomState) {
             return;
         }
-        navigator.clipboard.writeText(buildInviteLink(roomState.id));
-        void message.success('Invite link copied to clipboard! Share it with your team.');
+        navigator.clipboard
+            .writeText(buildInviteLink(roomState.id))
+            .then(() => {
+                void message.success('Invite link copied to clipboard! Share it with your team.');
+            })
+            .catch(() => {
+                void message.error('Could not copy the invite link. Copy it from the address bar.');
+            });
     };
 
     const openRename = () => {
