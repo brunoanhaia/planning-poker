@@ -50,12 +50,12 @@ export const Home: React.FC = () => {
         localStorage.setItem(COLOR_STORAGE_KEY, color);
     };
 
-    const handleCreate = (title: string, deckType: DeckType) => {
+    const handleCreate = (title: string, deckType: DeckType, customDeck?: (number | string)[]) => {
         if (!hasDisplayName) {
             return;
         }
         persistProfile();
-        createRoom(displayName.trim(), avatar, color, title || undefined, deckType);
+        createRoom(displayName.trim(), avatar, color, title || undefined, deckType, customDeck);
     };
 
     const handleJoin = (roomCode: string) => {

@@ -10,6 +10,7 @@ import {
 import { TimerState } from '@planitpoker/shared';
 import {
     Alert,
+    Badge,
     Button,
     Card,
     Dropdown,
@@ -59,20 +60,6 @@ const formatTimerDisplay = (timer: null | TimerState | undefined): string => {
     const minutes = Math.floor(timer.remaining / 60);
     const seconds = String(timer.remaining % 60).padStart(2, '0');
     return `${minutes}:${seconds}`;
-};
-
-/**
- * Colour of the countdown tag: red in the final seconds, blue while the
- * countdown runs, and no colour once it is paused or switched off.
- */
-const getTimerTagColor = (timer: null | TimerState | undefined): 'blue' | 'red' | undefined => {
-    if (isTimerEnding(timer)) {
-        return 'red';
-    }
-    if (timer?.isRunning === true) {
-        return 'blue';
-    }
-    return undefined;
 };
 
 /** Renders the reveal/reset/waiting affordance for the current voting state. */
@@ -144,8 +131,15 @@ export const EstimationPanel: React.FC = () => {
                     </Typography.Title>
 
                     <Space size={8} wrap>
-                        <Tag color={getTimerTagColor(timer)} icon={<ClockCircleOutlined />}>
-                            {formatTimerDisplay(timer)}
+                        <Tag icon={<ClockCircleOutlined />}>
+                            {isTimerEnding(timer) || timer?.isRunning === true ? (
+                                <Badge
+                                    status={isTimerEnding(timer) ? 'error' : 'processing'}
+                                    text={formatTimerDisplay(timer)}
+                                />
+                            ) : (
+                                formatTimerDisplay(timer)
+                            )}
                         </Tag>
 
                         {isAdmin &&

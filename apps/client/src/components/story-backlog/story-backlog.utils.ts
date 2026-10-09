@@ -61,9 +61,9 @@ export const parseBulkStories = (bulkText: string): { description?: string; titl
         .map((line) => line.trim())
         .filter((line) => line.length > 0)
         .map((line) => {
-            const [title, ...rest] = line.split(/[;|]/);
-            const trimmedTitle = title.trim();
-            const description = rest.join(' - ').trim();
+            const separatorIndex = line.search(/[;|]/);
+            const trimmedTitle = (separatorIndex < 0 ? line : line.slice(0, separatorIndex)).trim();
+            const description = separatorIndex < 0 ? '' : line.slice(separatorIndex + 1).trim();
             return description ? { description, title: trimmedTitle } : { title: trimmedTitle };
         })
         .filter(({ title }) => title.length > 0);

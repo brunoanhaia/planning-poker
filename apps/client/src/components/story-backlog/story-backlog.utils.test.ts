@@ -40,6 +40,13 @@ describe('parseBulkStories', () => {
         ]);
     });
 
+    it('preserves all punctuation after the first separator', () => {
+        expect(parseBulkStories('Story; first; second | third!\nOther | a | b; c')).toEqual([
+            { description: 'first; second | third!', title: 'Story' },
+            { description: 'a | b; c', title: 'Other' },
+        ]);
+    });
+
     it('treats a line without a separator as a title only', () => {
         expect(parseBulkStories('Just a title')).toEqual([{ title: 'Just a title' }]);
     });

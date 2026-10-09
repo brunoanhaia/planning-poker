@@ -160,7 +160,6 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
 
                         <Tooltip title="Click to copy invite link">
                             <Tag
-                                color="blue"
                                 icon={<CopyOutlined />}
                                 onClick={handleCopyLink}
                                 role="button"

@@ -69,8 +69,8 @@ const renderStoryStatus = (story: Story) => {
 /** Triggers a client side CSV download for the whole backlog. */
 const downloadBacklogCsv = (room: RoomState): void => {
     const header = CSV_COLUMNS.map(escapeCsvCell).join(',');
-    const rows = room.stories.map((story, index) =>
-        [index + 1, story.title, story.description || '', story.status, story.finalEstimate ?? '']
+    const rows = room.stories.map((story) =>
+        [story.id, story.title, story.description || '', story.status, story.finalEstimate ?? '']
             .map(escapeCsvCell)
             .join(',')
     );
@@ -78,7 +78,7 @@ const downloadBacklogCsv = (room: RoomState): void => {
     const link = document.createElement('a');
     link.setAttribute(
         'href',
-        encodeURI(['data:text/csv;charset=utf-8,', header, ...rows].join('\n'))
+        `data:text/csv;charset=utf-8,${encodeURIComponent([header, ...rows].join('\n'))}`
     );
     link.setAttribute('download', buildBacklogCsvFilename(room.title));
     document.body.appendChild(link);
@@ -332,7 +332,7 @@ export const StoryBacklog: React.FC = () => {
                     <Flex gap={8} justify="space-between" wrap>
                         <Button
                             danger
-                            disabled={!scoreDraft?.currentScore}
+                            disabled={scoreDraft?.currentScore == null}
                             onClick={() => {
                                 if (scoreDraft) {
                                     updateStoryEstimate(scoreDraft.id, null);

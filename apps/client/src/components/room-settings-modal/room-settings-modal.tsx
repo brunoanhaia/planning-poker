@@ -61,8 +61,14 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         }
 
         if (deckType === 'custom') {
-            changeDeck('custom', parseCustomDeck(customDeck));
-        } else {
+            const cards = parseCustomDeck(customDeck);
+            const hasSameCards =
+                cards.length === roomState.customDeck?.length &&
+                cards.every((card, index) => card === roomState.customDeck?.[index]);
+            if (deckType !== roomState.deckType || !hasSameCards) {
+                changeDeck('custom', cards);
+            }
+        } else if (deckType !== roomState.deckType) {
             changeDeck(deckType);
         }
         onClose();

@@ -2,7 +2,10 @@ import {
     DECK_TYPES,
     DECK_TYPE_LABELS,
     DeckType,
+    MAX_CUSTOM_DECK_SIZE,
+    MAX_NAME_LENGTH,
     MAX_TITLE_LENGTH,
+    MIN_CUSTOM_DECK_SIZE,
     PRESET_DECKS,
 } from '@planitpoker/shared';
 import { Button, Flex, Input, Select, Typography } from 'antd';
@@ -19,8 +22,8 @@ const renderDeckPreview = (deckType: DeckType): string => {
 export interface CreateSessionFormProps {
     /** Disables the submit button until a display name has been captured. */
     disabled: boolean;
-    /** Called with the trimmed session title (possibly empty) and the selected deck. */
-    onSubmit: (title: string, deckType: DeckType) => void;
+    /** Called with the trimmed session title (possibly empty) and the selected deck, including custom cards when selected. */
+    onSubmit: (title: string, deckType: DeckType, customDeck?: (number | string)[]) => void;
 }
 
 /**
@@ -29,10 +32,41 @@ export interface CreateSessionFormProps {
 export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, onSubmit }) => {
     const [roomTitle, setRoomTitle] = useState('');
     const [deckType, setDeckType] = useState<DeckType>('fibonacci');
+    const [customDeck, setCustomDeck] = useState('');
+    const [customDeckError, setCustomDeckError] = useState('');
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
-        onSubmit(roomTitle.trim(), deckType);
+        if (deckType !== 'custom') {
+            onSubmit(roomTitle.trim(), deckType);
+            return;
+        }
+
+        const cards = customDeck
+            .split(',')
+            .map((entry) => entry.trim())
+            .filter(Boolean)
+            .map((entry) => (Number.isNaN(Number(entry)) ? entry : Number(entry)));
+        if (cards.length < MIN_CUSTOM_DECK_SIZE || cards.length > MAX_CUSTOM_DECK_SIZE) {
+            setCustomDeckError(
+                `Enter between ${MIN_CUSTOM_DECK_SIZE} and ${MAX_CUSTOM_DECK_SIZE} cards.`
+            );
+            return;
+        }
+        if (
+            cards.some((card) =>
+                typeof card === 'number' ? !Number.isFinite(card) : card.length > MAX_NAME_LENGTH
+            )
+        ) {
+            setCustomDeckError(`Use finite numbers or labels up to ${MAX_NAME_LENGTH} characters.`);
+            return;
+        }
+        if (new Set(cards.map(String)).size !== cards.length) {
+            setCustomDeckError('Custom cards must be unique.');
+            return;
+        }
+        setCustomDeckError('');
+        onSubmit(roomTitle.trim(), deckType, cards);
     };
 
     return (
@@ -65,6 +99,36 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                         Deck cards preview: {renderDeckPreview(deckType)}
                     </Typography.Paragraph>
                 </div>
+
+                {deckType === 'custom' && (
+                    <div>
+                        <label htmlFor="create-session-custom-deck">
+                            Comma-Separated Custom Cards
+                        </label>
+                        <Input
+                            aria-describedby={
+                                customDeckError ? 'create-session-custom-deck-error' : undefined
+                            }
+                            aria-invalid={Boolean(customDeckError)}
+                            id="create-session-custom-deck"
+                            onChange={(event) => {
+                                setCustomDeck(event.target.value);
+                                setCustomDeckError('');
+                            }}
+                            placeholder="e.g. 0, 1, 2, 3, 5, 8, ?, ☕"
+                            value={customDeck}
+                        />
+                        {customDeckError && (
+                            <Typography.Text
+                                id="create-session-custom-deck-error"
+                                role="alert"
+                                type="danger"
+                            >
+                                {customDeckError}
+                            </Typography.Text>
+                        )}
+                    </div>
+                )}
 
                 <Button block disabled={disabled} htmlType="submit" size="large" type="primary">
                     Start Session &amp; Generate Room Code
