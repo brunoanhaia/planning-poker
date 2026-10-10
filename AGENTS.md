@@ -64,6 +64,20 @@ npm run format           # prettier across repo
 - `vitest/no-focused-tests` is an error in client/server.
 - Imports are sorted with `perfectionist/sort-imports`.
 
+## Versioning & Commits
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) — `type(scope): subject`, with the type limited to `feat`, `fix`, `perf`, `revert`, `docs`, `style`, `refactor`, `test`, `build` and `ci`.
+
+```bash
+npm run lint:commits    # validates every commit since origin/main
+npm run changelog       # prepends CHANGELOG.md from the conventional history
+```
+
+- **Config**: `commitlint.config.mjs` extends `@commitlint/config-conventional`. A commit is rejected when the header has no type/subject, when the subject is capitalised or ends in a period, when the body is not preceded by a blank line, or when the header exceeds 100 characters.
+- **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky installs itself through the `prepare` script, so the hook is armed by a plain `npm install`. Where post-install scripts are blocked, run `npx husky` once to arm it.
+- **Changelog**: `CHANGELOG.md` is generated, never hand-edited. The `conventionalcommits` preset deliberately hides `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci`, so the file carries only `feat` and `fix` (plus breaking changes); a rename of behaviour that is not user-visible stays out of the changelog on purpose.
+- `CHANGELOG.md` is listed in `.prettierignore` — `npm run format` must not rewrite generated markup.
+
 ## Environment Variables
 
 - Server: `PORT`, `ALLOWED_ORIGINS` (comma-separated)
