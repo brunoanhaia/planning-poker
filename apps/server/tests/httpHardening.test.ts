@@ -94,13 +94,46 @@ describe('HTTP hardening', () => {
     });
 
     it('caps the accepted JSON body', async () => {
-        const response = await fetch(`${baseUrl}/api/health`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ padding: 'x'.repeat(60 * 1024) }),
-        });
+        // Its own limiter, so the 413 comes from the parser and not from an
+        // allowance the earlier tests spent.
+        const { baseUrl: isolatedUrl, running } = bootIsolated(0, 5);
 
-        expect(response.status).toBe(413);
+        try {
+            const response = await fetch(`${isolatedUrl}/api/health`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ padding: 'x'.repeat(60 * 1024) }),
+            });
+
+            expect(response.status).toBe(413);
+        } finally {
+            running.handler.shutdown();
+            running.server.close();
+        }
+    });
+
+    it('spends request allowance on an oversized body instead of parsing it for free', async () => {
+        const { baseUrl: isolatedUrl, running } = bootIsolated(0, 2);
+
+        try {
+            const oversized = {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ padding: 'x'.repeat(60 * 1024) }),
+            };
+
+            const statuses: number[] = [];
+            for (let i = 0; i < 3; i += 1) {
+                statuses.push((await fetch(`${isolatedUrl}/api/health`, oversized)).status);
+            }
+
+            // The body parser sees the payload, but only after the limiter has
+            // charged for it, so the third attempt is refused rather than parsed.
+            expect(statuses).toEqual([413, 413, 429]);
+        } finally {
+            running.handler.shutdown();
+            running.server.close();
+        }
     });
 
     it('uses the production allowance by default', () => {

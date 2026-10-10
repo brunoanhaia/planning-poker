@@ -158,6 +158,17 @@ export const startServer = (options: StartServerOptions): RunningServer => {
             credentials: true,
         })
     );
+
+    // Before the body parser: a client must not be able to spend parser work
+    // on a malformed or oversized payload without spending request allowance.
+    app.use(
+        rateLimit({
+            limit: options.rateLimitMaxRequests ?? HTTP_RATE_LIMIT_MAX_REQUESTS,
+            windowMs: HTTP_RATE_LIMIT_WINDOW_MS,
+            standardHeaders: 'draft-7',
+            message: { error: 'Too many requests. Try again later.' },
+        })
+    );
     app.use(express.json({ limit: HTTP_MAX_BODY_BYTES }));
 
     // Mint a browser identity the first time this client is seen. The kick ban
@@ -169,14 +180,6 @@ export const startServer = (options: StartServerOptions): RunningServer => {
         }
         next();
     });
-    app.use(
-        rateLimit({
-            limit: options.rateLimitMaxRequests ?? HTTP_RATE_LIMIT_MAX_REQUESTS,
-            windowMs: HTTP_RATE_LIMIT_WINDOW_MS,
-            standardHeaders: 'draft-7',
-            message: { error: 'Too many requests. Try again later.' },
-        })
-    );
 
     app.get('/api/health', (req, res) => {
         res.json({ status: 'ok', timestamp: new Date().toISOString() });
