@@ -16,11 +16,19 @@
         "test": "npm run test --workspaces --if-present",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
-        "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
+        "lint:commits": "commitlint --from origin/main",
+        "changelog": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s",
+        "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+        "prepare": "husky"
     },
     "devDependencies": {
+        "@commitlint/cli": "^19.8.1",
+        "@commitlint/config-conventional": "^19.8.1",
+        "conventional-changelog-cli": "^5.0.0",
+        "conventional-changelog-conventionalcommits": "^8.0.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.6",
+        "husky": "^9.1.7",
         "prettier": "^3.9.6"
     }
 }
