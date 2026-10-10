@@ -34,6 +34,39 @@ export const MAX_COLOR_LENGTH = 32;
 /** Maximum number of stories accepted in a single bulk import. */
 export const MAX_BULK_STORIES = 50;
 
+/** Maximum number of rooms the server keeps in memory at once. */
+export const MAX_ROOMS = 1000;
+
+/** Maximum number of participants admitted to a single room. */
+export const MAX_PARTICIPANTS_PER_ROOM = 100;
+
+/** Maximum number of stories a single room's backlog may hold. */
+export const MAX_STORIES_PER_ROOM = 200;
+
+/** Largest WebSocket frame the server accepts, in bytes. */
+export const WS_MAX_PAYLOAD_BYTES = 32 * 1024;
+
+/** Largest JSON body the HTTP API accepts, in bytes. */
+export const HTTP_MAX_BODY_BYTES = 50 * 1024;
+
+/** Messages a single socket may send inside the throttle window. */
+export const WS_THROTTLE_MAX_MESSAGES = 30;
+
+/** Throttle window length, in milliseconds. */
+export const WS_THROTTLE_WINDOW_MS = 10 * 1000;
+
+/** How long a kicked participant is barred from rejoining, in milliseconds. */
+export const KICK_BAN_DURATION_MS = 5 * 60 * 1000;
+
+/** How long a room without activity is kept before it is dropped, in milliseconds. */
+export const ROOM_IDLE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** HTTP rate limit window, in milliseconds. */
+export const HTTP_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+/** Requests accepted per HTTP rate limit window, per client address. */
+export const HTTP_RATE_LIMIT_MAX_REQUESTS = 300;
+
 /** Minimum number of cards required for a custom deck. */
 export const MIN_CUSTOM_DECK_SIZE = 2;
 
@@ -245,7 +278,28 @@ export interface KickedPayload {
     message?: string;
 }
 
+/**
+ * Machine-readable reason carried by an `ERROR` message.
+ *
+ * The message stays human-readable for the UI; the code lets a client — and the
+ * audit log — tell a rejection that comes from business rules apart from one
+ * that comes from authorization, from a quota, or from the abuse controls.
+ */
+export type ErrorCode =
+    | 'BANNED'
+    | 'FORBIDDEN'
+    | 'INVALID_STORY_INDEX'
+    | 'NO_SESSION'
+    | 'PARTICIPANT_LIMIT_REACHED'
+    | 'RATE_LIMITED'
+    | 'ROOM_FULL'
+    | 'ROOM_LIMIT_REACHED'
+    | 'ROOM_LOCKED'
+    | 'ROOM_NOT_FOUND'
+    | 'STORY_LIMIT_REACHED';
+
 export interface ErrorPayload {
+    code?: ErrorCode;
     message: string;
 }
 

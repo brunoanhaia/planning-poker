@@ -10,7 +10,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should create room with creator as primary admin and host', () => {
-        const { hostId, roomId, roomState } = rm.createRoom('Alice', '🚀', '#6366f1', 'Sprint 42');
+        const { hostId, roomId, roomState } = rm.createRoom('Alice', '🚀', '#6366f1', 'Sprint 42')!;
 
         expect(roomId).toHaveLength(6);
         expect(roomState.title).toBe('Sprint 42');
@@ -21,7 +21,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should allow admin to rename room and reject non-admin', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
 
@@ -37,7 +37,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should lock room and reject new participants while allowing existing ones', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
 
@@ -55,7 +55,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should handle auto-reveal when all active voters cast votes', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
 
@@ -73,7 +73,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should manage live countdown timer', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         rm.startTimer(roomId, hostId, 60);
         const initialRoom = rm.getRoom(roomId)!;
@@ -94,7 +94,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should allow admin to kick participant and toggle participant role', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
 
@@ -110,7 +110,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should allow promoting co-admins and transferring primary admin', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
 
@@ -127,7 +127,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should allow bulk story import, estimate acceptance and session ending', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         rm.bulkAddStories(roomId, hostId, [
             { title: 'Story 1', description: 'Desc 1' },
@@ -148,7 +148,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     });
 
     it('should only allow admin or co-host to reveal votes and reject non-admin', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
         const charlieResult = rm.joinRoom(roomId, 'Charlie', '🐱', '#10b981')!;

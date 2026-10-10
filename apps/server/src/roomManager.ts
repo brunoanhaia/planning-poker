@@ -5,12 +5,14 @@ import {
     DECK_TYPES,
     DeckType,
     MAX_CUSTOM_DECK_SIZE,
+    MAX_ROOMS,
     MAX_TIMER_DURATION_SECONDS,
     MAX_TITLE_LENGTH,
     MIN_CUSTOM_DECK_SIZE,
     MIN_TIMER_DURATION_SECONDS,
     Participant,
     PRESET_DECKS,
+    ROOM_IDLE_TTL_MS,
     RoomState,
     Story,
 } from '@planitpoker/shared';
@@ -28,6 +30,7 @@ import {
     toggleParticipantSpectator,
     transferRoomAdmin,
 } from './participantService.js';
+import { sessionService } from './sessionService.js';
 import {
     addStoryToRoom,
     bulkAddStoriesToRoom,
@@ -47,6 +50,8 @@ export interface CreateRoomResult {
  */
 export class RoomManager {
     private readonly rooms: Map<string, RoomState> = new Map();
+    /** Last time a room was touched by a client, in milliseconds. */
+    private readonly roomTouchedAt: Map<string, number> = new Map();
 
     /**
      * Resets the voting state of a room for a new round.
@@ -59,6 +64,16 @@ export class RoomManager {
             participant.vote = null;
             participant.hasVoted = false;
         });
+    }
+
+    /**
+     * Records that a room is still in use, for the idle sweep.
+     *
+     * @param roomId - The room identifier.
+     * @param now - Current timestamp, in milliseconds.
+     */
+    private touch(roomId: string, now: number): void {
+        this.roomTouchedAt.set(roomId, now);
     }
 
     /**
@@ -79,11 +94,29 @@ export class RoomManager {
     /**
      * Retrieves a room state by its room ID code.
      *
+     * Reading does not refresh the room's idle timestamp: a broadcast or a
+     * timer tick would then keep an abandoned room alive forever. Whether a
+     * room is still occupied is answered by {@link sweepIdleRooms}, which
+     * looks at the connected participants instead.
+     *
      * @param roomId - The room identifier code (case-insensitive).
      * @returns The RoomState or undefined if not found.
      */
     public getRoom(roomId: string): RoomState | undefined {
         return this.rooms.get(roomId.toUpperCase());
+    }
+
+    /**
+     * Reports whether a room is still held in memory.
+     *
+     * Used by the cleanup ticker to forget per-participant bookkeeping that
+     * belongs to a room which no longer exists.
+     *
+     * @param roomId - The room identifier code (case-insensitive).
+     * @returns True when the room exists.
+     */
+    public hasRoom(roomId: string): boolean {
+        return this.getRoom(roomId) !== undefined;
     }
 
     /**
@@ -95,7 +128,8 @@ export class RoomManager {
      * @param roomTitle - Optional title for the planning room.
      * @param deckType - Estimation deck type (defaults to 'fibonacci').
      * @param customDeck - Optional custom card values if deckType is 'custom'.
-     * @returns Object containing hostId, roomId, and the created roomState.
+     * @returns Object containing hostId, roomId, and the created roomState, or
+     *   null when the server already holds {@link MAX_ROOMS} rooms.
      */
     public createRoom(
         hostName: string,
@@ -104,7 +138,10 @@ export class RoomManager {
         roomTitle?: string,
         deckType: DeckType = 'fibonacci',
         customDeck?: CardValue[]
-    ): CreateRoomResult {
+    ): CreateRoomResult | null {
+        if (this.rooms.size >= MAX_ROOMS) {
+            return null;
+        }
         const roomId = this.generateUniqueRoomId();
         const hostId = generateUserId();
 
@@ -155,6 +192,7 @@ export class RoomManager {
         };
 
         this.rooms.set(roomId, roomState);
+        this.touch(roomId, Date.now());
         return { hostId, roomId, roomState };
     }
 
@@ -192,7 +230,59 @@ export class RoomManager {
         if (!room) {
             return null;
         }
-        return joinParticipant(room, userName, avatar, color, existingUserId);
+        const result = joinParticipant(room, userName, avatar, color, existingUserId);
+        if (result.participant) {
+            this.touch(room.id, Date.now());
+        }
+        return result;
+    }
+
+    /**
+     * Drops rooms nobody has touched for {@link ROOM_IDLE_TTL_MS}, along with
+     * the session tokens bound to them.
+     *
+     * Two independent conditions must hold before a room goes: the idle
+     * deadline has passed **and** every participant has disconnected. A room
+     * with somebody still connected is a room in use — a tab left open, a
+     * discussion on pause — and dropping it would disconnect live participants
+     * and revoke their tokens. Conversely, a room nobody reads anymore (no
+     * broadcast, no timer tick) is exactly the one worth reclaiming, so reads
+     * deliberately do not count as activity.
+     *
+     * Session tokens bound to a dropped room are revoked here, together with
+     * the room itself, so a caller that only needs the identifiers does not
+     * have to remember a second cleanup step.
+     *
+     * @param now - Current timestamp, in milliseconds.
+     * @returns The identifiers of the rooms that were dropped.
+     */
+    public sweepIdleRooms(now: number): string[] {
+        const dropped: string[] = [];
+
+        this.roomTouchedAt.forEach((touchedAt, roomId) => {
+            if (now - touchedAt < ROOM_IDLE_TTL_MS) {
+                return;
+            }
+            const room = this.rooms.get(roomId);
+            if (room?.participants.some((participant) => participant.isOnline)) {
+                return;
+            }
+            this.rooms.delete(roomId);
+            this.roomTouchedAt.delete(roomId);
+            sessionService.revokeByRoom(roomId);
+            dropped.push(roomId);
+        });
+
+        return dropped;
+    }
+
+    /**
+     * Number of rooms currently held in memory. Exposed for diagnostics and tests.
+     *
+     * @returns The size of the room map.
+     */
+    public getRoomCount(): number {
+        return this.rooms.size;
     }
 
     /**

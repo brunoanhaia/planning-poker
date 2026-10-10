@@ -64,10 +64,28 @@ export class SessionService {
      *
      * @param roomId - The room identifier.
      * @param userId - The participant identifier.
+     * @returns The tokens that were revoked, so the caller can remember which
+     *   credentials are no longer welcome.
      */
-    public revokeByUser(roomId: string, userId: string): void {
+    public revokeByUser(roomId: string, userId: string): string[] {
+        const revoked: string[] = [];
         for (const [token, binding] of this.sessions) {
             if (binding.roomId === roomId && binding.userId === userId) {
+                this.sessions.delete(token);
+                revoked.push(token);
+            }
+        }
+        return revoked;
+    }
+
+    /**
+     * Revokes every token bound to a room (e.g. when the room is dropped).
+     *
+     * @param roomId - The room identifier.
+     */
+    public revokeByRoom(roomId: string): void {
+        for (const [token, binding] of this.sessions) {
+            if (binding.roomId === roomId) {
                 this.sessions.delete(token);
             }
         }

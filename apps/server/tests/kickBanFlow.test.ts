@@ -1,0 +1,417 @@
+import { KICK_BAN_DURATION_MS, WS_THROTTLE_MAX_MESSAGES } from '@planitpoker/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { WebSocketServer } from 'ws';
+
+import { WebSocketHandler } from '../src/webSocketHandler.js';
+
+/** One message the handler sent to a socket double. */
+interface SentMessage {
+    payload: {
+        code?: string;
+        message?: string;
+        roomState?: { hostId: string; id: string };
+        sessionToken?: string;
+        userId?: string;
+    };
+    type: string;
+}
+
+/** A socket double that records what the handler sends it. */
+class SocketDouble {
+    public static readonly OPEN = 1;
+    public readyState = 1;
+    public isAlive = true;
+    public hasOrigin = true;
+    public roomId?: string;
+    public userId?: string;
+    /** Identity the handler read from the handshake cookie. */
+    public clientId?: string;
+    public readonly sent: SentMessage[] = [];
+    /** Close codes the handler asked the socket to use. */
+    public readonly closeCodes: number[] = [];
+    private readonly listeners = new Map<string, ((...args: unknown[]) => void)[]>();
+
+    public on(event: string, listener: (...args: unknown[]) => void): this {
+        this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
+        return this;
+    }
+
+    public emit(event: string, ...args: unknown[]): void {
+        (this.listeners.get(event) ?? []).forEach((listener) => listener(...args));
+    }
+
+    public send(data: string): void {
+        this.sent.push(JSON.parse(data) as SentMessage);
+    }
+
+    public terminate(): void {}
+    public close(code?: number, _reason?: string): void {
+        // `ws` does nothing when close() arrives on a socket that is already
+        // CLOSING or CLOSED, and leaves OPEN immediately otherwise.
+        if (this.readyState !== 1) {
+            return;
+        }
+        if (code !== undefined) {
+            this.closeCodes.push(code);
+        }
+        this.readyState = 2;
+    }
+    public ping(): void {}
+    public removeListener(): void {}
+}
+
+/** Messages of one type the handler sent to a socket. */
+const messagesOf = (socket: SocketDouble, type: string): SentMessage[] =>
+    socket.sent.filter((message) => message.type === type);
+
+/** The last message of one type, if any. */
+const lastMessage = (socket: SocketDouble, type: string): SentMessage | undefined => {
+    const matching = messagesOf(socket, type);
+    return matching.length > 0 ? matching[matching.length - 1] : undefined;
+};
+
+/** The room id of the last `ROOM_STATE` a socket received. */
+const roomIdOf = (socket: SocketDouble): string => {
+    const roomState = lastMessage(socket, 'ROOM_STATE')?.payload.roomState;
+    if (!roomState) {
+        throw new Error('no ROOM_STATE was received');
+    }
+    return roomState.id;
+};
+
+/** The participant id of the last `SESSION` a socket received. */
+const participantIdOf = (socket: SocketDouble): string => {
+    const participantId = lastMessage(socket, 'SESSION')?.payload.userId;
+    if (!participantId) {
+        throw new Error('no SESSION was received');
+    }
+    return participantId;
+};
+
+/** The token of the last `SESSION` a socket received. */
+const tokenOf = (socket: SocketDouble): string => {
+    const token = lastMessage(socket, 'SESSION')?.payload.sessionToken;
+    if (!token) {
+        throw new Error('no SESSION was received');
+    }
+    return token;
+};
+
+const handlers: WebSocketHandler[] = [];
+
+/** Boots the real handler against a socket double harness. */
+const boot = () => {
+    const sockets: SocketDouble[] = [];
+    const listeners = new Map<string, (...args: unknown[]) => void>();
+    const wss = {
+        clients: sockets,
+        close: vi.fn(),
+        on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
+            listeners.set(event, listener);
+        }),
+    } as unknown as WebSocketServer;
+
+    const handler = new WebSocketHandler(wss);
+    handlers.push(handler);
+
+    /**
+     * Opens a connection the way the handler sees it.
+     *
+     * @param options - Origin presence and the identity cookie, if any.
+     */
+    const connect = (options?: { clientId?: string; hasOrigin?: boolean }): SocketDouble => {
+        const hasOrigin = options?.hasOrigin ?? true;
+        // A browser always carries the identity the server issued it, unless a
+        // test explicitly asks for one that has none.
+        const clientId = options?.clientId ?? (hasOrigin ? 'default-client' : undefined);
+        const socket = new SocketDouble();
+        socket.hasOrigin = hasOrigin;
+        if (clientId) {
+            socket.clientId = clientId;
+        }
+        sockets.push(socket);
+        listeners.get('connection')?.(socket, {
+            headers: {
+                ...(hasOrigin ? { origin: 'http://localhost:5173' } : {}),
+                ...(clientId ? { cookie: `pip_client=${clientId}` } : {}),
+            },
+        });
+        return socket;
+    };
+
+    return { connect, handler, sockets };
+};
+
+/** Sends a message to a socket double. */
+const send = (socket: SocketDouble, type: string, payload: unknown): void =>
+    socket.emit('message', JSON.stringify({ payload, type }));
+
+afterEach(() => {
+    while (handlers.length > 0) {
+        handlers.pop()?.shutdown();
+    }
+});
+
+describe('Kick ban, end to end', () => {
+    it('refuses the rejoin the kicked client attempts with its own token', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const hostToken = tokenOf(host);
+        const roomId = roomIdOf(host);
+        expect(roomId).toMatch(/^[A-Z0-9]{6}$/);
+
+        const bob = connect();
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        const bobToken = tokenOf(bob);
+        const bobId = participantIdOf(bob);
+        expect(bobToken).toBeTruthy();
+        expect(bobId).toBeDefined();
+
+        // Alice kicks Bob, which revokes his token.
+        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+        expect(messagesOf(host, 'ERROR')).toHaveLength(0);
+        expect(lastMessage(bob, 'KICKED')).toBeDefined();
+
+        // Bob comes straight back with the very token that was just revoked.
+        const bobAgain = connect();
+        send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId, sessionToken: bobToken });
+
+        const error = lastMessage(bobAgain, 'ERROR');
+        expect(error?.payload.code).toBe('BANNED');
+        expect(bobAgain.userId).toBeUndefined();
+
+        // The host is unaffected.
+        expect(hostToken).toBeTruthy();
+    });
+
+    it('lets the same client back once the bar expires', () => {
+        vi.useFakeTimers();
+        try {
+            const { connect } = boot();
+
+            const host = connect();
+            send(host, 'CREATE_ROOM', { name: 'Alice' });
+            const roomId = roomIdOf(host);
+
+            const bob = connect();
+            send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+            const bobToken = tokenOf(bob);
+            const bobId = participantIdOf(bob);
+
+            send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+
+            // Still barred with the very token that was revoked.
+            const barred = connect();
+            send(barred, 'JOIN_ROOM', { name: 'Bob', roomId, sessionToken: bobToken });
+            expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
+
+            vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
+
+            const bobAgain = connect();
+            send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+            expect(lastMessage(bobAgain, 'ERROR')?.payload.code).toBeUndefined();
+            expect(lastMessage(bobAgain, 'SESSION')).toBeDefined();
+            expect(bobAgain.userId).toBeTruthy();
+            expect(bobAgain.userId).not.toBe(bobId);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not bar a client that was never in the room', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const stranger = connect();
+        send(stranger, 'JOIN_ROOM', {
+            name: 'Stranger',
+            roomId,
+            sessionToken: 'a-token-the-server-never-issued',
+        });
+
+        // An unknown token is not a bar: the client is let in as a new
+        // participant, exactly as before the ban existed.
+        expect(lastMessage(stranger, 'ERROR')).toBeUndefined();
+        expect(lastMessage(stranger, 'SESSION')).toBeDefined();
+    });
+});
+
+describe('Message throttle, end to end', () => {
+    it('disconnects the socket instead of answering every message', () => {
+        const { connect } = boot();
+
+        // Creating the room already spends one message of the allowance.
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        const spent = 1;
+        for (let i = spent; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        send(host, 'TOGGLE_AUTO_REVEAL', {});
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
+        expect(lastMessage(host, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+        // 1008: WebSocket policy violation.
+        expect(host.closeCodes).toEqual([1008]);
+
+        // Whatever the socket keeps sending is never answered again.
+        for (let i = 0; i < 5; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
+        expect(host.closeCodes).toEqual([1008]);
+    });
+
+    it('ignores frames that arrive once the socket is closing', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        // Spend the whole allowance and go one frame over, which closes it.
+        for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        send(host, 'TOGGLE_AUTO_REVEAL', {});
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
+
+        // Whatever is still in flight must not reach the audit log again.
+        const auditLines = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+        for (let i = 0; i < 5; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        auditLines.mockRestore();
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
+    });
+
+    it('does not disconnect a socket that stays inside the allowance', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        for (let i = 0; i < WS_THROTTLE_MAX_MESSAGES - 1; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(0);
+        expect(host.closeCodes).toEqual([]);
+    });
+});
+
+describe('Kick ban against a browser profile', () => {
+    it('still bars a rejoin that presents no token at all', () => {
+        const { connect } = boot();
+
+        const host = connect({ clientId: 'host-client' });
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const bob = connect({ clientId: 'bob-client' });
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        const bobId = participantIdOf(bob);
+
+        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+
+        // A fresh tab: no Origin-less escape, no token, same browser.
+        const bobAgain = connect({ clientId: 'bob-client' });
+        send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        expect(lastMessage(bobAgain, 'ERROR')?.payload.code).toBe('BANNED');
+        expect(bobAgain.userId).toBeUndefined();
+    });
+
+    it('lets a different browser through', () => {
+        const { connect } = boot();
+
+        const host = connect({ clientId: 'host-client' });
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const bob = connect({ clientId: 'bob-client' });
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        const bobId = participantIdOf(bob);
+
+        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+
+        const newcomer = connect({ clientId: 'carol-client' });
+        send(newcomer, 'JOIN_ROOM', { name: 'Carol', roomId });
+
+        expect(lastMessage(newcomer, 'SESSION')).toBeDefined();
+        expect(newcomer.userId).toBeTruthy();
+    });
+
+    it('releases the profile once the bar expires', () => {
+        vi.useFakeTimers();
+        try {
+            const { connect } = boot();
+
+            const host = connect({ clientId: 'host-client' });
+            send(host, 'CREATE_ROOM', { name: 'Alice' });
+            const roomId = roomIdOf(host);
+
+            const bob = connect({ clientId: 'bob-client' });
+            send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+            const bobId = participantIdOf(bob);
+
+            send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+            const barred = connect({ clientId: 'bob-client' });
+            send(barred, 'JOIN_ROOM', { name: 'Bob', roomId });
+            expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
+
+            vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
+
+            const bobAgain = connect({ clientId: 'bob-client' });
+            send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+            expect(lastMessage(bobAgain, 'SESSION')).toBeDefined();
+            expect(bobAgain.userId).not.toBe(bobId);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('Throttle before parsing', () => {
+    it('charges a malformed frame against the budget', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        // Creating the room already spent one message of the allowance.
+        for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            host.emit('message', 'not json at all');
+        }
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES - 1);
+
+        // The one frame that goes over is the one that pays for the disconnect.
+        host.emit('message', 'still not json');
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES);
+        expect(host.closeCodes).toEqual([1008]);
+    });
+
+    it('charges an unknown message type against the budget', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            host.emit('message', JSON.stringify({ payload: {}, type: 'NOT_A_TYPE' }));
+        }
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES - 1);
+
+        host.emit('message', JSON.stringify({ payload: {}, type: 'NOT_A_TYPE' }));
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES);
+        expect(host.closeCodes).toEqual([1008]);
+    });
+});

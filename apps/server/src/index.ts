@@ -1,12 +1,31 @@
+import {
+    HTTP_MAX_BODY_BYTES,
+    HTTP_RATE_LIMIT_MAX_REQUESTS,
+    HTTP_RATE_LIMIT_WINDOW_MS,
+    WS_MAX_PAYLOAD_BYTES,
+} from '@planitpoker/shared';
 import cors from 'cors';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
 import http from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 
+import {
+    buildClientIdCookie,
+    CLIENT_ID_COOKIE,
+    CLIENT_ID_COOKIE_OPTIONS,
+    issueClientId,
+    parseClientId,
+} from './clientIdentity.js';
 import { WebSocketHandler } from './webSocketHandler.js';
 
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173'];
+
+/** Default port of the combined HTTP + WebSocket server. */
+const DEFAULT_PORT = 5000;
 
 /**
  * Schema for the `ALLOWED_ORIGINS` env var: a comma-separated list that is
@@ -55,48 +74,177 @@ export const isOriginAllowed = (origin: string | undefined, allowedOrigins: stri
     return allowedOrigins.includes(origin);
 };
 
-const app = express();
-const ALLOWED_ORIGINS = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
-
-app.use(
-    cors({
-        origin: ALLOWED_ORIGINS,
-        credentials: true,
-    })
-);
-app.use(express.json());
-
-const PORT = process.env.PORT || 5000;
-
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-const server = http.createServer(app);
-const wss = new WebSocketServer({
-    server,
-    verifyClient: (info, done) => {
-        if (isOriginAllowed(info.origin, ALLOWED_ORIGINS)) {
-            done(true);
-            return;
-        }
-        console.warn(
-            `Rejected WebSocket connection from disallowed origin: ${info.origin ?? '<none>'}`
-        );
-        done(false, 403, 'Forbidden');
-    },
-});
-
-const webSocketHandler = new WebSocketHandler(wss);
-
-const shutdown = (): void => {
-    webSocketHandler.shutdown();
-    server.close(() => process.exit(0));
+/**
+ * Number of proxy hops in front of this server, as configured by env.
+ *
+ * Defaults to **zero**: a listener that is not known to sit behind a proxy must
+ * not honour `X-Forwarded-For`, or any client could pick its own address and
+ * with it its own rate-limit bucket. The bundled deployment sets it explicitly
+ * to `1` because its Nginx hop is guaranteed and its published port is bound to
+ * loopback, so nothing but that proxy can reach the listener.
+ *
+ * @param raw - The raw environment value, if any.
+ * @returns The number of trusted hops.
+ */
+export const parseTrustProxyHops = (raw: string | undefined): number => {
+    const parsed = Number(raw);
+    if (raw === undefined || raw.trim() === '' || !Number.isInteger(parsed) || parsed < 0) {
+        return 0;
+    }
+    return parsed;
 };
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+/** Options of {@link startServer}. */
+export interface StartServerOptions {
+    allowedOrigins: string[];
+    /** Port to listen on; `0` picks a free ephemeral port. */
+    port: number;
+    /** Requests accepted per client inside the rate-limit window. */
+    rateLimitMaxRequests?: number;
+    /**
+     * How many reverse-proxy hops in front of this server may be trusted when
+     * reading `X-Forwarded-For`. Defaults to the single bundled Nginx hop.
+     */
+    trustProxyHops?: number;
+}
 
-server.listen(PORT, () => {
-    console.log(`🚀 Planit Poker WebSocket & HTTP server listening on port ${PORT}`);
-});
+/** A started server, its HTTP listener and the socket handler it created. */
+export interface RunningServer {
+    handler: WebSocketHandler;
+    server: http.Server;
+}
+
+/**
+ * Builds and starts the combined HTTP + WebSocket server.
+ *
+ * The HTTP side carries the baseline hardening the API had been missing: the
+ * `X-Powered-By` fingerprint is disabled, `helmet` supplies the security
+ * headers on every response, the JSON body is capped explicitly instead of
+ * leaning on the framework default, and a per-client rate limit answers a
+ * spreadsheet of requests with a `429` instead of doing the work.
+ *
+ * The WebSocket side refuses frames larger than {@link WS_MAX_PAYLOAD_BYTES}
+ * (the client is disconnected with code 1009) and stays behind the origin
+ * allowlist checked in the handshake.
+ *
+ * @param options - Allowed origins, port and rate-limit allowance.
+ * @returns The listening HTTP server together with its socket handler.
+ */
+export const startServer = (options: StartServerOptions): RunningServer => {
+    const { allowedOrigins, port } = options;
+
+    const app = express();
+    app.disable('x-powered-by');
+    // Only the hops that are really there. `trust proxy: true` — or a number
+    // larger than the real chain — lets a client that reaches this listener
+    // directly supply its own `X-Forwarded-For`, and with it its own
+    // rate-limit bucket. Defaulting to zero means a bare listener never trusts
+    // the header; the bundled deployment passes one, because its Nginx hop is
+    // guaranteed and its published port is bound to loopback.
+    app.set('trust proxy', options.trustProxyHops ?? 0);
+    app.use(
+        // The SPA is never framed, so the framing header can be stricter than
+        // helmet's `SAMEORIGIN` default — it matches the header Nginx sends.
+        // Referrers are trimmed to the origin on cross-origin navigation, which
+        // is the same policy Nginx applies.
+        helmet({
+            referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+            xFrameOptions: { action: 'deny' },
+        })
+    );
+    app.use(
+        cors({
+            origin: allowedOrigins,
+            credentials: true,
+        })
+    );
+
+    // Before the body parser: a client must not be able to spend parser work
+    // on a malformed or oversized payload without spending request allowance.
+    app.use(
+        rateLimit({
+            limit: options.rateLimitMaxRequests ?? HTTP_RATE_LIMIT_MAX_REQUESTS,
+            windowMs: HTTP_RATE_LIMIT_WINDOW_MS,
+            standardHeaders: 'draft-7',
+            message: { error: 'Too many requests. Try again later.' },
+        })
+    );
+    app.use(express.json({ limit: HTTP_MAX_BODY_BYTES }));
+
+    // Mint a browser identity the first time this client is seen. The kick ban
+    // keys on it, so it has to exist before the WebSocket handshake — the
+    // application never reads it, and cannot clear it without clearing cookies.
+    app.use((req, res, next) => {
+        if (!parseClientId(req.headers.cookie)) {
+            res.cookie(CLIENT_ID_COOKIE, issueClientId(), CLIENT_ID_COOKIE_OPTIONS);
+        }
+        next();
+    });
+
+    app.get('/api/health', (req, res) => {
+        res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    });
+
+    const server = http.createServer(app);
+    const wss = new WebSocketServer({
+        maxPayload: WS_MAX_PAYLOAD_BYTES,
+        server,
+        verifyClient: (info, done) => {
+            if (isOriginAllowed(info.origin, allowedOrigins)) {
+                done(true);
+                return;
+            }
+            console.warn(
+                `Rejected WebSocket connection from disallowed origin: ${info.origin ?? '<none>'}`
+            );
+            done(false, 403, 'Forbidden');
+        },
+    });
+
+    // A WebSocket upgrade bypasses Express, so the middleware above never runs
+    // for it. The `headers` hook fires on the handshake response and is the
+    // supported place to attach the `Set-Cookie`, which is what puts the
+    // identity in the browser before its first socket message.
+    wss.on('headers', (headers: string[], request: http.IncomingMessage) => {
+        if (!parseClientId(request.headers.cookie)) {
+            headers.push(`Set-Cookie: ${buildClientIdCookie(issueClientId())}`);
+        }
+    });
+
+    const handler = new WebSocketHandler(wss);
+
+    return { handler, server: server.listen(port) };
+};
+
+/**
+ * True when this module is the entry point, so importing it in a test does not
+ * open a listening socket.
+ *
+ * @returns True when the module was executed directly.
+ */
+export const isEntryPoint = (): boolean => {
+    const entry = process.argv[1];
+    return Boolean(entry) && import.meta.url === pathToFileURL(entry).href;
+};
+
+if (isEntryPoint()) {
+    const port = Number(process.env.PORT || DEFAULT_PORT);
+    const { handler, server } = startServer({
+        allowedOrigins: parseAllowedOrigins(process.env.ALLOWED_ORIGINS),
+        port,
+        // The bundled deployment sits behind Nginx, which is the single hop to
+        // trust. A server exposed directly must say so, or a forged header
+        // would become the rate-limit key again.
+        trustProxyHops: parseTrustProxyHops(process.env.TRUST_PROXY_HOPS),
+    });
+
+    const shutdown = (): void => {
+        handler.shutdown();
+        server.close(() => process.exit(0));
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+
+    console.log(`🚀 Planit Poker WebSocket & HTTP server listening on port ${port}`);
+}
