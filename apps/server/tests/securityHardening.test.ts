@@ -1,8 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
 import { SessionService } from '../src/sessionService.js';
 import { isActiveOwner, shouldCleanupOnClose, socketKey } from '../src/webSocketHandler.js';
+
+describe('whitespace-only title handling', () => {
+    let rm: RoomManager;
+
+    beforeEach(() => {
+        rm = new RoomManager();
+    });
+
+    it('treats a whitespace-only title as a no-op, not as a forbidden one', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const before = rm.getRoom(roomId)!.stories.length;
+
+        // A blank title must not be answered with an authorization failure; the
+        // caller only has a null result to say "you may not do this".
+        const room = rm.addStory(roomId, hostId, '   ')!;
+
+        expect(room.stories).toHaveLength(before);
+        expect(rm.getRoom(roomId)!.stories).toHaveLength(before);
+    });
+});
 
 describe('RoomManager security hardening', () => {
     it('clamps a negative timer duration to the minimum', () => {
@@ -91,18 +111,6 @@ describe('RoomManager security hardening', () => {
         const story = room.stories[room.stories.length - 1];
         expect(story.title.length).toBeLessThanOrEqual(120);
         expect((story.description || '').length).toBeLessThanOrEqual(2000);
-    });
-
-    it('treats a whitespace-only title as a no-op, not as a forbidden one', () => {
-        const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
-        const before = rm.getRoom(roomId)!.stories.length;
-
-        // A blank title must not be answered with an authorization failure; the
-        // caller only has a null result to say "you may not do this".
-        const room = rm.addStory(roomId, hostId, '   ')!;
-
-        expect(room.stories).toHaveLength(before);
     });
 });
 

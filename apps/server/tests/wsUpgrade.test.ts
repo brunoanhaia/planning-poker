@@ -76,15 +76,36 @@ describe('WebSocket upgrade', () => {
     it('attaches the identity cookie to a cookieless handshake', async () => {
         const socket = new WebSocket(url(), { headers: { origin: 'http://localhost:5173' } });
 
-        // A successful handshake is proof the hook ran: without it the client
-        // was refused, and the cookie is what a fresh browser needs.
-        const opened = await new Promise<boolean>((resolve) => {
-            socket.on('open', () => resolve(true));
-            socket.on('error', () => resolve(false));
+        // The `upgrade` event carries the raw handshake response, which is the
+        // only place a fresh browser can be given the cookie.
+        const handshakeCookie = await new Promise<string | undefined>((resolve) => {
+            socket.on('upgrade', (response) => {
+                const header = response.headers['set-cookie'];
+                resolve(Array.isArray(header) ? header[0] : header);
+            });
+            socket.on('error', () => resolve(undefined));
         });
 
         socket.close();
-        expect(opened).toBe(true);
+        expect(handshakeCookie).toContain('pip_client=');
+        expect(handshakeCookie).toContain('HttpOnly');
+    });
+
+    it('does not reissue the cookie when the handshake already carries one', async () => {
+        const socket = new WebSocket(url(), {
+            headers: { cookie: 'pip_client=already-here', origin: 'http://localhost:5173' },
+        });
+
+        const handshakeCookie = await new Promise<string | undefined>((resolve) => {
+            socket.on('upgrade', (response) => {
+                const header = response.headers['set-cookie'];
+                resolve(Array.isArray(header) ? header[0] : header);
+            });
+            socket.on('error', () => resolve(undefined));
+        });
+
+        socket.close();
+        expect(handshakeCookie).toBeUndefined();
     });
 
     it('still admits a native client without a cookie, on its token', async () => {
