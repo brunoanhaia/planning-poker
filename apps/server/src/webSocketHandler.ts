@@ -401,6 +401,27 @@ export class WebSocketHandler {
         const isRoomBound = binding?.roomId === normalizedRoomId;
         const isUserBound = !userId || binding?.userId === userId;
         const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
+        const now = Date.now();
+
+        // A kick revokes the token the client is holding, so the bar has to be
+        // checked on the presented credential: without this the client would
+        // come back with a dead token, have no identity to match, and be
+        // handed a brand-new participant.
+        const tokenBan = sessionToken ? this.bans.tokenBanFor(sessionToken, now) : null;
+        if (tokenBan) {
+            auditLog({
+                action: 'join.rejected.banned',
+                outcome: 'denied',
+                roomId: tokenBan.roomId,
+                userId: tokenBan.userId,
+            });
+            this.sendError(
+                ws,
+                'You were removed from this session. Try again in a few minutes.',
+                'BANNED'
+            );
+            return;
+        }
 
         // Non-browser clients (no Origin) bypass the handshake origin check, so
         // they must prove identity with a valid session token bound to this room.
@@ -413,9 +434,9 @@ export class WebSocketHandler {
             return;
         }
 
-        // A kick must not be answerable with a fresh join: the bar is keyed by
-        // participant identifier and expires on its own.
-        if (provenUserId && this.bans.isBanned(normalizedRoomId, provenUserId, Date.now())) {
+        // Same bar, reached when the join still proves its identity with a live
+        // token — for instance a ban issued without the token being revoked.
+        if (provenUserId && this.bans.isBanned(normalizedRoomId, provenUserId, now)) {
             auditLog({
                 action: 'join.rejected.banned',
                 outcome: 'denied',
@@ -680,8 +701,15 @@ export class WebSocketHandler {
             return;
         }
 
+        const revokedTokens = sessionService.revokeByUser(session.roomId, payload.targetUserId);
+        this.bans.banTokens(
+            revokedTokens,
+            session.roomId,
+            payload.targetUserId,
+            Date.now(),
+            KICK_BAN_DURATION_MS
+        );
         this.bans.ban(session.roomId, payload.targetUserId, Date.now(), KICK_BAN_DURATION_MS);
-        sessionService.revokeByUser(session.roomId, payload.targetUserId);
         auditLog({
             action: 'user.kicked',
             outcome: 'allowed',

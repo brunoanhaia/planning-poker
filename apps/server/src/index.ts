@@ -74,6 +74,11 @@ export interface StartServerOptions {
     port: number;
     /** Requests accepted per client inside the rate-limit window. */
     rateLimitMaxRequests?: number;
+    /**
+     * How many reverse-proxy hops in front of this server may be trusted when
+     * reading `X-Forwarded-For`. Defaults to the single bundled Nginx hop.
+     */
+    trustProxyHops?: number;
 }
 
 /** A started server, its HTTP listener and the socket handler it created. */
@@ -103,7 +108,12 @@ export const startServer = (options: StartServerOptions): RunningServer => {
 
     const app = express();
     app.disable('x-powered-by');
-    app.set('trust proxy', true);
+    // Only the hops that are really there: Nginx appends the client address to
+    // `X-Forwarded-For` instead of replacing it, so trusting every hop would
+    // let a client pick its own address — and with it its own rate-limit
+    // bucket. Trusting exactly one hop makes Express read the address the
+    // proxy appended, which a client cannot forge.
+    app.set('trust proxy', options.trustProxyHops ?? 1);
     app.use(
         // The SPA is never framed, so the framing header can be stricter than
         // helmet's `SAMEORIGIN` default — it matches the header Nginx sends.

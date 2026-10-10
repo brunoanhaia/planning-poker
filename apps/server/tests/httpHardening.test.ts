@@ -75,3 +75,64 @@ describe('HTTP hardening', () => {
         expect(HTTP_RATE_LIMIT_MAX_REQUESTS).toBe(300);
     });
 });
+
+describe('Rate limiting behind a proxy', () => {
+    /** Boots a second, isolated limiter so it does not share the bucket above. */
+    const bootIsolated = (trustProxyHops: number, rateLimitMaxRequests: number) => {
+        const running = startServer({
+            allowedOrigins: ['http://localhost:5173'],
+            port: 0,
+            rateLimitMaxRequests,
+            trustProxyHops,
+        });
+        const address = running.server.address();
+        const port = typeof address === 'object' && address !== null ? address.port : 0;
+        return { baseUrl: `http://127.0.0.1:${port}`, running };
+    };
+
+    it('keys the limit on the client even when X-Forwarded-For is forged', async () => {
+        const { baseUrl: proxiedUrl, running } = bootIsolated(1, 2);
+        // The address the trusted proxy appended; a client controls everything
+        // sent to the left of it, which `trust proxy: true` would happily use
+        // as the bucket key.
+        const appendedByProxy = '203.0.113.7';
+
+        try {
+            const statuses: number[] = [];
+            for (const forged of ['1.1.1.1', '2.2.2.2', '3.3.3.3']) {
+                const response = await fetch(`${proxiedUrl}/api/health`, {
+                    headers: { 'X-Forwarded-For': `${forged}, ${appendedByProxy}` },
+                });
+                statuses.push(response.status);
+            }
+
+            expect(statuses).toEqual([200, 200, 429]);
+        } finally {
+            running.handler.shutdown();
+            running.server.close();
+        }
+    });
+
+    it('ignores the header entirely when no proxy hop is trusted', async () => {
+        const { baseUrl: directUrl, running } = bootIsolated(0, 2);
+
+        try {
+            const statuses: number[] = [];
+            for (const forged of [
+                '1.1.1.1, 203.0.113.7',
+                '2.2.2.2, 203.0.113.7',
+                '3.3.3.3, 203.0.113.7',
+            ]) {
+                const response = await fetch(`${directUrl}/api/health`, {
+                    headers: { 'X-Forwarded-For': forged },
+                });
+                statuses.push(response.status);
+            }
+
+            expect(statuses).toEqual([200, 200, 429]);
+        } finally {
+            running.handler.shutdown();
+            running.server.close();
+        }
+    });
+});
