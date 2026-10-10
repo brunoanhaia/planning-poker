@@ -7,7 +7,7 @@ import {
 } from '@planitpoker/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BanService, banKey } from '../src/banService.js';
+import { BanService, banKey, clientBanKey } from '../src/banService.js';
 import { ROOM_CLEANUP_INTERVAL_MS } from '../src/constants.js';
 import { RoomManager } from '../src/roomManager.js';
 import { isBacklogFull } from '../src/storyService.js';
@@ -269,5 +269,52 @@ describe('Server limits', () => {
 
     it('runs the idle sweep once per hour', () => {
         expect(ROOM_CLEANUP_INTERVAL_MS).toBe(60 * 60 * 1000);
+    });
+});
+
+describe('Kick ban on a browser profile', () => {
+    const BAN_MS = 5 * 60_000;
+    let bans: BanService;
+    const NOW = 2_000_000;
+
+    beforeEach(() => {
+        bans = new BanService();
+    });
+
+    it('bars the browser profile it was issued for', () => {
+        bans.banClient('ROOM01', 'client-a', NOW, BAN_MS);
+
+        expect(bans.isClientBanned('ROOM01', 'client-a', NOW + BAN_MS - 1)).toBe(true);
+    });
+
+    it('is scoped to the room it was issued in', () => {
+        bans.banClient('ROOM01', 'client-a', NOW, BAN_MS);
+
+        expect(bans.isClientBanned('ROOM02', 'client-a', NOW)).toBe(false);
+    });
+
+    it('does not bar another browser of the same room', () => {
+        bans.banClient('ROOM01', 'client-a', NOW, BAN_MS);
+
+        expect(bans.isClientBanned('ROOM01', 'client-b', NOW)).toBe(false);
+    });
+
+    it('lets the browser back once the bar expires', () => {
+        bans.banClient('ROOM01', 'client-a', NOW, BAN_MS);
+
+        expect(bans.isClientBanned('ROOM01', 'client-a', NOW + BAN_MS)).toBe(false);
+    });
+
+    it('sweeps an expired bar away', () => {
+        bans.banClient('ROOM01', 'client-a', NOW, BAN_MS);
+        bans.sweep(NOW + BAN_MS + 1);
+
+        expect(bans.isClientBanned('ROOM01', 'client-a', NOW + BAN_MS + 1)).toBe(false);
+    });
+
+    it('builds a distinct key per room and browser', () => {
+        expect(clientBanKey('ROOM01', 'client-a')).toBe('client:ROOM01:client-a');
+        expect(clientBanKey('ROOM01', 'client-a')).not.toBe(clientBanKey('ROOM01', 'client-b'));
+        expect(clientBanKey('ROOM01', 'client-a')).not.toBe(clientBanKey('ROOM02', 'client-a'));
     });
 });

@@ -1,3 +1,4 @@
+import { WS_MAX_PAYLOAD_BYTES } from '@planitpoker/shared';
 import http from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
@@ -106,6 +107,24 @@ describe('WebSocket upgrade', () => {
 
         socket.close();
         expect(handshakeCookie).toBeUndefined();
+    });
+
+    it('refuses a frame larger than the configured payload', async () => {
+        const socket = new WebSocket(url(), { headers: { origin: 'http://localhost:5173' } });
+
+        // 32 KiB plus a little, wrapped so the server sees one oversized frame.
+        const oversized = JSON.stringify({
+            payload: { name: 'x'.repeat(WS_MAX_PAYLOAD_BYTES) },
+            type: 'CREATE_ROOM',
+        });
+
+        const closedWith = await new Promise<number | undefined>((resolve) => {
+            socket.on('close', (code) => resolve(code));
+            socket.on('error', () => resolve(undefined));
+            socket.on('open', () => socket.send(oversized));
+        });
+
+        expect(closedWith).toBe(1009);
     });
 
     it('still admits a native client without a cookie, on its token', async () => {

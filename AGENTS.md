@@ -66,7 +66,7 @@ npm run format           # prettier across repo
 
 ## Environment Variables
 
-- Server: `PORT`, `ALLOWED_ORIGINS` (comma-separated)
+- Server: `PORT`, `ALLOWED_ORIGINS` (comma-separated), `TRUST_PROXY_HOPS` (proxy hops allowed to set `X-Forwarded-For`; defaults to `0`, the bundled compose stack sets `1` behind its Nginx)
 - Client: `VITE_WS_URL` (production WebSocket URL, e.g. `wss://...`; empty = same-origin via Nginx `/ws` proxy). Baked at build time (`--build-arg VITE_WS_URL=...`).
 - Compose: `SERVER_PORT`, `CLIENT_PORT` (host port mappings). See `.env.example`.
 
@@ -80,7 +80,9 @@ docker compose up --build   # client :80, server :5000
 ```
 
 - **Server image**: `apps/server/Dockerfile` (Node 24 multi-stage, `HEALTHCHECK` on `/api/health`, runs `node dist/index.js` as `node` user).
-- **Client image**: `apps/client/Dockerfile` (Vite build + `nginxinc/nginx-unprivileged:1.27-alpine` as `nginx` user on `:8080`, config in `apps/client/nginx.conf`). Nginx serves the SPA with fallback to `index.html` and proxies `/api/*` + `/ws` (with `Upgrade`) to the `server` service.
+- **Client image**: `apps/client/Dockerfile` (Vite build — `VITE_WS_URL` may be baked in per environment; the compose stack omits it and relies on Nginx; `HEALTHCHECK` on `/api/health`, `nginxinc/nginx-unprivileged:1.27-alpine` as `nginx` user on `:8080`, config in `apps/client/nginx.conf`). Nginx serves the SPA with fallback to `index.html` and proxies `/api/*` + `/ws` (with `Upgrade`) to the `server` service.
+- **Published ports**: the compose stack maps the client to `CLIENT_PORT` (default `80`) and the server to `127.0.0.1:SERVER_PORT` (default `5000`). The server port is bound to loopback on purpose — browsers reach the API through Nginx, so nothing but that proxy can talk to the server directly.
+- **Proxy trust**: `TRUST_PROXY_HOPS` is set by the stack, not by the image. A defaulted server (`0`) ignores `X-Forwarded-For` and therefore rate-limits by real address, which is the safe default; a bare compose stack without Nginx in front must keep it at `0`.
 
 ## Style & Conventions
 
