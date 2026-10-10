@@ -74,11 +74,22 @@ export const isOriginAllowed = (origin: string | undefined, allowedOrigins: stri
     return allowedOrigins.includes(origin);
 };
 
-/** Number of proxy hops in front of this server, as configured by env. */
+/**
+ * Number of proxy hops in front of this server, as configured by env.
+ *
+ * Defaults to **zero**: a listener that is not known to sit behind a proxy must
+ * not honour `X-Forwarded-For`, or any client could pick its own address and
+ * with it its own rate-limit bucket. The bundled deployment sets it explicitly
+ * to `1` because its Nginx hop is guaranteed and its published port is bound to
+ * loopback, so nothing but that proxy can reach the listener.
+ *
+ * @param raw - The raw environment value, if any.
+ * @returns The number of trusted hops.
+ */
 export const parseTrustProxyHops = (raw: string | undefined): number => {
     const parsed = Number(raw);
     if (raw === undefined || raw.trim() === '' || !Number.isInteger(parsed) || parsed < 0) {
-        return 1;
+        return 0;
     }
     return parsed;
 };
@@ -124,12 +135,13 @@ export const startServer = (options: StartServerOptions): RunningServer => {
 
     const app = express();
     app.disable('x-powered-by');
-    // Only the hops that are really there: Nginx appends the client address to
-    // `X-Forwarded-For` instead of replacing it, so trusting every hop would
-    // let a client pick its own address — and with it its own rate-limit
-    // bucket. Trusting exactly one hop makes Express read the address the
-    // proxy appended, which a client cannot forge.
-    app.set('trust proxy', options.trustProxyHops ?? 1);
+    // Only the hops that are really there. `trust proxy: true` — or a number
+    // larger than the real chain — lets a client that reaches this listener
+    // directly supply its own `X-Forwarded-For`, and with it its own
+    // rate-limit bucket. Defaulting to zero means a bare listener never trusts
+    // the header; the bundled deployment passes one, because its Nginx hop is
+    // guaranteed and its published port is bound to loopback.
+    app.set('trust proxy', options.trustProxyHops ?? 0);
     app.use(
         // The SPA is never framed, so the framing header can be stricter than
         // helmet's `SAMEORIGIN` default — it matches the header Nginx sends.

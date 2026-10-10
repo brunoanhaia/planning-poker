@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { RunningServer } from '../src/index.js';
 
-import { startServer } from '../src/index.js';
+import { parseTrustProxyHops, startServer } from '../src/index.js';
 
 /**
  * Boots the real server on an ephemeral port so the security headers and the
@@ -105,6 +105,40 @@ describe('HTTP hardening', () => {
 
     it('uses the production allowance by default', () => {
         expect(HTTP_RATE_LIMIT_MAX_REQUESTS).toBe(300);
+    });
+
+    it('ignores X-Forwarded-For when it is told nothing about a proxy', async () => {
+        // Nothing passes the option, so the default must be zero hops: honouring
+        // the header would let a direct client choose its own rate-limit bucket.
+        const { baseUrl: bareUrl, running } = bootIsolated(0, 2);
+
+        try {
+            const statuses: number[] = [];
+            for (const forged of ['1.1.1.1', '2.2.2.2', '3.3.3.3']) {
+                statuses.push(await healthStatus(bareUrl, { 'X-Forwarded-For': forged }));
+            }
+
+            expect(statuses).toEqual([200, 200, 429]);
+        } finally {
+            running.handler.shutdown();
+            running.server.close();
+        }
+    });
+});
+
+describe('parseTrustProxyHops', () => {
+    it('defaults to zero trusted hops', () => {
+        expect(parseTrustProxyHops(undefined)).toBe(0);
+        expect(parseTrustProxyHops('')).toBe(0);
+        expect(parseTrustProxyHops('not-a-number')).toBe(0);
+        expect(parseTrustProxyHops('-1')).toBe(0);
+        expect(parseTrustProxyHops('1.5')).toBe(0);
+    });
+
+    it('accepts an explicit non-negative integer', () => {
+        expect(parseTrustProxyHops('0')).toBe(0);
+        expect(parseTrustProxyHops('1')).toBe(1);
+        expect(parseTrustProxyHops('2')).toBe(2);
     });
 });
 
