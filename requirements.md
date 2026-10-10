@@ -29,7 +29,8 @@
 5. **Code Quality**: Strict TypeScript typing via `@planitpoker/shared`, ESLint/Prettier compliance, and clean‑code conventions (no magic values, early returns, explicit blocks).
 6. **Testing**: Comprehensive unit, integration, and end‑to‑end tests using Vitest, Playwright, and Axe‑core covering functional flows and accessibility.
 7. **Maintainability**: Modular architecture with separate client, server, and shared packages; custom skills (`realtime‑websocket‑manager`, `react‑clean‑architecture`, etc.) enforce separation of concerns.
-8. **Documentation**: Up‑to‑date README, AGENTS.md, and requirements file reflecting the native WebSocket stack.
-9. **Deployability**: Shippable as containers — versioned `apps/server/Dockerfile` (Node 24) and `apps/client/Dockerfile` (Nginx + SPA fallback, `/api` + `/ws` reverse proxy) composed via `docker-compose.yml` with healthchecks and env-driven ports/origins.
+8. **UI consistency**: The client must render exclusively with Ant Design 6 components. Theming is centralised in a single `ConfigProvider` configuration (`apps/client/src/theme/app-theme.ts`); components must not ship their own stylesheets, and any component-scoped token override must be documented and must not leak to other components.
+9. **Documentation**: Up‑to‑date README, AGENTS.md, and requirements file reflecting the native WebSocket stack.
+10. **Deployability**: Shippable as containers — versioned `apps/server/Dockerfile` (Node 24) and `apps/client/Dockerfile` (Nginx + SPA fallback, `/api` + `/ws` reverse proxy) composed via `docker-compose.yml` with healthchecks and env-driven ports/origins.
 
 _This file should be updated whenever new functional or non‑functional requirements are added._

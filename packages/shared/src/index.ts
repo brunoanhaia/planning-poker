@@ -22,6 +22,9 @@ export const MAX_TITLE_LENGTH = 120;
 /** Maximum length (in characters) for a story description. */
 export const MAX_DESCRIPTION_LENGTH = 2000;
 
+/** Local-storage key that persists the chosen colour scheme. */
+export const COLOR_MODE_STORAGE_KEY = 'planit_theme';
+
 /** Maximum length (in characters) for an avatar emoji/string. */
 export const MAX_AVATAR_LENGTH = 16;
 
@@ -51,6 +54,15 @@ export const PRESET_DECKS: Record<Exclude<DeckType, 'custom'>, readonly CardValu
     modified_fibonacci: [0, 0.5, 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'] as const,
     powers_of_2: [1, 2, 4, 8, 16, 32, 64, '?', '☕'] as const,
     tshirt: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'] as const,
+};
+
+/** Human readable label and card preview for every selectable deck. */
+export const DECK_TYPE_LABELS: Record<DeckType, string> = {
+    custom: 'Custom Deck',
+    fibonacci: 'Fibonacci',
+    modified_fibonacci: 'Modified Fibonacci',
+    powers_of_2: 'Powers of 2',
+    tshirt: 'T-Shirt Sizes',
 };
 
 export const AVATARS = [
