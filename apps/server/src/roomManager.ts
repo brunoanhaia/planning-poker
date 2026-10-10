@@ -94,21 +94,16 @@ export class RoomManager {
     /**
      * Retrieves a room state by its room ID code.
      *
-     * Reading a room *is* activity: while a room is being polled — a broadcast,
-     * a timer tick, a vote — nobody joins and nothing is created, so without
-     * refreshing the timestamp here the idle sweep would eventually drop a room
-     * that is still in use.
+     * Reading does not refresh the room's idle timestamp: a broadcast or a
+     * timer tick would then keep an abandoned room alive forever. Whether a
+     * room is still occupied is answered by {@link sweepIdleRooms}, which
+     * looks at the connected participants instead.
      *
      * @param roomId - The room identifier code (case-insensitive).
      * @returns The RoomState or undefined if not found.
      */
     public getRoom(roomId: string): RoomState | undefined {
-        const normalizedId = roomId.toUpperCase();
-        const room = this.rooms.get(normalizedId);
-        if (room) {
-            this.touch(normalizedId, Date.now());
-        }
-        return room;
+        return this.rooms.get(roomId.toUpperCase());
     }
 
     /**
@@ -233,9 +228,13 @@ export class RoomManager {
      * Drops rooms nobody has touched for {@link ROOM_IDLE_TTL_MS}, along with
      * the session tokens bound to them.
      *
-     * A room lives as long as it is used: a client that disconnects without
-     * leaving keeps its seat for the whole TTL, so a reload still lands back in
-     * its room. Rooms that stay silent past the TTL are dead weight in memory.
+     * Two independent conditions must hold before a room goes: the idle
+     * deadline has passed **and** every participant has disconnected. A room
+     * with somebody still connected is a room in use — a tab left open, a
+     * discussion on pause — and dropping it would disconnect live participants
+     * and revoke their tokens. Conversely, a room nobody reads anymore (no
+     * broadcast, no timer tick) is exactly the one worth reclaiming, so reads
+     * deliberately do not count as activity.
      *
      * @param now - Current timestamp, in milliseconds.
      * @returns The identifiers of the rooms that were dropped.
@@ -245,6 +244,10 @@ export class RoomManager {
 
         this.roomTouchedAt.forEach((touchedAt, roomId) => {
             if (now - touchedAt < ROOM_IDLE_TTL_MS) {
+                return;
+            }
+            const room = this.rooms.get(roomId);
+            if (room?.participants.some((participant) => participant.isOnline)) {
                 return;
             }
             this.rooms.delete(roomId);

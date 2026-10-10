@@ -1,4 +1,4 @@
-import { KICK_BAN_DURATION_MS } from '@planitpoker/shared';
+import { KICK_BAN_DURATION_MS, WS_THROTTLE_MAX_MESSAGES } from '@planitpoker/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocketServer } from 'ws';
 
@@ -21,6 +21,8 @@ class SocketDouble {
     public roomId?: string;
     public userId?: string;
     public readonly sent: SentMessage[] = [];
+    /** Close codes the handler asked the socket to use. */
+    public readonly closeCodes: number[] = [];
     private readonly listeners = new Map<string, ((...args: unknown[]) => void)[]>();
 
     public on(event: string, listener: (...args: unknown[]) => void): this {
@@ -37,7 +39,17 @@ class SocketDouble {
     }
 
     public terminate(): void {}
-    public close(): void {}
+    public close(code?: number, _reason?: string): void {
+        // `ws` does nothing when close() arrives on a socket that is already
+        // CLOSING or CLOSED, and leaves OPEN immediately otherwise.
+        if (this.readyState !== 1) {
+            return;
+        }
+        if (code !== undefined) {
+            this.closeCodes.push(code);
+        }
+        this.readyState = 2;
+    }
     public ping(): void {}
     public removeListener(): void {}
 }
@@ -180,5 +192,47 @@ describe('Kick ban, end to end', () => {
         // participant, exactly as before the ban existed.
         expect(lastMessage(stranger, 'ERROR')).toBeUndefined();
         expect(lastMessage(stranger, 'SESSION')).toBeDefined();
+    });
+});
+
+describe('Message throttle, end to end', () => {
+    it('disconnects the socket instead of answering every message', () => {
+        const { connect } = boot();
+
+        // Creating the room already spends one message of the allowance.
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        const spent = 1;
+        for (let i = spent; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        send(host, 'TOGGLE_AUTO_REVEAL', {});
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
+        expect(lastMessage(host, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+        // 1008: WebSocket policy violation.
+        expect(host.closeCodes).toEqual([1008]);
+
+        // Whatever the socket keeps sending is never answered again.
+        for (let i = 0; i < 5; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
+        expect(host.closeCodes).toEqual([1008]);
+    });
+
+    it('does not disconnect a socket that stays inside the allowance', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        for (let i = 0; i < WS_THROTTLE_MAX_MESSAGES - 1; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(0);
+        expect(host.closeCodes).toEqual([]);
     });
 });

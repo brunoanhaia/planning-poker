@@ -31,13 +31,15 @@ export const addStoryToRoom = (
     title: string,
     description?: string
 ): RoomState | null => {
-    const trimmedTitle = title.trim().slice(0, MAX_TITLE_LENGTH);
-    if (!trimmedTitle) {
+    if (isBacklogFull(room)) {
         return null;
     }
 
-    if (isBacklogFull(room)) {
-        return null;
+    const trimmedTitle = title.trim().slice(0, MAX_TITLE_LENGTH);
+    if (!trimmedTitle) {
+        // A blank title is a no-op, not a rejection: the caller reports a null
+        // result as an authorization failure, which would be a lie.
+        return room;
     }
 
     const newStory: Story = {

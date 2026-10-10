@@ -92,6 +92,18 @@ describe('RoomManager security hardening', () => {
         expect(story.title.length).toBeLessThanOrEqual(120);
         expect((story.description || '').length).toBeLessThanOrEqual(2000);
     });
+
+    it('treats a whitespace-only title as a no-op, not as a forbidden one', () => {
+        const rm = new RoomManager();
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const before = rm.getRoom(roomId)!.stories.length;
+
+        // A blank title must not be answered with an authorization failure; the
+        // caller only has a null result to say "you may not do this".
+        const room = rm.addStory(roomId, hostId, '   ')!;
+
+        expect(room.stories).toHaveLength(before);
+    });
 });
 
 describe('SessionService', () => {

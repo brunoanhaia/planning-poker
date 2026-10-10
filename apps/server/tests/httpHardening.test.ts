@@ -29,6 +29,30 @@ afterAll(() => {
     running.current?.server.close();
 });
 
+/**
+ * Boots a server on an ephemeral port with its own limiter, so a test can
+ * spend the whole allowance without depending on what came before it.
+ *
+ * @param trustProxyHops - Proxy hops the limiter should trust.
+ * @param rateLimitMaxRequests - Requests accepted per window.
+ * @returns The base URL and the handles needed to shut it down.
+ */
+const bootIsolated = (trustProxyHops: number, rateLimitMaxRequests: number) => {
+    const isolated = startServer({
+        allowedOrigins: ['http://localhost:5173'],
+        port: 0,
+        rateLimitMaxRequests,
+        trustProxyHops,
+    });
+    const address = isolated.server.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+    return { baseUrl: `http://127.0.0.1:${port}`, running: isolated };
+};
+
+/** Fetches `/api/health` once and returns the status. */
+const healthStatus = async (baseUrl: string, headers?: Record<string, string>) =>
+    (await fetch(`${baseUrl}/api/health`, { headers })).status;
+
 describe('HTTP hardening', () => {
     it('does not advertise the framework', async () => {
         const response = await fetch(`${baseUrl}/api/health`);
@@ -54,11 +78,19 @@ describe('HTTP hardening', () => {
     });
 
     it('answers a burst of requests with 429 once the allowance is spent', async () => {
-        // The limiter is shared across the tests above, so a single extra
-        // request is enough to exhaust the tiny allowance.
-        const response = await fetch(`${baseUrl}/api/health`);
+        const { baseUrl: isolatedUrl, running: isolated } = bootIsolated(0, 3);
 
-        expect(response.status).toBe(429);
+        try {
+            const statuses: number[] = [];
+            for (let i = 0; i < 4; i += 1) {
+                statuses.push(await healthStatus(isolatedUrl));
+            }
+
+            expect(statuses).toEqual([200, 200, 200, 429]);
+        } finally {
+            isolated.handler.shutdown();
+            isolated.server.close();
+        }
     });
 
     it('caps the accepted JSON body', async () => {
@@ -77,19 +109,6 @@ describe('HTTP hardening', () => {
 });
 
 describe('Rate limiting behind a proxy', () => {
-    /** Boots a second, isolated limiter so it does not share the bucket above. */
-    const bootIsolated = (trustProxyHops: number, rateLimitMaxRequests: number) => {
-        const running = startServer({
-            allowedOrigins: ['http://localhost:5173'],
-            port: 0,
-            rateLimitMaxRequests,
-            trustProxyHops,
-        });
-        const address = running.server.address();
-        const port = typeof address === 'object' && address !== null ? address.port : 0;
-        return { baseUrl: `http://127.0.0.1:${port}`, running };
-    };
-
     it('keys the limit on the client even when X-Forwarded-For is forged', async () => {
         const { baseUrl: proxiedUrl, running } = bootIsolated(1, 2);
         // The address the trusted proxy appended; a client controls everything
@@ -100,10 +119,11 @@ describe('Rate limiting behind a proxy', () => {
         try {
             const statuses: number[] = [];
             for (const forged of ['1.1.1.1', '2.2.2.2', '3.3.3.3']) {
-                const response = await fetch(`${proxiedUrl}/api/health`, {
-                    headers: { 'X-Forwarded-For': `${forged}, ${appendedByProxy}` },
-                });
-                statuses.push(response.status);
+                statuses.push(
+                    await healthStatus(proxiedUrl, {
+                        'X-Forwarded-For': `${forged}, ${appendedByProxy}`,
+                    })
+                );
             }
 
             expect(statuses).toEqual([200, 200, 429]);
@@ -123,10 +143,7 @@ describe('Rate limiting behind a proxy', () => {
                 '2.2.2.2, 203.0.113.7',
                 '3.3.3.3, 203.0.113.7',
             ]) {
-                const response = await fetch(`${directUrl}/api/health`, {
-                    headers: { 'X-Forwarded-For': forged },
-                });
-                statuses.push(response.status);
+                statuses.push(await healthStatus(directUrl, { 'X-Forwarded-For': forged }));
             }
 
             expect(statuses).toEqual([200, 200, 429]);

@@ -12,11 +12,13 @@ interface TokenBan {
 }
 
 /**
- * Bars a kicked participant from re-entering the room straight away.
+ * Raises friction against a participant who was just removed from a room.
  *
  * Removing a participant from the roster does not keep them out: an open room
  * accepts a fresh `JOIN_ROOM` from the same client, which turns a moderation
- * action into a rename. The bar therefore follows two identities:
+ * action into a rename. This bar softens that, and it is **advisory** — it
+ * holds the client that comes back with the identity it was removed with, and
+ * nothing more:
  *
  * - the participant identifier, for a join that still proves it with a live
  *   session token;
@@ -24,10 +26,15 @@ interface TokenBan {
  *   tombstone on the credential, the very next join would present a dead token
  *   and be handed a brand-new participant, and the bar would never fire.
  *
+ * A client that rejoins with neither is simply a new participant: it arrives
+ * with an unknown token and a fresh id, which no server-side list can tell
+ * apart from a genuine newcomer. Preventing *that* would need a credential the
+ * client cannot discard, and the only one available here — the client address —
+ * is the proxy's, so it would bar the room instead of the participant. The
+ * bar therefore buys the host a quiet moment, not a locked door.
+ *
  * Both bars expire on their own, so a removal is a timeout rather than a
- * permanent lockout. The client address is deliberately *not* used: behind the
- * bundled Nginx every connection arrives from the proxy, so it would bar
- * everybody instead of the removed participant.
+ * permanent lockout.
  */
 export class BanService {
     private readonly bannedUntil = new Map<string, number>();

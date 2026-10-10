@@ -93,6 +93,7 @@ describe('Idle room sweep', () => {
     it('drops a room that nobody touched for the whole TTL', () => {
         const rm = new RoomManager();
         const { roomId } = rm.createRoom('Alice');
+        rm.leaveRoom(roomId, rm.getRoom(roomId)!.hostId);
 
         rm.sweepIdleRooms(Date.now() + ROOM_IDLE_TTL_MS + 1);
 
@@ -100,40 +101,37 @@ describe('Idle room sweep', () => {
         expect(rm.getRoomCount()).toBe(0);
     });
 
-    it('survives the sweep while it is still being read', () => {
+    it('keeps a room whose participants are still connected', () => {
         vi.useFakeTimers();
         try {
             const rm = new RoomManager();
             const { hostId, roomId } = rm.createRoom('Alice');
 
-            // A room that is merely being polled never joins nor creates
-            // anything, so only a read can prove it is alive. The sweep runs
-            // before any vote on purpose: voting reads the room too and would
-            // refresh the timestamp by itself, hiding what the read proved.
-            vi.advanceTimersByTime(ROOM_IDLE_TTL_MS - 1);
-            rm.getRoom(roomId);
-            vi.advanceTimersByTime(1);
+            // Far past the TTL, with no join, no vote and no read at all: the
+            // only thing keeping the room is the open connection.
+            vi.advanceTimersByTime(ROOM_IDLE_TTL_MS * 2);
 
-            rm.sweepIdleRooms(Date.now());
+            const dropped = rm.sweepIdleRooms(Date.now());
+
+            expect(dropped).not.toContain(roomId);
             expect(rm.getRoom(roomId)).toBeDefined();
             expect(rm.getRoomCount()).toBe(1);
-
-            // Still usable after a sweep that came for it.
             expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
         } finally {
             vi.useRealTimers();
         }
     });
 
-    it('drops a room that is never read again', () => {
+    it('drops a room once its participants have disconnected', () => {
         vi.useFakeTimers();
         try {
             const rm = new RoomManager();
             const { roomId } = rm.createRoom('Alice');
+            rm.leaveRoom(roomId, rm.getRoom(roomId)!.hostId);
+
             vi.advanceTimersByTime(ROOM_IDLE_TTL_MS + 1);
 
-            rm.sweepIdleRooms(Date.now());
-
+            expect(rm.sweepIdleRooms(Date.now())).toEqual([roomId]);
             expect(rm.getRoom(roomId)).toBeUndefined();
         } finally {
             vi.useRealTimers();
@@ -154,6 +152,7 @@ describe('Idle room sweep', () => {
     it('reports the rooms it dropped', () => {
         const rm = new RoomManager();
         const { roomId } = rm.createRoom('Alice');
+        rm.leaveRoom(roomId, rm.getRoom(roomId)!.hostId);
 
         expect(rm.sweepIdleRooms(Date.now() + ROOM_IDLE_TTL_MS + 1)).toEqual([roomId]);
     });

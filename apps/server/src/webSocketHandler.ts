@@ -247,8 +247,9 @@ export class WebSocketHandler {
             return;
         }
 
-        // A flooded socket is answered once and dropped, so one abusive client
-        // cannot amplify the work of the others.
+        // A flooded socket is answered once, then disconnected: without the
+        // close, every further message would cost another error frame and
+        // another audit record — the very amplification being prevented.
         if (!this.throttle.allows(ws, Date.now())) {
             auditLog({
                 action: 'message.throttled',
@@ -261,6 +262,8 @@ export class WebSocketHandler {
                 'Too many messages. Slow down and try again in a few seconds.',
                 'RATE_LIMITED'
             );
+            // 1008 is the WebSocket "policy violation" close code.
+            ws.close(1008, 'Rate limit exceeded');
             return;
         }
 
