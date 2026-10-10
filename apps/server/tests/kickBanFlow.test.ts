@@ -6,8 +6,12 @@ import { WebSocketHandler } from '../src/webSocketHandler.js';
 
 /** One message the handler sent to a socket double. */
 interface SentMessage {
-    payload: { code?: string; message?: string; sessionToken?: string; userId?: string } & {
-        roomState?: { id?: string };
+    payload: {
+        code?: string;
+        message?: string;
+        roomState?: { hostId: string; id: string };
+        sessionToken?: string;
+        userId?: string;
     };
     type: string;
 }
@@ -15,11 +19,13 @@ interface SentMessage {
 /** A socket double that records what the handler sends it. */
 class SocketDouble {
     public static readonly OPEN = 1;
-    public readonly readyState = 1;
+    public readyState = 1;
     public isAlive = true;
     public hasOrigin = true;
     public roomId?: string;
     public userId?: string;
+    /** Identity the handler read from the handshake cookie. */
+    public clientId?: string;
     public readonly sent: SentMessage[] = [];
     /** Close codes the handler asked the socket to use. */
     public readonly closeCodes: number[] = [];
@@ -62,6 +68,33 @@ const messagesOf = (socket: SocketDouble, type: string): SentMessage[] =>
 const lastMessage = (socket: SocketDouble, type: string): SentMessage | undefined => {
     const matching = messagesOf(socket, type);
     return matching.length > 0 ? matching[matching.length - 1] : undefined;
+};
+
+/** The room id of the last `ROOM_STATE` a socket received. */
+const roomIdOf = (socket: SocketDouble): string => {
+    const roomState = lastMessage(socket, 'ROOM_STATE')?.payload.roomState;
+    if (!roomState) {
+        throw new Error('no ROOM_STATE was received');
+    }
+    return roomState.id;
+};
+
+/** The participant id of the last `SESSION` a socket received. */
+const participantIdOf = (socket: SocketDouble): string => {
+    const participantId = lastMessage(socket, 'SESSION')?.payload.userId;
+    if (!participantId) {
+        throw new Error('no SESSION was received');
+    }
+    return participantId;
+};
+
+/** The token of the last `SESSION` a socket received. */
+const tokenOf = (socket: SocketDouble): string => {
+    const token = lastMessage(socket, 'SESSION')?.payload.sessionToken;
+    if (!token) {
+        throw new Error('no SESSION was received');
+    }
+    return token;
 };
 
 const handlers: WebSocketHandler[] = [];
@@ -125,15 +158,14 @@ describe('Kick ban, end to end', () => {
 
         const host = connect();
         send(host, 'CREATE_ROOM', { name: 'Alice' });
-        const session = lastMessage(host, 'SESSION');
-        const hostToken = session?.payload.sessionToken as string;
-        const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+        const hostToken = tokenOf(host);
+        const roomId = roomIdOf(host);
         expect(roomId).toMatch(/^[A-Z0-9]{6}$/);
 
         const bob = connect();
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
-        const bobToken = lastMessage(bob, 'SESSION')?.payload.sessionToken as string;
-        const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+        const bobToken = tokenOf(bob);
+        const bobId = participantIdOf(bob);
         expect(bobToken).toBeTruthy();
         expect(bobId).toBeDefined();
 
@@ -161,12 +193,12 @@ describe('Kick ban, end to end', () => {
 
             const host = connect();
             send(host, 'CREATE_ROOM', { name: 'Alice' });
-            const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+            const roomId = roomIdOf(host);
 
             const bob = connect();
             send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
-            const bobToken = lastMessage(bob, 'SESSION')?.payload.sessionToken as string;
-            const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+            const bobToken = tokenOf(bob);
+            const bobId = participantIdOf(bob);
 
             send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
@@ -193,7 +225,7 @@ describe('Kick ban, end to end', () => {
 
         const host = connect();
         send(host, 'CREATE_ROOM', { name: 'Alice' });
-        const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+        const roomId = roomIdOf(host);
 
         const stranger = connect();
         send(stranger, 'JOIN_ROOM', {
@@ -280,11 +312,11 @@ describe('Kick ban against a browser profile', () => {
 
         const host = connect({ clientId: 'host-client' });
         send(host, 'CREATE_ROOM', { name: 'Alice' });
-        const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+        const roomId = roomIdOf(host);
 
         const bob = connect({ clientId: 'bob-client' });
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
-        const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+        const bobId = participantIdOf(bob);
 
         send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
@@ -301,11 +333,11 @@ describe('Kick ban against a browser profile', () => {
 
         const host = connect({ clientId: 'host-client' });
         send(host, 'CREATE_ROOM', { name: 'Alice' });
-        const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+        const roomId = roomIdOf(host);
 
         const bob = connect({ clientId: 'bob-client' });
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
-        const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+        const bobId = participantIdOf(bob);
 
         send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
@@ -323,11 +355,11 @@ describe('Kick ban against a browser profile', () => {
 
             const host = connect({ clientId: 'host-client' });
             send(host, 'CREATE_ROOM', { name: 'Alice' });
-            const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+            const roomId = roomIdOf(host);
 
             const bob = connect({ clientId: 'bob-client' });
             send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
-            const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+            const bobId = participantIdOf(bob);
 
             send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
             const barred = connect({ clientId: 'bob-client' });

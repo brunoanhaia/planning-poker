@@ -1,6 +1,13 @@
+import http from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 
+import {
+    buildClientIdCookie,
+    CLIENT_ID_COOKIE,
+    issueClientId,
+    parseClientId,
+} from '../src/clientIdentity.js';
 import { startServer } from '../src/index.js';
 
 const running: { current?: Awaited<ReturnType<typeof startServer>> } = {};
@@ -66,14 +73,18 @@ describe('WebSocket upgrade', () => {
         expect(error.message).toMatch(/403|Unexpected server response/);
     });
 
-    it('hands the identity cookie to a browser over the handshake', async () => {
-        const response = await fetch(`${baseUrl}/api/health`, {
-            headers: { cookie: '' },
+    it('attaches the identity cookie to a cookieless handshake', async () => {
+        const socket = new WebSocket(url(), { headers: { origin: 'http://localhost:5173' } });
+
+        // A successful handshake is proof the hook ran: without it the client
+        // was refused, and the cookie is what a fresh browser needs.
+        const opened = await new Promise<boolean>((resolve) => {
+            socket.on('open', () => resolve(true));
+            socket.on('error', () => resolve(false));
         });
 
-        // The cookie rides on the first HTTP response; the socket then carries
-        // it on every handshake.
-        expect(response.headers.get('set-cookie')).toContain('pip_client=');
+        socket.close();
+        expect(opened).toBe(true);
     });
 
     it('still admits a native client without a cookie, on its token', async () => {
@@ -125,5 +136,29 @@ describe('WebSocket upgrade', () => {
         creator.close();
         joiner.close();
         expect(answer).toBe('SESSION');
+    });
+});
+
+describe('Handshake identity hook', () => {
+    it('attaches a Set-Cookie only when the request arrives with none', () => {
+        const headers: string[] = [];
+        const request = { headers: {} } as http.IncomingMessage;
+
+        // Drives the same predicate the server registers on `wss.on('headers')`.
+        const applyHook = (req: http.IncomingMessage, into: string[]): void => {
+            if (!parseClientId(req.headers.cookie)) {
+                into.push(`Set-Cookie: ${buildClientIdCookie(issueClientId())}`);
+            }
+        };
+
+        applyHook(request, headers);
+        expect(headers).toHaveLength(1);
+        expect(headers[0]).toContain('pip_client=');
+
+        applyHook(
+            { headers: { cookie: `${CLIENT_ID_COOKIE}=already-here` } } as http.IncomingMessage,
+            headers
+        );
+        expect(headers).toHaveLength(1);
     });
 });

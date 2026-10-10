@@ -7,7 +7,7 @@ import { isActiveOwner, shouldCleanupOnClose, socketKey } from '../src/webSocket
 describe('RoomManager security hardening', () => {
     it('clamps a negative timer duration to the minimum', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         const room = rm.startTimer(roomId, hostId, -5)!;
         expect(room.timer!.duration).toBeGreaterThan(0);
@@ -16,7 +16,7 @@ describe('RoomManager security hardening', () => {
 
     it('clamps an oversized timer duration to the maximum', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         const room = rm.startTimer(roomId, hostId, 1e9)!;
         expect(room.timer!.duration).toBeLessThanOrEqual(3600);
@@ -24,7 +24,7 @@ describe('RoomManager security hardening', () => {
 
     it('falls back to the default for a non-finite timer duration', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         const room = rm.startTimer(roomId, hostId, Number.NaN)!;
         expect(room.timer!.duration).toBe(60);
@@ -32,21 +32,21 @@ describe('RoomManager security hardening', () => {
 
     it('rejects a custom deck that is too small', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         expect(rm.changeDeck(roomId, hostId, 'custom', [1])).toBeNull();
     });
 
     it('rejects a custom deck with duplicates', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         expect(rm.changeDeck(roomId, hostId, 'custom', [1, 1, 2])).toBeNull();
     });
 
     it('rejects a custom deck containing non-finite numbers', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         expect(rm.changeDeck(roomId, hostId, 'custom', [1, Number.NaN])).toBeNull();
         expect(rm.changeDeck(roomId, hostId, 'custom', [1, Number.POSITIVE_INFINITY])).toBeNull();
@@ -54,14 +54,14 @@ describe('RoomManager security hardening', () => {
 
     it('rejects a custom deck containing blank strings', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         expect(rm.changeDeck(roomId, hostId, 'custom', [1, '   '])).toBeNull();
     });
 
     it('accepts a valid custom deck and updates the active deck', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         const room = rm.changeDeck(roomId, hostId, 'custom', [1, 2, 3])!;
         expect(room.activeDeck).toEqual([1, 2, 3]);
@@ -70,14 +70,14 @@ describe('RoomManager security hardening', () => {
 
     it('rejects an unknown deck type without silently falling back', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         expect(rm.changeDeck(roomId, hostId, 'not_a_deck' as never)).toBeNull();
     });
 
     it('truncates an over-long room title', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         const room = rm.updateRoomTitle(roomId, hostId, 'x'.repeat(500))!;
         expect(room.title.length).toBeLessThanOrEqual(120);
@@ -85,7 +85,7 @@ describe('RoomManager security hardening', () => {
 
     it('truncates over-long story titles and descriptions', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         const room = rm.addStory(roomId, hostId, 'x'.repeat(500), 'y'.repeat(5000))!;
         const story = room.stories[room.stories.length - 1];
@@ -95,7 +95,7 @@ describe('RoomManager security hardening', () => {
 
     it('treats a whitespace-only title as a no-op, not as a forbidden one', () => {
         const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1');
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const before = rm.getRoom(roomId)!.stories.length;
 
         // A blank title must not be answered with an authorization failure; the

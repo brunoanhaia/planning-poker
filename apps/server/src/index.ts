@@ -14,6 +14,7 @@ import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 
 import {
+    buildClientIdCookie,
     CLIENT_ID_COOKIE,
     CLIENT_ID_COOKIE_OPTIONS,
     issueClientId,
@@ -183,6 +184,16 @@ export const startServer = (options: StartServerOptions): RunningServer => {
             );
             done(false, 403, 'Forbidden');
         },
+    });
+
+    // A WebSocket upgrade bypasses Express, so the middleware above never runs
+    // for it. The `headers` hook fires on the handshake response and is the
+    // supported place to attach the `Set-Cookie`, which is what puts the
+    // identity in the browser before its first socket message.
+    wss.on('headers', (headers: string[], request: http.IncomingMessage) => {
+        if (!parseClientId(request.headers.cookie)) {
+            headers.push(`Set-Cookie: ${buildClientIdCookie(issueClientId())}`);
+        }
     });
 
     const handler = new WebSocketHandler(wss);

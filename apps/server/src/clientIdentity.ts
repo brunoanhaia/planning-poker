@@ -5,22 +5,23 @@ import { randomUUID } from 'node:crypto';
  *
  * A session token proves *a participant*, and a kick revokes it — so it cannot
  * answer "is this the browser I just removed?". The client id can: it is minted
- * once per browser, travels on every WebSocket handshake, and the application
- * never reads it, so it cannot be replaced from the page.
+ * per browser, travels on every WebSocket handshake, and the application never
+ * reads it, so it cannot be replaced from the page.
  *
- * The two request paths that need it behave differently, and both are handled:
+ * It is handed over on two paths, and both matter:
  *
- * - an HTTP request passes through Express, where a missing cookie is answered
- *   with a `Set-Cookie`, so the browser carries one from its very next call;
- * - a WebSocket upgrade is answered by `ws` itself and never reaches that
- *   middleware. The server therefore writes the `Set-Cookie` header while
- *   performing the upgrade (see `startServer`), which is the only response the
- *   browser of a fresh tab ever sees on that path.
+ * - the Express middleware answers an HTTP request that arrives without the
+ *   cookie with a `Set-Cookie`, so the browser carries one from then on;
+ * - a WebSocket upgrade never passes through Express, so the `headers` hook on
+ *   the `WebSocketServer` attaches the `Set-Cookie` to the handshake response,
+ *   which is the only response a browser that opens the socket first sees.
  *
- * A client that arrives without a cookie and then refuses it is simply a client
- * without a history: no kick ban can name it, the same trade-off every
- * anonymous client has. What the identity removes is the *free* bypass of
- * rejoining from a fresh tab, which is what the issue asked for.
+ * It only reaches the browser where both share an origin — the bundled Nginx
+ * deployment, or production with a direct `VITE_WS_URL`. In development the
+ * Vite dev server serves the page on its own port and only proxies `ws`, so no
+ * cookie is ever sent to the API and the browser-profile bar lapses there. That
+ * is why the bar is advisory: the token and the participant id still hold, and
+ * the cookie is an additional layer where the deployment allows it.
  */
 export const CLIENT_ID_COOKIE = 'pip_client';
 

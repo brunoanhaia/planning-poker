@@ -14,8 +14,13 @@ import { isBacklogFull } from '../src/storyService.js';
 import { MessageThrottle } from '../src/throttle.js';
 
 describe('Room caps', () => {
+    let rm: RoomManager;
+
+    beforeEach(() => {
+        rm = new RoomManager();
+    });
+
     it('stops creating rooms once the limit is reached', () => {
-        const rm = new RoomManager();
         for (let i = 0; i < MAX_ROOMS; i += 1) {
             expect(rm.createRoom(`Host ${i}`)).not.toBeNull();
         }
@@ -25,8 +30,7 @@ describe('Room caps', () => {
     });
 
     it('admits no participant beyond the per-room cap', () => {
-        const rm = new RoomManager();
-        const { roomId } = rm.createRoom('Alice');
+        const { roomId } = rm.createRoom('Alice')!;
 
         // The host already occupies one seat.
         for (let i = 1; i < MAX_PARTICIPANTS_PER_ROOM; i += 1) {
@@ -40,8 +44,7 @@ describe('Room caps', () => {
     });
 
     it('caps the backlog at MAX_STORIES_PER_ROOM', () => {
-        const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice');
+        const { hostId, roomId } = rm.createRoom('Alice')!;
 
         // The room starts with one story.
         for (let i = 1; i < MAX_STORIES_PER_ROOM; i += 1) {
@@ -54,8 +57,7 @@ describe('Room caps', () => {
     });
 
     it('refuses a bulk import once the backlog is full', () => {
-        const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice');
+        const { hostId, roomId } = rm.createRoom('Alice')!;
         const room = rm.getRoom(roomId)!;
         room.stories = Array.from({ length: MAX_STORIES_PER_ROOM }, (_, index) => ({
             id: `story_${index}`,
@@ -68,8 +70,7 @@ describe('Room caps', () => {
     });
 
     it('drops only the overflow of a bulk import', () => {
-        const rm = new RoomManager();
-        const { hostId, roomId } = rm.createRoom('Alice');
+        const { hostId, roomId } = rm.createRoom('Alice')!;
         const room = rm.getRoom(roomId)!;
         room.stories = Array.from({ length: MAX_STORIES_PER_ROOM - 2 }, (_, index) => ({
             id: `story_${index}`,
@@ -90,9 +91,14 @@ describe('Room caps', () => {
 });
 
 describe('Idle room sweep', () => {
+    let rm: RoomManager;
+
+    beforeEach(() => {
+        rm = new RoomManager();
+    });
+
     it('drops a room that nobody touched for the whole TTL', () => {
-        const rm = new RoomManager();
-        const { roomId } = rm.createRoom('Alice');
+        const { roomId } = rm.createRoom('Alice')!;
         rm.leaveRoom(roomId, rm.getRoom(roomId)!.hostId);
 
         rm.sweepIdleRooms(Date.now() + ROOM_IDLE_TTL_MS + 1);
@@ -104,8 +110,7 @@ describe('Idle room sweep', () => {
     it('keeps a room whose participants are still connected', () => {
         vi.useFakeTimers();
         try {
-            const rm = new RoomManager();
-            const { hostId, roomId } = rm.createRoom('Alice');
+            const { hostId, roomId } = rm.createRoom('Alice')!;
 
             // Far past the TTL, with no join, no vote and no read at all: the
             // only thing keeping the room is the open connection.
@@ -125,8 +130,7 @@ describe('Idle room sweep', () => {
     it('drops a room once its participants have disconnected', () => {
         vi.useFakeTimers();
         try {
-            const rm = new RoomManager();
-            const { roomId } = rm.createRoom('Alice');
+            const { roomId } = rm.createRoom('Alice')!;
             rm.leaveRoom(roomId, rm.getRoom(roomId)!.hostId);
 
             vi.advanceTimersByTime(ROOM_IDLE_TTL_MS + 1);
@@ -139,8 +143,7 @@ describe('Idle room sweep', () => {
     });
 
     it('keeps a room that was touched recently', () => {
-        const rm = new RoomManager();
-        const { roomId } = rm.createRoom('Alice');
+        const { roomId } = rm.createRoom('Alice')!;
         const now = Date.now();
 
         rm.joinRoom(roomId, 'Bob');
@@ -150,8 +153,7 @@ describe('Idle room sweep', () => {
     });
 
     it('reports the rooms it dropped', () => {
-        const rm = new RoomManager();
-        const { roomId } = rm.createRoom('Alice');
+        const { roomId } = rm.createRoom('Alice')!;
         rm.leaveRoom(roomId, rm.getRoom(roomId)!.hostId);
 
         expect(rm.sweepIdleRooms(Date.now() + ROOM_IDLE_TTL_MS + 1)).toEqual([roomId]);
