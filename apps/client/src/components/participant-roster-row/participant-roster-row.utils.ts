@@ -3,15 +3,15 @@ import { MenuProps } from 'antd';
 import React from 'react';
 
 /** Keys of the roster action menu, each pairing with one socket command. */
-export const PARTICIPANT_MENU_ACTIONS = [
+export const PARTICIPANT_MENU_ACTIONS: readonly string[] = [
     'kick',
     'toggle-co-admin',
     'toggle-role',
     'transfer-host',
-] as const;
+];
 
 /** One administrative action that can be taken on a participant. */
-export type ParticipantMenuAction = (typeof PARTICIPANT_MENU_ACTIONS)[number];
+export type ParticipantMenuAction = 'kick' | 'toggle-co-admin' | 'toggle-role' | 'transfer-host';
 
 /**
  * Narrows a menu key reported by Ant Design back to a roster action.
@@ -20,7 +20,7 @@ export type ParticipantMenuAction = (typeof PARTICIPANT_MENU_ACTIONS)[number];
  * @returns `true` when the key belongs to the roster action menu.
  */
 export const isParticipantMenuAction = (key: React.Key): key is ParticipantMenuAction =>
-    typeof key === 'string' && PARTICIPANT_MENU_ACTIONS.some((action) => action === key);
+    typeof key === 'string' && PARTICIPANT_MENU_ACTIONS.includes(key);
 
 /** Arguments of {@link buildParticipantMenuItems}. */
 export interface BuildParticipantMenuItemsArgs {
@@ -29,6 +29,18 @@ export interface BuildParticipantMenuItemsArgs {
     /** Participant the actions are offered for. */
     participant: Participant;
 }
+
+/** Actions every administrator may take on a participant. */
+const ROSTER_ACTIONS = (participant: Participant): NonNullable<MenuProps['items']> => [
+    {
+        key: 'toggle-role',
+        label: participant.isSpectator ? 'Make Voter' : 'Make Spectator',
+    },
+    {
+        key: 'toggle-co-admin',
+        label: participant.isAdmin ? 'Demote from Co-Admin' : 'Promote to Co-Admin',
+    },
+];
 
 /**
  * Builds the management menu of a single roster row.
@@ -43,24 +55,11 @@ export interface BuildParticipantMenuItemsArgs {
 export const buildParticipantMenuItems = ({
     canTransferHost,
     participant,
-}: BuildParticipantMenuItemsArgs): MenuProps['items'] => {
-    const items: NonNullable<MenuProps['items']> = [
-        {
-            key: 'toggle-role',
-            label: participant.isSpectator ? 'Make Voter' : 'Make Spectator',
-        },
-        {
-            key: 'toggle-co-admin',
-            label: participant.isAdmin ? 'Demote from Co-Admin' : 'Promote to Co-Admin',
-        },
-    ];
-
-    if (canTransferHost) {
-        items.push({ key: 'transfer-host', label: 'Transfer Primary Host' });
-    }
-
-    items.push({ type: 'divider' });
-    items.push({ danger: true, key: 'kick', label: 'Kick from Room' });
-
-    return items;
-};
+}: BuildParticipantMenuItemsArgs): MenuProps['items'] => [
+    ...ROSTER_ACTIONS(participant),
+    ...(canTransferHost
+        ? [{ key: 'transfer-host', label: 'Transfer Primary Host' }]
+        : ([] as NonNullable<MenuProps['items']>)),
+    { type: 'divider' },
+    { danger: true, key: 'kick', label: 'Kick from Room' },
+];

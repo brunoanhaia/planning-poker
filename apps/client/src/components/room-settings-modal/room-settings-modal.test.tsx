@@ -55,6 +55,59 @@ describe('RoomSettingsModal', () => {
         ).toBe('0, 1, ?');
     });
 
+    it('falls back to the live room deck after applying a change', async () => {
+        const socket = createMockSocketValue({ roomState: buildRoomState() });
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        const { rerender } = render(<RoomSettingsModal onClose={vi.fn()} open />);
+
+        const selectedDeck = () =>
+            document.querySelector('.ant-select-content')?.textContent ?? null;
+        expect(selectedDeck()).toBe('Fibonacci');
+
+        fireEvent.mouseDown(screen.getByLabelText('Estimation Deck Type'));
+        fireEvent.click(
+            await screen.findByText('T-Shirt Sizes', {
+                selector: '.ant-select-item-option-content',
+            })
+        );
+        expect(selectedDeck()).toBe('T-Shirt Sizes');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Apply Settings' }));
+        expect(socket.changeDeck).toHaveBeenCalledWith('tshirt');
+
+        // The room still reports the deck it had before the change: a lingering
+        // draft would keep showing the applied value instead of the room's own.
+        rerender(<RoomSettingsModal onClose={vi.fn()} open={false} />);
+        rerender(<RoomSettingsModal onClose={vi.fn()} open />);
+
+        await waitFor(() => {
+            expect(selectedDeck()).toBe('Fibonacci');
+        });
+    });
+
+    it('keeps a draft alive while the modal is closed without applying', async () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ roomState: buildRoomState() })
+        );
+        const onClose = vi.fn();
+        const { rerender } = render(<RoomSettingsModal onClose={onClose} open />);
+
+        fireEvent.change(screen.getByLabelText('Room / Sprint Title'), {
+            target: { value: 'Draft kept on cancel' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onClose).toHaveBeenCalled();
+
+        rerender(<RoomSettingsModal onClose={vi.fn()} open={false} />);
+        rerender(<RoomSettingsModal onClose={vi.fn()} open />);
+
+        await waitFor(() => {
+            expect((screen.getByLabelText('Room / Sprint Title') as HTMLInputElement).value).toBe(
+                'Draft kept on cancel'
+            );
+        });
+    });
+
     it('confirms ending the session with an Ant Design Popconfirm', async () => {
         const socket = createMockSocketValue({ roomState: buildRoomState() });
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);

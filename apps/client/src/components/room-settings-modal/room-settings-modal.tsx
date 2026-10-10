@@ -82,6 +82,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         } else if (deckType !== roomState.deckType) {
             changeDeck(deckType);
         }
+
+        // Applying discards the drafts, so the fields fall back to the live room
+        // instead of keeping a value the server may have rejected — or that
+        // another administrator changed in the meantime.
+        setTitleDraft(null);
+        setDeckTypeDraft(null);
+        setCustomDeckDraft(null);
         onClose();
     };
 
