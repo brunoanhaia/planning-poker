@@ -107,16 +107,19 @@ describe('Idle room sweep', () => {
             const { hostId, roomId } = rm.createRoom('Alice');
 
             // A room that is merely being polled never joins nor creates
-            // anything, so only a read can prove it is alive.
+            // anything, so only a read can prove it is alive. The sweep runs
+            // before any vote on purpose: voting reads the room too and would
+            // refresh the timestamp by itself, hiding what the read proved.
             vi.advanceTimersByTime(ROOM_IDLE_TTL_MS - 1);
             rm.getRoom(roomId);
-            vi.advanceTimersByTime(ROOM_IDLE_TTL_MS - 1);
-            expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
+            vi.advanceTimersByTime(1);
 
             rm.sweepIdleRooms(Date.now());
-
             expect(rm.getRoom(roomId)).toBeDefined();
             expect(rm.getRoomCount()).toBe(1);
+
+            // Still usable after a sweep that came for it.
+            expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
         } finally {
             vi.useRealTimers();
         }
