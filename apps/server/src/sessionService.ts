@@ -72,6 +72,19 @@ export class SessionService {
             }
         }
     }
+
+    /**
+     * Revokes every token bound to a room (e.g. when the room is dropped).
+     *
+     * @param roomId - The room identifier.
+     */
+    public revokeByRoom(roomId: string): void {
+        for (const [token, binding] of this.sessions) {
+            if (binding.roomId === roomId) {
+                this.sessions.delete(token);
+            }
+        }
+    }
 }
 
 /** Shared singleton session registry. */

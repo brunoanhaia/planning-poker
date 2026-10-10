@@ -26,3 +26,6 @@ export const DEFAULT_HOST_COLOR = '#6366f1';
 
 /** Default participant color fallback. */
 export const DEFAULT_PARTICIPANT_COLOR = '#3b82f6';
+
+/** How often the idle-room sweep runs, in milliseconds (every hour). */
+export const ROOM_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;

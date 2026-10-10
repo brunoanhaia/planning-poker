@@ -1,9 +1,21 @@
-import { Avatar, AvatarColor, CardValue, Participant, RoomState } from '@planitpoker/shared';
+import {
+    Avatar,
+    AvatarColor,
+    CardValue,
+    MAX_PARTICIPANTS_PER_ROOM,
+    Participant,
+    RoomState,
+} from '@planitpoker/shared';
 
 import { DEFAULT_AVATAR, DEFAULT_PARTICIPANT_COLOR } from './constants.js';
 import { generateUserId } from './idGenerator.js';
 
+/** Why a join attempt was refused. */
+export type JoinRejection = 'ROOM_FULL' | 'ROOM_LOCKED';
+
 export interface JoinParticipantResult {
+    /** Machine-readable reason, when the join was refused. */
+    code?: JoinRejection;
     error?: string;
     participant?: Participant;
     roomState?: RoomState;
@@ -39,7 +51,11 @@ export const joinParticipant = (
     }
 
     if (room.isLocked) {
-        return { error: 'Room is locked by the administrator.' };
+        return { code: 'ROOM_LOCKED', error: 'Room is locked by the administrator.' };
+    }
+
+    if (room.participants.length >= MAX_PARTICIPANTS_PER_ROOM) {
+        return { code: 'ROOM_FULL', error: 'Room is full. Try again when somebody leaves.' };
     }
 
     const newId = generateUserId();
@@ -218,6 +234,13 @@ export const transferRoomAdmin = (
 
 /**
  * Sanitizes the room state for a specific client to hide other participants' votes before reveal.
+ *
+ * Only the card itself is withheld: another participant's `hasVoted` flag is
+ * intentionally disclosed, because the roster renders it as the "Voted" chip
+ * that tells a host who is still thinking. Hiding it would turn a moderation
+ * affordance into an information leak removed by accident; disclosing it is a
+ * recorded product decision (see issue #12), so the flag must keep flowing to
+ * every client while `vote` stays `null` until the reveal.
  *
  * @param roomState - The original RoomState from the server.
  * @param currentUserId - The recipient user's ID.

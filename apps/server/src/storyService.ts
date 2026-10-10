@@ -1,6 +1,7 @@
 import {
     CardValue,
     MAX_DESCRIPTION_LENGTH,
+    MAX_STORIES_PER_ROOM,
     MAX_TITLE_LENGTH,
     RoomState,
     Story,
@@ -9,17 +10,34 @@ import {
 import { generateStoryId } from './idGenerator.js';
 
 /**
+ * Reports whether a room's backlog has reached its quota.
+ *
+ * @param room - The active room state.
+ * @returns True when no further story can be added.
+ */
+export const isBacklogFull = (room: RoomState): boolean =>
+    room.stories.length >= MAX_STORIES_PER_ROOM;
+
+/**
  * Adds a new user story to the backlog of a room.
  *
  * @param room - The active room state.
  * @param title - The title or headline of the story.
  * @param description - Optional details or acceptance criteria.
- * @returns The updated RoomState.
+ * @returns The updated RoomState, or null when the backlog is full.
  */
-export const addStoryToRoom = (room: RoomState, title: string, description?: string): RoomState => {
+export const addStoryToRoom = (
+    room: RoomState,
+    title: string,
+    description?: string
+): RoomState | null => {
     const trimmedTitle = title.trim().slice(0, MAX_TITLE_LENGTH);
     if (!trimmedTitle) {
-        return room;
+        return null;
+    }
+
+    if (isBacklogFull(room)) {
+        return null;
     }
 
     const newStory: Story = {
@@ -36,30 +54,42 @@ export const addStoryToRoom = (room: RoomState, title: string, description?: str
 /**
  * Bulk adds multiple user stories to the backlog.
  *
+ * Stops at the backlog quota: a room that already holds stories keeps the ones
+ * it has and refuses the rest instead of accepting an unbounded import.
+ *
  * @param room - The active room state.
  * @param storiesList - Array of story title and description pairs.
- * @returns The updated RoomState.
+ * @returns The updated RoomState, or null when the backlog is already full.
  */
 export const bulkAddStoriesToRoom = (
     room: RoomState,
     storiesList: { description?: string; title: string }[]
-): RoomState => {
-    if (!Array.isArray(storiesList)) {
-        return room;
+): RoomState | null => {
+    if (!Array.isArray(storiesList) || isBacklogFull(room)) {
+        return null;
     }
 
-    storiesList.forEach((item) => {
+    const accepted: Story[] = [];
+    for (const item of storiesList) {
+        if (room.stories.length + accepted.length >= MAX_STORIES_PER_ROOM) {
+            break;
+        }
         const trimmedTitle = item.title?.trim().slice(0, MAX_TITLE_LENGTH);
         if (trimmedTitle) {
-            room.stories.push({
+            accepted.push({
                 description: item.description?.trim().slice(0, MAX_DESCRIPTION_LENGTH),
                 id: generateStoryId(),
                 status: 'pending',
                 title: trimmedTitle,
             });
         }
-    });
+    }
 
+    if (accepted.length === 0) {
+        return room;
+    }
+
+    room.stories.push(...accepted);
     return room;
 };
 

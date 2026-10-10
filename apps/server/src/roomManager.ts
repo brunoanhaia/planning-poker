@@ -5,12 +5,14 @@ import {
     DECK_TYPES,
     DeckType,
     MAX_CUSTOM_DECK_SIZE,
+    MAX_ROOMS,
     MAX_TIMER_DURATION_SECONDS,
     MAX_TITLE_LENGTH,
     MIN_CUSTOM_DECK_SIZE,
     MIN_TIMER_DURATION_SECONDS,
     Participant,
     PRESET_DECKS,
+    ROOM_IDLE_TTL_MS,
     RoomState,
     Story,
 } from '@planitpoker/shared';
@@ -28,6 +30,7 @@ import {
     toggleParticipantSpectator,
     transferRoomAdmin,
 } from './participantService.js';
+import { sessionService } from './sessionService.js';
 import {
     addStoryToRoom,
     bulkAddStoriesToRoom,
@@ -47,6 +50,8 @@ export interface CreateRoomResult {
  */
 export class RoomManager {
     private readonly rooms: Map<string, RoomState> = new Map();
+    /** Last time a room was touched by a client, in milliseconds. */
+    private readonly roomTouchedAt: Map<string, number> = new Map();
 
     /**
      * Resets the voting state of a room for a new round.
@@ -59,6 +64,16 @@ export class RoomManager {
             participant.vote = null;
             participant.hasVoted = false;
         });
+    }
+
+    /**
+     * Records that a room is still in use, for the idle sweep.
+     *
+     * @param roomId - The room identifier.
+     * @param now - Current timestamp, in milliseconds.
+     */
+    private touch(roomId: string, now: number): void {
+        this.roomTouchedAt.set(roomId, now);
     }
 
     /**
@@ -95,7 +110,8 @@ export class RoomManager {
      * @param roomTitle - Optional title for the planning room.
      * @param deckType - Estimation deck type (defaults to 'fibonacci').
      * @param customDeck - Optional custom card values if deckType is 'custom'.
-     * @returns Object containing hostId, roomId, and the created roomState.
+     * @returns Object containing hostId, roomId, and the created roomState, or
+     *   null when the server already holds {@link MAX_ROOMS} rooms.
      */
     public createRoom(
         hostName: string,
@@ -104,7 +120,10 @@ export class RoomManager {
         roomTitle?: string,
         deckType: DeckType = 'fibonacci',
         customDeck?: CardValue[]
-    ): CreateRoomResult {
+    ): CreateRoomResult | null {
+        if (this.rooms.size >= MAX_ROOMS) {
+            return null;
+        }
         const roomId = this.generateUniqueRoomId();
         const hostId = generateUserId();
 
@@ -155,6 +174,7 @@ export class RoomManager {
         };
 
         this.rooms.set(roomId, roomState);
+        this.touch(roomId, Date.now());
         return { hostId, roomId, roomState };
     }
 
@@ -192,7 +212,47 @@ export class RoomManager {
         if (!room) {
             return null;
         }
-        return joinParticipant(room, userName, avatar, color, existingUserId);
+        const result = joinParticipant(room, userName, avatar, color, existingUserId);
+        if (result.participant) {
+            this.touch(room.id, Date.now());
+        }
+        return result;
+    }
+
+    /**
+     * Drops rooms nobody has touched for {@link ROOM_IDLE_TTL_MS}, along with
+     * the session tokens bound to them.
+     *
+     * A room lives as long as it is used: a client that disconnects without
+     * leaving keeps its seat for the whole TTL, so a reload still lands back in
+     * its room. Rooms that stay silent past the TTL are dead weight in memory.
+     *
+     * @param now - Current timestamp, in milliseconds.
+     * @returns The identifiers of the rooms that were dropped.
+     */
+    public sweepIdleRooms(now: number): string[] {
+        const dropped: string[] = [];
+
+        this.roomTouchedAt.forEach((touchedAt, roomId) => {
+            if (now - touchedAt < ROOM_IDLE_TTL_MS) {
+                return;
+            }
+            this.rooms.delete(roomId);
+            this.roomTouchedAt.delete(roomId);
+            sessionService.revokeByRoom(roomId);
+            dropped.push(roomId);
+        });
+
+        return dropped;
+    }
+
+    /**
+     * Number of rooms currently held in memory. Exposed for diagnostics and tests.
+     *
+     * @returns The size of the room map.
+     */
+    public getRoomCount(): number {
+        return this.rooms.size;
     }
 
     /**
