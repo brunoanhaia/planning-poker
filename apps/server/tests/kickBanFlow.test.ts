@@ -139,9 +139,16 @@ describe('Kick ban, end to end', () => {
 
             const bob = connect();
             send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+            const bobToken = lastMessage(bob, 'SESSION')?.payload.sessionToken as string;
             const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
 
             send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+
+            // Still barred with the very token that was revoked.
+            const barred = connect();
+            send(barred, 'JOIN_ROOM', { name: 'Bob', roomId, sessionToken: bobToken });
+            expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
+
             vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
 
             const bobAgain = connect();

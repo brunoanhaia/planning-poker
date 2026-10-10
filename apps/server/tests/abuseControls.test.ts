@@ -5,7 +5,7 @@ import {
     ROOM_IDLE_TTL_MS,
     WS_MAX_PAYLOAD_BYTES,
 } from '@planitpoker/shared';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BanService, banKey } from '../src/banService.js';
 import { ROOM_CLEANUP_INTERVAL_MS } from '../src/constants.js';
@@ -98,6 +98,43 @@ describe('Idle room sweep', () => {
 
         expect(rm.getRoom(roomId)).toBeUndefined();
         expect(rm.getRoomCount()).toBe(0);
+    });
+
+    it('survives the sweep while it is still being read', () => {
+        vi.useFakeTimers();
+        try {
+            const rm = new RoomManager();
+            const { hostId, roomId } = rm.createRoom('Alice');
+
+            // A room that is merely being polled never joins nor creates
+            // anything, so only a read can prove it is alive.
+            vi.advanceTimersByTime(ROOM_IDLE_TTL_MS - 1);
+            rm.getRoom(roomId);
+            vi.advanceTimersByTime(ROOM_IDLE_TTL_MS - 1);
+            expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
+
+            rm.sweepIdleRooms(Date.now());
+
+            expect(rm.getRoom(roomId)).toBeDefined();
+            expect(rm.getRoomCount()).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('drops a room that is never read again', () => {
+        vi.useFakeTimers();
+        try {
+            const rm = new RoomManager();
+            const { roomId } = rm.createRoom('Alice');
+            vi.advanceTimersByTime(ROOM_IDLE_TTL_MS + 1);
+
+            rm.sweepIdleRooms(Date.now());
+
+            expect(rm.getRoom(roomId)).toBeUndefined();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('keeps a room that was touched recently', () => {

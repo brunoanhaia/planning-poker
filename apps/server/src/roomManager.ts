@@ -94,11 +94,21 @@ export class RoomManager {
     /**
      * Retrieves a room state by its room ID code.
      *
+     * Reading a room *is* activity: while a room is being polled — a broadcast,
+     * a timer tick, a vote — nobody joins and nothing is created, so without
+     * refreshing the timestamp here the idle sweep would eventually drop a room
+     * that is still in use.
+     *
      * @param roomId - The room identifier code (case-insensitive).
      * @returns The RoomState or undefined if not found.
      */
     public getRoom(roomId: string): RoomState | undefined {
-        return this.rooms.get(roomId.toUpperCase());
+        const normalizedId = roomId.toUpperCase();
+        const room = this.rooms.get(normalizedId);
+        if (room) {
+            this.touch(normalizedId, Date.now());
+        }
+        return room;
     }
 
     /**
