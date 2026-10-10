@@ -13,6 +13,12 @@ import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 
+import {
+    CLIENT_ID_COOKIE,
+    CLIENT_ID_COOKIE_OPTIONS,
+    issueClientId,
+    parseClientId,
+} from './clientIdentity.js';
 import { WebSocketHandler } from './webSocketHandler.js';
 
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173'];
@@ -65,6 +71,15 @@ export const isOriginAllowed = (origin: string | undefined, allowedOrigins: stri
         return true;
     }
     return allowedOrigins.includes(origin);
+};
+
+/** Number of proxy hops in front of this server, as configured by env. */
+export const parseTrustProxyHops = (raw: string | undefined): number => {
+    const parsed = Number(raw);
+    if (raw === undefined || raw.trim() === '' || !Number.isInteger(parsed) || parsed < 0) {
+        return 1;
+    }
+    return parsed;
 };
 
 /** Options of {@link startServer}. */
@@ -131,6 +146,16 @@ export const startServer = (options: StartServerOptions): RunningServer => {
         })
     );
     app.use(express.json({ limit: HTTP_MAX_BODY_BYTES }));
+
+    // Mint a browser identity the first time this client is seen. The kick ban
+    // keys on it, so it has to exist before the WebSocket handshake — the
+    // application never reads it, and cannot clear it without clearing cookies.
+    app.use((req, res, next) => {
+        if (!parseClientId(req.headers.cookie)) {
+            res.cookie(CLIENT_ID_COOKIE, issueClientId(), CLIENT_ID_COOKIE_OPTIONS);
+        }
+        next();
+    });
     app.use(
         rateLimit({
             limit: options.rateLimitMaxRequests ?? HTTP_RATE_LIMIT_MAX_REQUESTS,
@@ -181,6 +206,10 @@ if (isEntryPoint()) {
     const { handler, server } = startServer({
         allowedOrigins: parseAllowedOrigins(process.env.ALLOWED_ORIGINS),
         port,
+        // The bundled deployment sits behind Nginx, which is the single hop to
+        // trust. A server exposed directly must say so, or a forged header
+        // would become the rate-limit key again.
+        trustProxyHops: parseTrustProxyHops(process.env.TRUST_PROXY_HOPS),
     });
 
     const shutdown = (): void => {

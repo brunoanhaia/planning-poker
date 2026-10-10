@@ -81,13 +81,24 @@ const boot = () => {
     const handler = new WebSocketHandler(wss);
     handlers.push(handler);
 
-    /** Opens a connection the way the handler sees it. */
-    const connect = (hasOrigin = true): SocketDouble => {
+    /**
+     * Opens a connection the way the handler sees it.
+     *
+     * @param options - Origin presence and the identity cookie, if any.
+     */
+    const connect = (options?: { clientId?: string; hasOrigin?: boolean }): SocketDouble => {
+        const hasOrigin = options?.hasOrigin ?? true;
         const socket = new SocketDouble();
         socket.hasOrigin = hasOrigin;
+        if (options?.clientId) {
+            socket.clientId = options.clientId;
+        }
         sockets.push(socket);
         listeners.get('connection')?.(socket, {
-            headers: hasOrigin ? { origin: 'http://localhost:5173' } : {},
+            headers: {
+                ...(hasOrigin ? { origin: 'http://localhost:5173' } : {}),
+                ...(options?.clientId ? { cookie: `pip_client=${options.clientId}` } : {}),
+            },
         });
         return socket;
     };
@@ -234,5 +245,115 @@ describe('Message throttle, end to end', () => {
 
         expect(messagesOf(host, 'ERROR')).toHaveLength(0);
         expect(host.closeCodes).toEqual([]);
+    });
+});
+
+describe('Kick ban against a browser profile', () => {
+    it('still bars a rejoin that presents no token at all', () => {
+        const { connect } = boot();
+
+        const host = connect({ clientId: 'host-client' });
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+
+        const bob = connect({ clientId: 'bob-client' });
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+
+        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+
+        // A fresh tab: no Origin-less escape, no token, same browser.
+        const bobAgain = connect({ clientId: 'bob-client' });
+        send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        expect(lastMessage(bobAgain, 'ERROR')?.payload.code).toBe('BANNED');
+        expect(bobAgain.userId).toBeUndefined();
+    });
+
+    it('lets a different browser through', () => {
+        const { connect } = boot();
+
+        const host = connect({ clientId: 'host-client' });
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+
+        const bob = connect({ clientId: 'bob-client' });
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+
+        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+
+        const newcomer = connect({ clientId: 'carol-client' });
+        send(newcomer, 'JOIN_ROOM', { name: 'Carol', roomId });
+
+        expect(lastMessage(newcomer, 'SESSION')).toBeDefined();
+        expect(newcomer.userId).toBeTruthy();
+    });
+
+    it('releases the profile once the bar expires', () => {
+        vi.useFakeTimers();
+        try {
+            const { connect } = boot();
+
+            const host = connect({ clientId: 'host-client' });
+            send(host, 'CREATE_ROOM', { name: 'Alice' });
+            const roomId = lastMessage(host, 'ROOM_STATE')?.payload.roomState.id as string;
+
+            const bob = connect({ clientId: 'bob-client' });
+            send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+            const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
+
+            send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+            const barred = connect({ clientId: 'bob-client' });
+            send(barred, 'JOIN_ROOM', { name: 'Bob', roomId });
+            expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
+
+            vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
+
+            const bobAgain = connect({ clientId: 'bob-client' });
+            send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+            expect(lastMessage(bobAgain, 'SESSION')).toBeDefined();
+            expect(bobAgain.userId).not.toBe(bobId);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('Throttle before parsing', () => {
+    it('charges a malformed frame against the budget', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        // Creating the room already spent one message of the allowance.
+        for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            host.emit('message', 'not json at all');
+        }
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES - 1);
+
+        // The one frame that goes over is the one that pays for the disconnect.
+        host.emit('message', 'still not json');
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES);
+        expect(host.closeCodes).toEqual([1008]);
+    });
+
+    it('charges an unknown message type against the budget', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            host.emit('message', JSON.stringify({ payload: {}, type: 'NOT_A_TYPE' }));
+        }
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES - 1);
+
+        host.emit('message', JSON.stringify({ payload: {}, type: 'NOT_A_TYPE' }));
+        expect(messagesOf(host, 'ERROR')).toHaveLength(WS_THROTTLE_MAX_MESSAGES);
+        expect(host.closeCodes).toEqual([1008]);
     });
 });

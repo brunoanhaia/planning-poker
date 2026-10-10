@@ -23,6 +23,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 
 import { auditLog } from './auditLogger.js';
 import { BanService } from './banService.js';
+import { parseClientId } from './clientIdentity.js';
 import {
     DEFAULT_AVATAR,
     DEFAULT_HOST_COLOR,
@@ -44,6 +45,8 @@ interface ExtendedWebSocket extends WebSocket {
     userId?: string;
     /** True when the handshake carried an `Origin` header (i.e. a browser client). */
     hasOrigin?: boolean;
+    /** Stable identity of the browser profile, from its first-party cookie. */
+    clientId?: string;
 }
 
 interface RoomSession {
@@ -132,6 +135,8 @@ export class WebSocketHandler {
         WS_THROTTLE_MAX_MESSAGES,
         WS_THROTTLE_WINDOW_MS
     );
+    /** Identity of the browser profile behind each `roomId:userId`, for the kick ban. */
+    private readonly clientIdByUser = new Map<string, string>();
     /** Bars a kicked participant from re-entering the room immediately. */
     private readonly bans = new BanService();
     private cleanupInterval: NodeJS.Timeout | null = null;
@@ -154,6 +159,11 @@ export class WebSocketHandler {
                 auditLog({ action: 'room.dropped.idle', outcome: 'allowed', roomId });
             });
             this.throttle.sweep(now);
+            this.clientIdByUser.forEach((_clientId, key) => {
+                if (!roomManager.hasRoom(key.slice(0, key.indexOf(':')))) {
+                    this.clientIdByUser.delete(key);
+                }
+            });
         }, ROOM_CLEANUP_INTERVAL_MS);
     }
 
@@ -164,12 +174,19 @@ export class WebSocketHandler {
         this.wss.on('connection', (ws: ExtendedWebSocket, request: http.IncomingMessage) => {
             ws.isAlive = true;
             ws.hasOrigin = Boolean(request.headers.origin);
+            ws.clientId = parseClientId(request.headers.cookie) ?? undefined;
 
             ws.on('pong', () => {
                 ws.isAlive = true;
             });
 
             ws.on('message', (message: string) => {
+                // The limit sits before parsing, so a frame that never becomes
+                // a message — malformed JSON, an unknown type — still costs the
+                // sender budget and cannot buy an answer per frame.
+                if (!this.allowsMessage(ws)) {
+                    return;
+                }
                 try {
                     const parsed: WSMessage = JSON.parse(message.toString());
                     this.handleMessage(ws, parsed);
@@ -235,6 +252,38 @@ export class WebSocketHandler {
     }
 
     /**
+     * Records one incoming frame for a socket and decides whether it may be
+     * processed at all.
+     *
+     * A socket that goes over its budget is told once and disconnected: every
+     * further frame would otherwise cost another error frame and another audit
+     * record — the amplification the limit exists to stop.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @returns True when the frame is inside the allowance.
+     */
+    private allowsMessage(ws: ExtendedWebSocket): boolean {
+        if (this.throttle.allows(ws, Date.now())) {
+            return true;
+        }
+
+        auditLog({
+            action: 'message.throttled',
+            outcome: 'denied',
+            roomId: ws.roomId,
+            userId: ws.userId,
+        });
+        this.sendError(
+            ws,
+            'Too many messages. Slow down and try again in a few seconds.',
+            'RATE_LIMITED'
+        );
+        // 1008 is the WebSocket "policy violation" close code.
+        ws.close(1008, 'Rate limit exceeded');
+        return false;
+    }
+
+    /**
      * Routes incoming WebSocket messages to domain operations.
      *
      * @param ws - The sender's WebSocket connection.
@@ -244,26 +293,6 @@ export class WebSocketHandler {
         const handler = this.messageHandlers[msg.type];
         if (!handler) {
             this.sendError(ws, `Unknown action type: ${msg.type}`, 'FORBIDDEN');
-            return;
-        }
-
-        // A flooded socket is answered once, then disconnected: without the
-        // close, every further message would cost another error frame and
-        // another audit record — the very amplification being prevented.
-        if (!this.throttle.allows(ws, Date.now())) {
-            auditLog({
-                action: 'message.throttled',
-                outcome: 'denied',
-                roomId: ws.roomId,
-                userId: ws.userId,
-            });
-            this.sendError(
-                ws,
-                'Too many messages. Slow down and try again in a few seconds.',
-                'RATE_LIMITED'
-            );
-            // 1008 is the WebSocket "policy violation" close code.
-            ws.close(1008, 'Rate limit exceeded');
             return;
         }
 
@@ -426,6 +455,23 @@ export class WebSocketHandler {
             return;
         }
 
+        // The bar that survives the revoked token: a browser that was just
+        // kicked can reconnect with a new tab, no token and a fresh name, and
+        // would otherwise be admitted as a brand-new participant.
+        if (ws.clientId && this.bans.isClientBanned(normalizedRoomId, ws.clientId, now)) {
+            auditLog({
+                action: 'join.rejected.banned',
+                outcome: 'denied',
+                roomId: normalizedRoomId,
+            });
+            this.sendError(
+                ws,
+                'You were removed from this session. Try again in a few minutes.',
+                'BANNED'
+            );
+            return;
+        }
+
         // Non-browser clients (no Origin) bypass the handshake origin check, so
         // they must prove identity with a valid session token bound to this room.
         if (!ws.hasOrigin && !provenUserId) {
@@ -480,6 +526,12 @@ export class WebSocketHandler {
         if (!participant || !roomState) {
             this.sendError(ws, 'Unable to join room.');
             return;
+        }
+
+        // Remember which browser profile this participant is, so a kick can bar
+        // it even when the participant comes back without its token.
+        if (ws.clientId) {
+            this.clientIdByUser.set(socketKey(roomState.id, participant.id), ws.clientId);
         }
 
         ws.roomId = roomState.id;
@@ -713,6 +765,14 @@ export class WebSocketHandler {
             KICK_BAN_DURATION_MS
         );
         this.bans.ban(session.roomId, payload.targetUserId, Date.now(), KICK_BAN_DURATION_MS);
+
+        // The browser profile, when the kicked participant was ever seen with
+        // one: this is the bar that a tab without a token cannot walk past.
+        const clientId = this.clientIdByUser.get(socketKey(session.roomId, payload.targetUserId));
+        if (clientId) {
+            this.bans.banClient(session.roomId, clientId, Date.now(), KICK_BAN_DURATION_MS);
+        }
+        this.clientIdByUser.delete(socketKey(session.roomId, payload.targetUserId));
         auditLog({
             action: 'user.kicked',
             outcome: 'allowed',

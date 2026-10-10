@@ -107,6 +107,19 @@ export class RoomManager {
     }
 
     /**
+     * Reports whether a room is still held in memory.
+     *
+     * Used by the cleanup ticker to forget per-participant bookkeeping that
+     * belongs to a room which no longer exists.
+     *
+     * @param roomId - The room identifier code (case-insensitive).
+     * @returns True when the room exists.
+     */
+    public hasRoom(roomId: string): boolean {
+        return this.getRoom(roomId) !== undefined;
+    }
+
+    /**
      * Creates a new Planning Poker room with an initial user story.
      *
      * @param hostName - Name of the creator/host.

@@ -18,10 +18,17 @@ services:
         container_name: planitpoker-server
         restart: unless-stopped
         ports:
-            - '${SERVER_PORT:-5000}:5000'
+            # Loopback only: in the same-origin deployment every browser request
+            # reaches the server through the Nginx container. Publishing the port
+            # on all interfaces would let a client bypass Nginx and forge the
+            # `X-Forwarded-For` the rate limiter reads. A stack that serves the
+            # API directly should also set TRUST_PROXY_HOPS=0.
+            - '127.0.0.1:${SERVER_PORT:-5000}:5000'
         environment:
             - PORT=5000
             - NODE_ENV=production
+            # One trusted hop: the bundled Nginx proxy.
+            - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-1}
             # Same-origin (compose) needs no CORS config; keep defaults for direct access / local dev.
             - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173}
         healthcheck:

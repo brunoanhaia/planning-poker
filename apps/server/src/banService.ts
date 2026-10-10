@@ -11,34 +11,48 @@ interface TokenBan {
     until: number;
 }
 
+/** Identifier of a bar that follows a browser profile rather than a session. */
+export const clientBanKey = (roomId: string, clientId: string): string =>
+    `client:${roomId}:${clientId}`;
+
+/** A bar that lives on a browser profile. */
+interface ClientBan {
+    roomId: string;
+    until: number;
+}
+
 /**
  * Raises friction against a participant who was just removed from a room.
  *
  * Removing a participant from the roster does not keep them out: an open room
  * accepts a fresh `JOIN_ROOM` from the same client, which turns a moderation
  * action into a rename. This bar softens that, and it is **advisory** — it
- * holds the client that comes back with the identity it was removed with, and
+ * holds the client that comes back with something it was removed with, and
  * nothing more:
  *
- * - the participant identifier, for a join that still proves it with a live
- *   session token;
  * - the session token itself, because kicking revokes that token — without a
  *   tombstone on the credential, the very next join would present a dead token
- *   and be handed a brand-new participant, and the bar would never fire.
+ *   and be handed a brand-new participant, and the bar would never fire;
+ * - the participant identifier, for a join that still proves it with a live
+ *   session token;
+ * - the browser profile, carried by a first-party cookie the application never
+ *   reads, which survives the token revocation and a reload.
  *
- * A client that rejoins with neither is simply a new participant: it arrives
- * with an unknown token and a fresh id, which no server-side list can tell
- * apart from a genuine newcomer. Preventing *that* would need a credential the
- * client cannot discard, and the only one available here — the client address —
- * is the proxy's, so it would bar the room instead of the participant. The
- * bar therefore buys the host a quiet moment, not a locked door.
+ * A client that rejoins with none of those is simply a new participant: it
+ * arrives with an unknown token, a fresh id and a cleared cookie, which no
+ * server-side list can tell apart from a genuine newcomer. Preventing *that*
+ * needs a credential the client cannot discard, and the only other one
+ * available here — the client address — is the proxy's, so it would bar the
+ * room instead of the participant. The bar therefore buys the host a quiet
+ * moment, not a locked door.
  *
- * Both bars expire on their own, so a removal is a timeout rather than a
+ * Every bar expires on its own, so a removal is a timeout rather than a
  * permanent lockout.
  */
 export class BanService {
     private readonly bannedUntil = new Map<string, number>();
     private readonly bannedTokens = new Map<string, TokenBan>();
+    private readonly bannedClients = new Map<string, ClientBan>();
 
     /**
      * Bars a participant from joining a room.
@@ -112,6 +126,38 @@ export class BanService {
     }
 
     /**
+     * Bars a browser profile from rejoining a room.
+     *
+     * @param roomId - The room the participant was removed from.
+     * @param clientId - The identity cookie carried by that participant.
+     * @param now - Current timestamp, in milliseconds.
+     * @param durationMs - How long the bar lasts, in milliseconds.
+     */
+    public banClient(roomId: string, clientId: string, now: number, durationMs: number): void {
+        this.bannedClients.set(clientBanKey(roomId, clientId), { roomId, until: now + durationMs });
+    }
+
+    /**
+     * Reports whether a browser profile is barred from a room.
+     *
+     * @param roomId - The room being joined.
+     * @param clientId - The identity cookie of the joining client.
+     * @param now - Current timestamp, in milliseconds.
+     * @returns True while the bar is in force.
+     */
+    public isClientBanned(roomId: string, clientId: string, now: number): boolean {
+        const ban = this.bannedClients.get(clientBanKey(roomId, clientId));
+        if (!ban) {
+            return false;
+        }
+        if (ban.until <= now) {
+            this.bannedClients.delete(clientBanKey(roomId, clientId));
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Reports whether a participant is currently barred from a room.
      *
      * Expired bars are dropped on read, so the map cannot outlive its windows.
@@ -147,6 +193,11 @@ export class BanService {
         this.bannedTokens.forEach((ban, key) => {
             if (ban.until <= now) {
                 this.bannedTokens.delete(key);
+            }
+        });
+        this.bannedClients.forEach((ban, key) => {
+            if (ban.until <= now) {
+                this.bannedClients.delete(key);
             }
         });
     }
