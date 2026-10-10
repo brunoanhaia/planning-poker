@@ -109,7 +109,7 @@ describe('Kick ban, end to end', () => {
         const bobToken = lastMessage(bob, 'SESSION')?.payload.sessionToken as string;
         const bobId = lastMessage(bob, 'SESSION')?.payload.userId as string;
         expect(bobToken).toBeTruthy();
-        expect(bobId).not.toBe(undefined);
+        expect(bobId).toBeDefined();
 
         // Alice kicks Bob, which revokes his token.
         send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
