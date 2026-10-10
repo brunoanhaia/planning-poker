@@ -64,6 +64,20 @@ npm run format           # prettier across repo
 - `vitest/no-focused-tests` is an error in client/server.
 - Imports are sorted with `perfectionist/sort-imports`.
 
+## Versioning & Commits
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org) — `type(scope): subject`. `@commitlint/config-conventional` is the source of truth for the type list: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style` and `test`.
+
+```bash
+npm run lint:commits    # validates every commit since origin/main
+npm run changelog       # regenerates CHANGELOG.md from the conventional history
+```
+
+- **Config**: `commitlint.config.mjs` extends `@commitlint/config-conventional`. A commit is rejected when the header has no type/subject, when the subject is capitalised or ends in a period, when the body is not preceded by a blank line, or when the header exceeds 100 characters.
+- **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky installs itself through the `prepare` script, so the hook is armed by a plain `npm install`. Where post-install scripts are blocked, run `npx husky` once to arm it.
+- **Changelog**: `CHANGELOG.md` is generated, never hand-edited. The `conventionalcommits` preset shows `feat`, `fix`, `perf` and `revert` (plus breaking changes), and hides `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci`; a rename of behaviour that is not user-visible stays out of the changelog on purpose.
+- `CHANGELOG.md` is listed in `.prettierignore` — `npm run format` must not rewrite generated markup.
+
 ## Environment Variables
 
 - Server: `PORT`, `ALLOWED_ORIGINS` (comma-separated), `TRUST_PROXY_HOPS` (proxy hops allowed to set `X-Forwarded-For`; defaults to `0`, the bundled compose stack sets `1` behind its Nginx), `CLIENT_ID_COOKIE_SECURE` (`true` adds `Secure` to the identity cookie for TLS deployments; leave it empty on plain HTTP, where a browser would drop the cookie), `CLOUDFLARE_ENABLED` (`true` takes the real client from `CF-Connecting-IP`, honoured only for requests arriving from a published Cloudflare range)
