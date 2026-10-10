@@ -249,6 +249,10 @@ export class RoomManager {
      * broadcast, no timer tick) is exactly the one worth reclaiming, so reads
      * deliberately do not count as activity.
      *
+     * Session tokens bound to a dropped room are revoked here, together with
+     * the room itself, so a caller that only needs the identifiers does not
+     * have to remember a second cleanup step.
+     *
      * @param now - Current timestamp, in milliseconds.
      * @returns The identifiers of the rooms that were dropped.
      */

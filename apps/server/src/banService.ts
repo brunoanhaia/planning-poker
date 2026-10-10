@@ -36,7 +36,11 @@ interface ClientBan {
  * - the participant identifier, for a join that still proves it with a live
  *   session token;
  * - the browser profile, carried by a first-party cookie the application never
- *   reads, which survives the token revocation and a reload.
+ *   reads, which survives the token revocation and a reload. It only holds
+ *   where the page and the socket share an origin — the bundled Nginx
+ *   deployment, or production with a direct `VITE_WS_URL`. In development the
+ *   Vite origin and the API port are different origins, so no cookie is sent
+ *   and this part of the bar lapses.
  *
  * A client that rejoins with none of those is simply a new participant: it
  * arrives with an unknown token, a fresh id and a cleared cookie, which no

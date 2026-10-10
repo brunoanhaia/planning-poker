@@ -88,16 +88,19 @@ const boot = () => {
      */
     const connect = (options?: { clientId?: string; hasOrigin?: boolean }): SocketDouble => {
         const hasOrigin = options?.hasOrigin ?? true;
+        // A browser always carries the identity the server issued it, unless a
+        // test explicitly asks for one that has none.
+        const clientId = options?.clientId ?? (hasOrigin ? 'default-client' : undefined);
         const socket = new SocketDouble();
         socket.hasOrigin = hasOrigin;
-        if (options?.clientId) {
-            socket.clientId = options.clientId;
+        if (clientId) {
+            socket.clientId = clientId;
         }
         sockets.push(socket);
         listeners.get('connection')?.(socket, {
             headers: {
                 ...(hasOrigin ? { origin: 'http://localhost:5173' } : {}),
-                ...(options?.clientId ? { cookie: `pip_client=${options.clientId}` } : {}),
+                ...(clientId ? { cookie: `pip_client=${clientId}` } : {}),
             },
         });
         return socket;
@@ -231,6 +234,29 @@ describe('Message throttle, end to end', () => {
         }
         expect(messagesOf(host, 'ERROR')).toHaveLength(1);
         expect(host.closeCodes).toEqual([1008]);
+    });
+
+    it('ignores frames that arrive once the socket is closing', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+
+        // Spend the whole allowance and go one frame over, which closes it.
+        for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        send(host, 'TOGGLE_AUTO_REVEAL', {});
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
+
+        // Whatever is still in flight must not reach the audit log again.
+        const auditLines = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+        for (let i = 0; i < 5; i += 1) {
+            send(host, 'TOGGLE_AUTO_REVEAL', {});
+        }
+        auditLines.mockRestore();
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(1);
     });
 
     it('does not disconnect a socket that stays inside the allowance', () => {

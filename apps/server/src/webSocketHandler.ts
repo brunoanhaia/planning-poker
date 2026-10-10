@@ -174,6 +174,9 @@ export class WebSocketHandler {
         this.wss.on('connection', (ws: ExtendedWebSocket, request: http.IncomingMessage) => {
             ws.isAlive = true;
             ws.hasOrigin = Boolean(request.headers.origin);
+            // The handshake has already happened by the time we get here, so the
+            // identity is whatever the browser sent. Minting one for a cookieless
+            // client happens in `startServer`, which owns the upgrade.
             ws.clientId = parseClientId(request.headers.cookie) ?? undefined;
 
             ws.on('pong', () => {
@@ -181,6 +184,12 @@ export class WebSocketHandler {
             });
 
             ws.on('message', (message: string) => {
+                // Frames already in flight when the socket started closing are
+                // still delivered, and each of them would otherwise write
+                // another audit record — the amplification being prevented.
+                if (ws.readyState !== WebSocket.OPEN) {
+                    return;
+                }
                 // The limit sits before parsing, so a frame that never becomes
                 // a message — malformed JSON, an unknown type — still costs the
                 // sender budget and cannot buy an answer per frame.
@@ -472,8 +481,13 @@ export class WebSocketHandler {
             return;
         }
 
-        // Non-browser clients (no Origin) bypass the handshake origin check, so
-        // they must prove identity with a valid session token bound to this room.
+        // A browser with no identity cookie cannot be named by a kick ban —
+        // in development the page is served from the Vite origin while the
+        // socket reaches this server directly, so the cookie is not shared.
+        // Refusing the join would break that setup, and the ban is advisory
+        // anyway: the identity makes the bar hold, its absence makes it lapse.
+        // Non-browser clients (no Origin) must still prove identity with a
+        // valid session token bound to this room.
         if (!ws.hasOrigin && !provenUserId) {
             auditLog({ action: 'join.rejected.token-missing', outcome: 'denied' });
             this.sendError(
