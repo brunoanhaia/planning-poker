@@ -25,13 +25,27 @@ import { randomUUID } from 'node:crypto';
  */
 export const CLIENT_ID_COOKIE = 'pip_client';
 
-/** Attributes of the identity cookie. */
+/** True when the identity may only travel over TLS; off keeps plain HTTP working. */
+const SECURE_COOKIE = process.env.CLIENT_ID_COOKIE_SECURE === 'true';
+
+/**
+ * Attributes of the identity cookie.
+ *
+ * `Secure` is opt-in because the bundled compose stack is served over plain
+ * HTTP on its own network, where a browser would silently drop a `Secure`
+ * cookie and the browser-profile bar would lapse. A TLS deployment should set
+ * `CLIENT_ID_COOKIE_SECURE=true`.
+ */
 export const CLIENT_ID_COOKIE_OPTIONS = {
     httpOnly: true,
-    sameSite: 'strict',
     maxAge: 24 * 60 * 60 * 1000,
     path: '/',
+    sameSite: 'strict',
+    secure: SECURE_COOKIE,
 } as const;
+
+/** Shape of an identity the server minted, so anything else reads as none. */
+const CLIENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Serializes the cookie that carries a client identity.
@@ -39,16 +53,29 @@ export const CLIENT_ID_COOKIE_OPTIONS = {
  * @param value - The identifier to store.
  * @returns The `Set-Cookie` value.
  */
-export const buildClientIdCookie = (value: string): string =>
-    [`${CLIENT_ID_COOKIE}=${value}`, 'Path=/', 'Max-Age=86400', 'HttpOnly', 'SameSite=Strict'].join(
-        '; '
-    );
+export const buildClientIdCookie = (value: string, secure = SECURE_COOKIE): string => {
+    const attributes = [
+        `${CLIENT_ID_COOKIE}=${value}`,
+        'Path=/',
+        'Max-Age=86400',
+        'HttpOnly',
+        'SameSite=Strict',
+    ];
+    if (secure) {
+        attributes.push('Secure');
+    }
+    return attributes.join('; ');
+};
 
 /**
  * Reads the client identity out of a `Cookie` request header.
  *
+ * Only a value the server could have minted counts: a scripted client can send
+ * any header it likes, and accepting arbitrary text would let it plant whatever
+ * it wanted — including an unbounded string — as a key in the ban map.
+ *
  * @param cookieHeader - The raw header, e.g. `pip_client=<uuid>; other=1`.
- * @returns The identifier, or null when the header carries none.
+ * @returns The identifier, or null when the header carries none the server issued.
  */
 export const parseClientId = (cookieHeader: string | undefined | null): string | null => {
     if (!cookieHeader) {
@@ -61,7 +88,7 @@ export const parseClientId = (cookieHeader: string | undefined | null): string |
         }
         if (part.slice(0, separator).trim() === CLIENT_ID_COOKIE) {
             const value = part.slice(separator + 1).trim();
-            return value.length > 0 ? value : null;
+            return CLIENT_ID_PATTERN.test(value) ? value : null;
         }
     }
     return null;

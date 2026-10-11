@@ -247,6 +247,11 @@ describe('Failed room joins', () => {
     });
 });
 
+/** Identities a browser would carry, shaped as the server mints them. */
+const HOST_CLIENT_ID = '11111111-1111-4111-8111-111111111111';
+const BOB_CLIENT_ID = '22222222-2222-4222-8222-222222222222';
+const CAROL_CLIENT_ID = '33333333-3333-4333-8333-333333333333';
+
 describe('Kick ban, end to end', () => {
     it('refuses the rejoin the kicked client attempts with its own token', () => {
         const { connect } = boot();
@@ -405,18 +410,18 @@ describe('Kick ban against a browser profile', () => {
     it('still bars a rejoin that presents no token at all', () => {
         const { connect } = boot();
 
-        const host = connect({ clientId: 'host-client' });
+        const host = connect({ clientId: HOST_CLIENT_ID });
         send(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
-        const bob = connect({ clientId: 'bob-client' });
+        const bob = connect({ clientId: BOB_CLIENT_ID });
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
         const bobId = participantIdOf(bob);
 
         send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
         // A fresh tab: no Origin-less escape, no token, same browser.
-        const bobAgain = connect({ clientId: 'bob-client' });
+        const bobAgain = connect({ clientId: BOB_CLIENT_ID });
         send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
 
         expect(lastMessage(bobAgain, 'ERROR')?.payload.code).toBe('BANNED');
@@ -426,17 +431,17 @@ describe('Kick ban against a browser profile', () => {
     it('lets a different browser through', () => {
         const { connect } = boot();
 
-        const host = connect({ clientId: 'host-client' });
+        const host = connect({ clientId: HOST_CLIENT_ID });
         send(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
-        const bob = connect({ clientId: 'bob-client' });
+        const bob = connect({ clientId: BOB_CLIENT_ID });
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
         const bobId = participantIdOf(bob);
 
         send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
-        const newcomer = connect({ clientId: 'carol-client' });
+        const newcomer = connect({ clientId: CAROL_CLIENT_ID });
         send(newcomer, 'JOIN_ROOM', { name: 'Carol', roomId });
 
         expect(lastMessage(newcomer, 'SESSION')).toBeDefined();
@@ -448,22 +453,22 @@ describe('Kick ban against a browser profile', () => {
         try {
             const { connect } = boot();
 
-            const host = connect({ clientId: 'host-client' });
+            const host = connect({ clientId: HOST_CLIENT_ID });
             send(host, 'CREATE_ROOM', { name: 'Alice' });
             const roomId = roomIdOf(host);
 
-            const bob = connect({ clientId: 'bob-client' });
+            const bob = connect({ clientId: BOB_CLIENT_ID });
             send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
             const bobId = participantIdOf(bob);
 
             send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
-            const barred = connect({ clientId: 'bob-client' });
+            const barred = connect({ clientId: BOB_CLIENT_ID });
             send(barred, 'JOIN_ROOM', { name: 'Bob', roomId });
             expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
 
             vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
 
-            const bobAgain = connect({ clientId: 'bob-client' });
+            const bobAgain = connect({ clientId: BOB_CLIENT_ID });
             send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
 
             expect(lastMessage(bobAgain, 'SESSION')).toBeDefined();

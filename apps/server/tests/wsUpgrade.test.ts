@@ -41,7 +41,7 @@ describe('WebSocket upgrade', () => {
 
     it('does not reissue the cookie to a browser that already has one', async () => {
         const response = await fetch(`${baseUrl}/api/health`, {
-            headers: { cookie: 'pip_client=already-here' },
+            headers: { cookie: 'pip_client=22222222-2222-4222-8222-222222222222' },
         });
 
         expect(response.headers.get('set-cookie')).toBeNull();
@@ -95,7 +95,10 @@ describe('WebSocket upgrade', () => {
 
     it('does not reissue the cookie when the handshake already carries one', async () => {
         const socket = new WebSocket(url(), {
-            headers: { cookie: 'pip_client=already-here', origin: 'http://localhost:5173' },
+            headers: {
+                cookie: 'pip_client=22222222-2222-4222-8222-222222222222',
+                origin: 'http://localhost:5173',
+            },
         });
 
         const handshakeCookie = await new Promise<string | undefined>((resolve) => {
@@ -297,7 +300,9 @@ describe('Handshake identity hook', () => {
         expect(headers[0]).toContain('pip_client=');
 
         applyHook(
-            { headers: { cookie: `${CLIENT_ID_COOKIE}=already-here` } } as http.IncomingMessage,
+            {
+                headers: { cookie: `${CLIENT_ID_COOKIE}=22222222-2222-4222-8222-222222222222` },
+            } as http.IncomingMessage,
             headers
         );
         expect(headers).toHaveLength(1);
