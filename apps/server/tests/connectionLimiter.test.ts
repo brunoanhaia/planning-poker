@@ -222,13 +222,30 @@ describe('ConnectionLimiter handshake allowance', () => {
         expect(budget.hasCapacity('10.0.0.1', 1_000 + 60_000 + 1)).toBe(true);
     });
 
-    it('bounds how many addresses it tracks', () => {
-        const budget = new ConnectionLimiter(100, 1, 60_000, 10);
+    it('bounds the handshake history it keeps', () => {
+        // Sockets that closed leave only their handshake history, and that is
+        // what the bound exists for.
+        const budget = new ConnectionLimiter(100, 100, 60_000, 10);
 
         for (let address = 0; address < 200; address += 1) {
             budget.acquire(`10.0.${address}.1`, 1_000);
+            budget.release(`10.0.${address}.1`);
         }
 
         expect(budget.trackedAddresses).toBe(10);
+    });
+
+    it('never evicts an address that still holds a socket', () => {
+        // An entry in `open` is a live socket, so dropping it would hand that
+        // address a second full allowance and quietly double the ceiling.
+        const budget = new ConnectionLimiter(1, 100, 60_000, 3);
+
+        for (let address = 0; address < 10; address += 1) {
+            budget.acquire(`10.0.${address}.1`, 1_000);
+        }
+
+        expect(budget.count('10.0.0.1')).toBe(1);
+        expect(budget.hasCapacity('10.0.0.1', 1_000)).toBe(false);
+        expect(budget.count('10.0.9.1')).toBe(1);
     });
 });

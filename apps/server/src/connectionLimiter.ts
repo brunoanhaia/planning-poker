@@ -163,20 +163,27 @@ export class ConnectionLimiter {
     }
 
     /**
-     * Drops the oldest tracked address once a map passes its bound.
+     * Drops the oldest handshake history once it passes its bound.
+     *
+     * Only the handshake map is bounded. An entry in `open` always stands for at
+     * least one live socket — a count that reaches zero is deleted the moment it
+     * does — so evicting one would lose live state: the address would read as
+     * empty and be handed a second full allowance, quietly doubling the ceiling
+     * for whoever connected first. The handshake history, by contrast, is
+     * transient and left behind by addresses that have already gone, which is
+     * exactly what needs the bound. `open` is bounded by the connections it
+     * counts, one entry per live socket at most.
      *
      * A `Map` keeps insertion order, so the first key is the one that was tracked
      * longest ago and is therefore closest to having its window expire anyway.
      */
     private evictOverflow(): void {
-        [this.open, this.handshakes].forEach((tracked) => {
-            while (tracked.size > this.maxTrackedAddresses) {
-                const oldest = tracked.keys().next();
-                if (oldest.done) {
-                    return;
-                }
-                tracked.delete(oldest.value);
+        while (this.handshakes.size > this.maxTrackedAddresses) {
+            const oldest = this.handshakes.keys().next();
+            if (oldest.done) {
+                return;
             }
-        });
+            this.handshakes.delete(oldest.value);
+        }
     }
 }
