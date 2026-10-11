@@ -72,7 +72,7 @@ describe('useTurnstile', () => {
         });
 
         expect(calls.rendered).toHaveLength(1);
-        expect(calls.rendered[0]).toMatchObject({ element: 'planit-turnstile' });
+        expect(calls.rendered[0]).toMatchObject({ element: '#planit-turnstile' });
         expect(calls.rendered[0]).toMatchObject({ options: { sitekey: 'site-key' } });
     });
 

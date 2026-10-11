@@ -124,7 +124,9 @@ export const useTurnstile = (
             }
         };
 
-        widgetIdRef.current = api.render(String(WIDGET_ID), {
+        // Turnstile takes a CSS selector, so the bare id would never match the
+        // element and no widget would appear.
+        widgetIdRef.current = api.render(`#${WIDGET_ID}`, {
             'error-callback': dropToken,
             'expired-callback': dropToken,
             callback: (token: string) => callbackRef.current(token),
