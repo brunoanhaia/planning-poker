@@ -324,7 +324,7 @@ describe('Kick ban, end to end', () => {
         send(host, 'CREATE_ROOM', { name: 'Alice' });
         const hostToken = tokenOf(host);
         const roomId = roomIdOf(host);
-        expect(roomId).toMatch(/^[A-Z0-9]{6}$/);
+        expect(roomId).toMatch(/^[A-Z0-9]{8}$/);
 
         const bob = connect();
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });

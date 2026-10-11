@@ -12,7 +12,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     it('should create room with creator as primary admin and host', () => {
         const { hostId, roomId, roomState } = rm.createRoom('Alice', '🚀', '#6366f1', 'Sprint 42')!;
 
-        expect(roomId).toHaveLength(6);
+        expect(roomId).toHaveLength(8);
         expect(roomState.title).toBe('Sprint 42');
         expect(roomState.hostId).toBe(hostId);
         expect(roomState.participants[0].isAdmin).toBe(true);

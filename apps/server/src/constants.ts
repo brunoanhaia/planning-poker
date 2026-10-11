@@ -6,8 +6,16 @@
 /** Characters used for random room code generation (excludes confusing chars like 0, O, 1, I). */
 export const ROOM_ID_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-/** Length of generated room codes. */
-export const ROOM_ID_LENGTH = 6;
+/**
+ * Length of generated room codes.
+ *
+ * Eight characters from a 32-character alphabet is ~1.1×10¹² candidates: at the
+ * ~1 400 guesses per second a single host could once reach, walking the keyspace
+ * would take about nine days even without any other control, which makes the room
+ * code a secret rather than a guessing game. Six characters was ~1.1×10⁹ and
+ * could be walked in minutes.
+ */
+export const ROOM_ID_LENGTH = 8;
 
 /** Heartbeat ping/pong interval in milliseconds (30 seconds). */
 export const HEARTBEAT_INTERVAL_MS = 30000;

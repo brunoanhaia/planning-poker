@@ -2,7 +2,7 @@ import { Button, Flex, Input } from 'antd';
 import React, { useState } from 'react';
 
 /** Exact length of a room code, and therefore of the join deep link. */
-const ROOM_CODE_LENGTH = 6;
+const ROOM_CODE_LENGTH = 8;
 
 export interface JoinSessionFormProps {
     /** Pre-fills the field from a `#ABC123` deep link. */

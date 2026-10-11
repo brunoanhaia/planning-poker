@@ -133,17 +133,22 @@ code change and a redeployment, not a deployment setting.
 
 ### SEC-05 — Room-code brute force (Medium)
 
-The room code is the only secret: 6 characters from a 32-character alphabet
-(`ROOM_ID_CHARSET`, `ROOM_ID_LENGTH`) is ~1.07×10⁹ candidates, and up to 1 000 rooms are
-live at once, so a hit is expected after ~1.07×10⁶ probes. Failed joins were free: no
-lockout, no audit, and the per-socket throttle (30 per 10 s) resets with every new
-socket.
+The room code was the only secret: 6 characters from a 32-character alphabet
+(`ROOM_ID_CHARSET`, `ROOM_ID_LENGTH`) is ~1.07×10⁹ candidates, and up to 1 000 rooms were
+live at once, so a hit was expected after ~1.07×10⁶ probes. Failed joins were free: no
+lockout, no audit, and the per-socket throttle (30 per 10 s) resets with every new socket.
 
 **Measured:** 120 sockets × 30 codes = 3 600 probes answered in 2.6 s →
 **1 376 guesses/second from a single host**, ~13 minutes to a live room at that rate.
 Failed joins are not written to the audit log, so the attack is invisible.
 
-**Fix:** `JoinFailureLimiter` (`apps/server/src/joinFailureLimiter.ts`) charges a budget
+**Fix, part one — the secret got longer.** The code is now 8 characters, which is
+~1.1×10¹² candidates: at the ~1 400 guesses per second a single host could once reach,
+walking the keyspace takes about nine days _with no other control in the way_, against
+minutes before. That removes the reason to be aggressive with the per-address budget, so
+the remaining limits are a backstop rather than the defence.
+
+**Fix, part two — `JoinFailureLimiter`** (`apps/server/src/joinFailureLimiter.ts`) charges a budget
 of **distinct** unknown codes per address, applies a cool-down when it is spent, and
 audits every lookup that matched no room (`join.rejected.room-not-found`). The tracked
 state is bounded by `JOIN_FAILURE_MAX_TRACKED_ADDRESSES`, because a client cycling through
