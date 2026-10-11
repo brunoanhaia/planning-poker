@@ -4,6 +4,7 @@ import { WebSocketServer } from 'ws';
 
 import { ConnectionLimiter } from '../src/connectionLimiter.js';
 import { JOIN_FAILURE_LIMIT } from '../src/constants.js';
+import { TurnstileVerifier } from '../src/turnstile.js';
 import { WebSocketHandler } from '../src/webSocketHandler.js';
 
 /** One message the handler sent to a socket double. */
@@ -102,7 +103,7 @@ const tokenOf = (socket: SocketDouble): string => {
 const handlers: WebSocketHandler[] = [];
 
 /** Boots the real handler against a socket double harness. */
-const boot = () => {
+const boot = (options?: { turnstile?: TurnstileVerifier }) => {
     const sockets: SocketDouble[] = [];
     const listeners = new Map<string, (...args: unknown[]) => void>();
     const wss = {
@@ -115,6 +116,7 @@ const boot = () => {
 
     const handler = new WebSocketHandler(wss, {
         connections: new ConnectionLimiter(64, 1_000, 60_000, 100),
+        turnstile: options?.turnstile ?? new TurnstileVerifier(undefined),
         trustProxyHops: 0,
     });
     handlers.push(handler);
@@ -156,6 +158,16 @@ const boot = () => {
 /** Sends a message to a socket double. */
 const send = (socket: SocketDouble, type: string, payload: unknown): void =>
     socket.emit('message', JSON.stringify({ payload, type }));
+
+/** Sends a message and lets an asynchronous handler finish before asserting. */
+const sendAndSettle = async (
+    socket: SocketDouble,
+    type: string,
+    payload: unknown
+): Promise<void> => {
+    send(socket, type, payload);
+    await new Promise((resolve) => setImmediate(resolve));
+};
 
 afterEach(() => {
     while (handlers.length > 0) {
@@ -276,6 +288,141 @@ describe('Failed room joins', () => {
         const last = connect();
         send(last, 'JOIN_ROOM', { name: 'Probe again', roomId: 'ANOTHER' });
         expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+    });
+});
+
+describe('Join challenge', () => {
+    /** A verifier whose check always succeeds, standing in for Cloudflare. */
+    const accepting = (): TurnstileVerifier =>
+        new TurnstileVerifier(
+            'secret',
+            'https://example.invalid/siteverify',
+            async () => new Response(JSON.stringify({ success: true }), { status: 200 })
+        );
+
+    /** A verifier whose check always fails. */
+    const rejecting = (): TurnstileVerifier =>
+        new TurnstileVerifier(
+            'secret',
+            'https://example.invalid/siteverify',
+            async () => new Response(JSON.stringify({ success: false }), { status: 200 })
+        );
+
+    it('leaves joins open when no secret is configured', async () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const participant = connect();
+        await sendAndSettle(participant, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        expect(lastMessage(participant, 'ERROR')).toBeUndefined();
+        expect(participantIdOf(participant)).toBeTruthy();
+    });
+
+    it('asks a fresh participant to solve the challenge', async () => {
+        const { connect } = boot({ turnstile: accepting() });
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const participant = connect();
+        await sendAndSettle(participant, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        expect(lastMessage(participant, 'ERROR')?.payload.code).toBe('CHALLENGE_FAILED');
+        expect(participant.userId).toBeUndefined();
+    });
+
+    it('admits a participant that solved it', async () => {
+        const { connect } = boot({ turnstile: accepting() });
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const participant = connect();
+        await sendAndSettle(participant, 'JOIN_ROOM', {
+            name: 'Bob',
+            roomId,
+            turnstileToken: 'a-token',
+        });
+
+        expect(lastMessage(participant, 'ERROR')).toBeUndefined();
+        expect(participantIdOf(participant)).toBeTruthy();
+    });
+
+    it('refuses a token the verifier rejects', async () => {
+        const { connect } = boot({ turnstile: rejecting() });
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const participant = connect();
+        await sendAndSettle(participant, 'JOIN_ROOM', {
+            name: 'Bob',
+            roomId,
+            turnstileToken: 'a-token',
+        });
+
+        expect(lastMessage(participant, 'ERROR')?.payload.code).toBe('CHALLENGE_FAILED');
+    });
+
+    it('refuses the same token twice', async () => {
+        // Turnstile tokens are single-use, so a captured one cannot be replayed.
+        const { connect } = boot({ turnstile: accepting() });
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const first = connect();
+        await sendAndSettle(first, 'JOIN_ROOM', {
+            name: 'First',
+            roomId,
+            turnstileToken: 'a-token',
+        });
+        expect(lastMessage(first, 'ERROR')).toBeUndefined();
+
+        const second = connect();
+        await sendAndSettle(second, 'JOIN_ROOM', {
+            name: 'Second',
+            roomId,
+            turnstileToken: 'a-token',
+        });
+
+        expect(lastMessage(second, 'ERROR')?.payload.code).toBe('CHALLENGE_FAILED');
+    });
+
+    it('does not ask a reconnecting participant to solve it again', async () => {
+        const { connect } = boot({ turnstile: accepting() });
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const solved = connect();
+        await sendAndSettle(solved, 'JOIN_ROOM', {
+            name: 'Bob',
+            roomId,
+            turnstileToken: 'a-token',
+        });
+        const bobToken = tokenOf(solved);
+        const bobId = participantIdOf(solved);
+
+        const reconnecting = connect();
+        await sendAndSettle(reconnecting, 'JOIN_ROOM', {
+            name: 'Bob',
+            roomId,
+            sessionToken: bobToken,
+            userId: bobId,
+        });
+
+        expect(lastMessage(reconnecting, 'ERROR')).toBeUndefined();
+        expect(participantIdOf(reconnecting)).toBe(bobId);
     });
 });
 

@@ -1,27 +1,32 @@
 import { Button, Flex, Input } from 'antd';
 import React, { useState } from 'react';
 
+import { useTurnstile } from '../../utils/turnstile';
+
 /** Exact length of a room code, and therefore of the join deep link. */
 const ROOM_CODE_LENGTH = 8;
 
 export interface JoinSessionFormProps {
     /** Pre-fills the field from a `#ABC123` deep link. */
     initialRoomCode: string;
-    /** Called with the uppercase room code once a session is joined. */
-    onSubmit: (roomCode: string) => void;
+    /** Called with the uppercase room code, and the solved challenge, once a session is joined. */
+    onSubmit: (roomCode: string, turnstileToken: string | null) => void;
 }
 
 /**
- * Step 2 of the "join a room" flow: nothing but the six character room code.
+ * Step 2 of the "join a room" flow: the room code, and the challenge that proves
+ * a browser is on the other end of it when the deployment asks for one.
  */
 export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({ initialRoomCode, onSubmit }) => {
     const [roomCode, setRoomCode] = useState(initialRoomCode);
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+    const challenge = useTurnstile(setTurnstileToken);
 
     const isComplete = roomCode.trim().length === ROOM_CODE_LENGTH;
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
-        onSubmit(roomCode.trim().toUpperCase());
+        onSubmit(roomCode.trim().toUpperCase(), turnstileToken);
     };
 
     return (
@@ -41,7 +46,15 @@ export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({ initialRoomCod
                     />
                 </div>
 
-                <Button block htmlType="submit" size="large" type="primary" disabled={!isComplete}>
+                {challenge}
+
+                <Button
+                    block
+                    disabled={!isComplete || (Boolean(challenge) && !turnstileToken)}
+                    htmlType="submit"
+                    size="large"
+                    type="primary"
+                >
                     Join Room Now
                 </Button>
             </Flex>

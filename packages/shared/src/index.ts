@@ -218,6 +218,8 @@ export interface JoinRoomPayload {
     name: string;
     roomId: string;
     sessionToken?: string | null;
+    /** Proof of work from the Cloudflare Turnstile challenge, when the deployment gates joins. */
+    turnstileToken?: string | null;
     userId?: string | null;
 }
 
@@ -287,6 +289,7 @@ export interface KickedPayload {
  */
 export type ErrorCode =
     | 'BANNED'
+    | 'CHALLENGE_FAILED'
     | 'FORBIDDEN'
     | 'INVALID_STORY_INDEX'
     | 'NO_SESSION'

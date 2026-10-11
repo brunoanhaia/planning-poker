@@ -1,6 +1,7 @@
 /** Security-relevant lifecycle of a single server-side action. */
 export type AuditAction =
     | 'connection.rejected.limit'
+    | 'join.rejected.challenge'
     | 'join.rejected.banned'
     | 'join.rejected.room-full'
     | 'join.rejected.room-not-found'

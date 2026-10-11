@@ -43,6 +43,7 @@ import { roomManager } from './roomManager.js';
 import { sessionService } from './sessionService.js';
 import { isBacklogFull } from './storyService.js';
 import { MessageThrottle } from './throttle.js';
+import { TurnstileVerifier } from './turnstile.js';
 import { validatePayload } from './validation.js';
 
 interface ExtendedWebSocket extends WebSocket {
@@ -101,9 +102,11 @@ export interface WebSocketHandlerOptions {
     connections: ConnectionLimiter;
     /** Proxy hops in front of this server that may be trusted on the handshake. */
     trustProxyHops: number;
+    /** Proves a join came from a browser; a no-op verifier leaves joins open. */
+    turnstile: TurnstileVerifier;
 }
 
-type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
+type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void | Promise<void>;
 
 /**
  * Handles real-time WebSocket connections, message routing, and room state broadcasting.
@@ -159,6 +162,8 @@ export class WebSocketHandler {
     private readonly clientIdByUser = new Map<string, string>();
     /** Bars a kicked participant from re-entering the room immediately. */
     private readonly bans = new BanService();
+    /** Proves a join came from a browser, when a secret is configured. */
+    private readonly turnstile: TurnstileVerifier;
     /** Budget of failed room joins granted to one address. */
     private readonly joinFailures = new JoinFailureLimiter(
         JOIN_FAILURE_LIMIT,
@@ -170,12 +175,13 @@ export class WebSocketHandler {
 
     /**
      * @param wss - The server whose connections this handler serves.
-     * @param options - Connection accounting and the proxy hops to trust.
+     * @param options - Connection accounting, the proxy hops to trust, the challenge verifier.
      */
     constructor(wss: WebSocketServer, options: WebSocketHandlerOptions) {
         this.wss = wss;
         this.connections = options.connections;
         this.trustProxyHops = options.trustProxyHops;
+        this.turnstile = options.turnstile;
         this.init();
         this.startTimerTicker();
         this.startCleanupTicker();
@@ -402,7 +408,15 @@ export class WebSocketHandler {
             return;
         }
 
-        handler(ws, validation.data);
+        // Most handlers are synchronous. The join may await the challenge check,
+        // so its rejection is answered rather than left floating.
+        const outcome = handler(ws, validation.data);
+        if (outcome instanceof Promise) {
+            outcome.catch((error: unknown) => {
+                console.error(`Failed to handle ${String(msg.type)}:`, error);
+                this.sendError(ws, 'That request could not be completed.');
+            });
+        }
     }
 
     /**
@@ -530,8 +544,8 @@ export class WebSocketHandler {
      * that match no room, and the browser-profile bar is what survives a
      * discarded session token.
      */
-    private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
-        const { avatar, color, name, roomId, sessionToken, userId } = payload;
+    private async handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): Promise<void> {
+        const { avatar, color, name, roomId, sessionToken, turnstileToken, userId } = payload;
 
         const address = ws.remoteAddress ?? 'unknown';
         const now = Date.now();
@@ -609,6 +623,22 @@ export class WebSocketHandler {
                 'BANNED'
             );
             return;
+        }
+
+        // A caller that cannot prove who it is — a fresh participant, arriving with
+        // nothing but a room code — has to show it is a browser first. A
+        // reconnecting participant holds a valid token and is not asked again.
+        if (!provenUserId && this.turnstile.enabled) {
+            const human = await this.turnstile.verify(turnstileToken, ws.remoteAddress);
+            if (!human) {
+                auditLog({ action: 'join.rejected.challenge', outcome: 'denied' });
+                this.sendError(
+                    ws,
+                    'The join challenge could not be verified. Reload the page and try again.',
+                    'CHALLENGE_FAILED'
+                );
+                return;
+            }
         }
 
         const result = roomManager.joinRoom(

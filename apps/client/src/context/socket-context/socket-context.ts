@@ -23,7 +23,13 @@ export interface SocketContextValue {
     isAdmin: boolean;
     isConnected: boolean;
     isHost: boolean;
-    joinRoom: (roomId: string, name: string, avatar: string, color: string) => void;
+    joinRoom: (
+        roomId: string,
+        name: string,
+        avatar: string,
+        color: string,
+        turnstileToken?: string | null
+    ) => void;
     kickedMessage: null | string;
     kickParticipant: (targetUserId: string) => void;
     leaveRoom: () => void;

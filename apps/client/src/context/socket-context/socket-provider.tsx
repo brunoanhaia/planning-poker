@@ -141,13 +141,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
 
     const joinRoom = useCallback(
-        (roomId: string, name: string, avatar: string, color: string) => {
+        (
+            roomId: string,
+            name: string,
+            avatar: string,
+            color: string,
+            turnstileToken: string | null = null
+        ) => {
             send('JOIN_ROOM', {
                 avatar,
                 color,
                 name,
                 roomId,
                 sessionToken: sessionTokenRef.current,
+                turnstileToken,
                 userId: currentUserId,
             });
         },
