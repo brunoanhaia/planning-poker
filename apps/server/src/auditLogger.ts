@@ -1,12 +1,16 @@
 /** Security-relevant lifecycle of a single server-side action. */
 export type AuditAction =
+    | 'connection.rejected.limit'
     | 'join.rejected.banned'
     | 'join.rejected.room-full'
+    | 'join.rejected.room-not-found'
+    | 'join.rejected.rate-limited'
     | 'join.rejected.token-missing'
     | 'message.throttled'
     | 'room.created'
     | 'room.dropped.idle'
     | 'room.creation.rejected.limit'
+    | 'socket.error'
     | 'story.rejected.limit'
     | 'story.index.rejected'
     | 'user.kicked'

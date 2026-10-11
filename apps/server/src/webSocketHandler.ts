@@ -171,6 +171,13 @@ export class WebSocketHandler {
      * Initializes WebSocket listeners and client heartbeat interval.
      */
     private init(): void {
+        // A failure on the server object itself — not on one connection — must
+        // not take the process down either: there is no socket to terminate, so
+        // the record is the whole response.
+        this.wss.on('error', (error: Error) => {
+            console.error('WebSocket server error:', error.message);
+        });
+
         this.wss.on('connection', (ws: ExtendedWebSocket, request: http.IncomingMessage) => {
             ws.isAlive = true;
             ws.hasOrigin = Boolean(request.headers.origin);
@@ -181,6 +188,16 @@ export class WebSocketHandler {
 
             ws.on('pong', () => {
                 ws.isAlive = true;
+            });
+
+            // `ws` reports a frame it refuses to read — over the payload cap, or
+            // one it cannot parse — as an `error` event on the connection. With
+            // no listener, Node turns that into an unhandled exception and the
+            // whole process dies, which makes a single oversized frame a remote
+            // denial of service. Answering it here keeps the blast radius to
+            // the offending socket.
+            ws.on('error', (error: Error) => {
+                this.reportConnectionError(ws, error);
             });
 
             ws.on('message', (message: string) => {
@@ -290,6 +307,28 @@ export class WebSocketHandler {
         // 1008 is the WebSocket "policy violation" close code.
         ws.close(1008, 'Rate limit exceeded');
         return false;
+    }
+
+    /**
+     * Reports a failed connection without letting it reach the process.
+     *
+     * Every receiver failure — an oversized frame, a frame that cannot be read —
+     * arrives here. The socket is terminated, which is what the peer already
+     * expects, and the record is what an operator needs: which participant, if
+     * any, was behind it.
+     *
+     * @param ws - The connection that failed.
+     * @param error - The failure reported by `ws`.
+     */
+    private reportConnectionError(ws: ExtendedWebSocket, error: Error): void {
+        auditLog({
+            action: 'socket.error',
+            outcome: 'denied',
+            roomId: ws.roomId,
+            userId: ws.userId,
+        });
+        console.error('WebSocket connection error:', error.message);
+        ws.terminate();
     }
 
     /**

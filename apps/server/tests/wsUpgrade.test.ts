@@ -127,6 +127,57 @@ describe('WebSocket upgrade', () => {
         expect(closedWith).toBe(1009);
     });
 
+    it('keeps serving after a frame it refused to read', async () => {
+        // A refused frame is reported as an `error` event on the connection.
+        // Without a listener Node treats it as an unhandled exception and the
+        // whole process dies, so the server has to still answer afterwards.
+        const attacker = new WebSocket(url(), {
+            headers: { origin: 'http://localhost:5173' },
+        });
+
+        const closedWith = await new Promise<number | undefined>((resolve) => {
+            attacker.on('close', (code) => resolve(code));
+            attacker.on('error', () => resolve(undefined));
+            attacker.on('open', () =>
+                attacker.send(
+                    JSON.stringify({
+                        payload: { name: 'x'.repeat(WS_MAX_PAYLOAD_BYTES) },
+                        type: 'CREATE_ROOM',
+                    })
+                )
+            );
+        });
+        expect(closedWith).toBe(1009);
+
+        const stillServing = await fetch(`${baseUrl}/api/health`);
+        expect(stillServing.status).toBe(200);
+        expect((await stillServing.json()).status).toBe('ok');
+
+        // The rest of the suite runs against the same server, so a second
+        // oversized frame must not be needed to prove the point.
+        const survivor = new WebSocket(url(), { headers: { origin: 'http://localhost:5173' } });
+        let fallback: ReturnType<typeof setTimeout> | undefined;
+        const joined = await new Promise<boolean>((resolve) => {
+            survivor.on('message', (data) => {
+                if (JSON.parse(data.toString()).type === 'ROOM_STATE') {
+                    resolve(true);
+                }
+            });
+            survivor.on('error', () => resolve(false));
+            survivor.on('open', () =>
+                survivor.send(
+                    JSON.stringify({ payload: { name: 'Aftermath' }, type: 'CREATE_ROOM' })
+                )
+            );
+            fallback = setTimeout(() => resolve(false), 2000);
+        }).finally(() => {
+            clearTimeout(fallback);
+            survivor.close();
+        });
+
+        expect(joined).toBe(true);
+    });
+
     it('still admits a native client without a cookie, on its token', async () => {
         const creator = new WebSocket(url());
         const first = await new Promise<{ roomId: string; sessionToken: string }>(
