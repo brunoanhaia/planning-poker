@@ -37,3 +37,12 @@ export const ROOM_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
  * answers a flood.
  */
 export const WS_MAX_CONNECTIONS_PER_IP = 20;
+
+/** Failed room joins one address may spend inside {@link JOIN_FAILURE_WINDOW_MS}. */
+export const JOIN_FAILURE_LIMIT = 20;
+
+/** Sliding window the failed-join budget is spent in, in milliseconds. */
+export const JOIN_FAILURE_WINDOW_MS = 60 * 1000;
+
+/** How long an address that exhausted its failed-join budget is barred, in milliseconds. */
+export const JOIN_FAILURE_COOLDOWN_MS = 60 * 1000;

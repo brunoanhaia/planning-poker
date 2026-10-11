@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocketServer } from 'ws';
 
 import { ConnectionLimiter } from '../src/connectionLimiter.js';
+import { JOIN_FAILURE_LIMIT } from '../src/constants.js';
 import { WebSocketHandler } from '../src/webSocketHandler.js';
 
 /** One message the handler sent to a socket double. */
@@ -190,6 +191,59 @@ describe('Message dispatch hardening', () => {
 
         expect(messagesOf(host, 'ERROR')).toHaveLength(2);
         expect(lastMessage(host, 'ERROR')?.payload.message).toContain('JSON object');
+    });
+});
+
+describe('Failed room joins', () => {
+    it('spends a budget of wrong codes and then bars the address', () => {
+        const { connect } = boot();
+
+        // The budget is small enough to be spent inside one test, so the numbers
+        // below are the handler's own constants rather than the production ones.
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', { name: `Probe ${attempt}`, roomId: 'ZZZZZZ' });
+        }
+
+        const last = connect();
+        send(last, 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
+
+        expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+    });
+
+    it('audits a code that matched no room', () => {
+        const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+        const { connect } = boot();
+        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
+
+        const records = log.mock.calls.map((call) => JSON.parse(String(call[0])));
+        expect(records).toContainEqual(
+            expect.objectContaining({ action: 'join.rejected.room-not-found', outcome: 'denied' })
+        );
+        log.mockRestore();
+    });
+
+    it('does not let a successful join buy more misses', () => {
+        // Room creation is open to anybody, so a reset on success would be an
+        // oracle: spend the budget minus one on guesses, join a room of its own,
+        // and start again with a full allowance.
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT - 1; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', { name: `Miss ${attempt}`, roomId: 'ZZZZZZ' });
+        }
+
+        // Joining its own room must not clear the address's misses.
+        send(connect(), 'JOIN_ROOM', { name: 'Bob', roomId });
+        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
+
+        const last = connect();
+        send(last, 'JOIN_ROOM', { name: 'Probe again', roomId: 'ZZZZZZ' });
+        expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
     });
 });
 

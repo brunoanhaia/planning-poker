@@ -31,9 +31,13 @@ import {
     DEFAULT_PARTICIPANT_COLOR,
     DEFAULT_TIMER_DURATION_SECONDS,
     HEARTBEAT_INTERVAL_MS,
+    JOIN_FAILURE_COOLDOWN_MS,
+    JOIN_FAILURE_LIMIT,
+    JOIN_FAILURE_WINDOW_MS,
     ROOM_CLEANUP_INTERVAL_MS,
     TIMER_TICK_INTERVAL_MS,
 } from './constants.js';
+import { JoinFailureLimiter } from './joinFailureLimiter.js';
 import { roomManager } from './roomManager.js';
 import { sessionService } from './sessionService.js';
 import { isBacklogFull } from './storyService.js';
@@ -154,6 +158,12 @@ export class WebSocketHandler {
     private readonly clientIdByUser = new Map<string, string>();
     /** Bars a kicked participant from re-entering the room immediately. */
     private readonly bans = new BanService();
+    /** Budget of failed room joins granted to one address. */
+    private readonly joinFailures = new JoinFailureLimiter(
+        JOIN_FAILURE_LIMIT,
+        JOIN_FAILURE_WINDOW_MS,
+        JOIN_FAILURE_COOLDOWN_MS
+    );
     private cleanupInterval: NodeJS.Timeout | null = null;
 
     /**
@@ -176,6 +186,7 @@ export class WebSocketHandler {
         this.cleanupInterval = setInterval(() => {
             const now = Date.now();
             this.bans.sweep(now);
+            this.joinFailures.sweep(now);
             roomManager.sweepIdleRooms(now).forEach((roomId) => {
                 auditLog({ action: 'room.dropped.idle', outcome: 'allowed', roomId });
             });
@@ -511,16 +522,32 @@ export class WebSocketHandler {
 
     /**
      * Handles joining an existing room and binds the session to the connection.
+     *
+     * Two independent bars guard the door before the room is even looked up: the
+     * address budget of failed joins, which is what keeps a guessing client from
+     * walking the room-code keyspace, and the kick bans, which hold the client
+     * that was just removed.
      */
     private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
         const { avatar, color, name, roomId, sessionToken, userId } = payload;
+
+        const address = ws.remoteAddress ?? 'unknown';
+        const now = Date.now();
+        if (!this.joinFailures.allows(address, now)) {
+            auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
+            this.sendError(
+                ws,
+                'Too many attempts with a wrong room code. Try again in a minute.',
+                'RATE_LIMITED'
+            );
+            return;
+        }
 
         const normalizedRoomId = roomId.toUpperCase();
         const binding = sessionService.resolve(sessionToken);
         const isRoomBound = binding?.roomId === normalizedRoomId;
         const isUserBound = !userId || binding?.userId === userId;
         const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
-        const now = Date.now();
 
         // A kick revokes the token the client is holding, so the bar has to be
         // checked on the presented credential: without this the client would
@@ -601,6 +628,14 @@ export class WebSocketHandler {
         );
 
         if (!result) {
+            // A code that matches no room is a guess, and it is the one signal a
+            // brute-force attempt cannot avoid producing.
+            this.joinFailures.recordFailure(address, now);
+            auditLog({
+                action: 'join.rejected.room-not-found',
+                outcome: 'denied',
+                roomId: normalizedRoomId,
+            });
             this.sendError(
                 ws,
                 `Room "${roomId}" not found. Please check room code.`,
@@ -608,7 +643,6 @@ export class WebSocketHandler {
             );
             return;
         }
-
         if (result.error) {
             this.sendError(ws, result.error, result.code);
             return;
