@@ -20,7 +20,7 @@ export interface JoinSessionFormProps {
 export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({ initialRoomCode, onSubmit }) => {
     const [roomCode, setRoomCode] = useState(initialRoomCode);
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-    const { challenge, resetChallenge } = useTurnstile(setTurnstileToken);
+    const { challenge, reset: resetChallenge } = useTurnstile(setTurnstileToken);
 
     const isComplete = roomCode.trim().length === ROOM_CODE_LENGTH;
 

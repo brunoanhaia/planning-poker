@@ -18,12 +18,27 @@ const renderHook = (onToken: (token: string | null) => void) => {
     return { element, resetChallenge: () => resetChallenge(), unmount: view.unmount };
 };
 
+/** What the Turnstile API double recorded, so a test can assert on it. */
+interface RenderCall {
+    element: string;
+    options: {
+        'error-callback'?: () => void;
+        'expired-callback'?: () => void;
+        callback: (token: string) => void;
+        sitekey: string;
+    };
+}
+
 /** Installs a Turnstile API double that records what the hook asked of it. */
 const installApi = () => {
-    const calls = { removed: [] as string[], rendered: [] as unknown[], reset: [] as unknown[] };
+    const calls = {
+        removed: [] as string[],
+        rendered: [] as RenderCall[],
+        reset: [] as unknown[],
+    };
     (window as unknown as { turnstile?: unknown }).turnstile = {
         remove: (widgetId: string) => calls.removed.push(widgetId),
-        render: (element: string, options: unknown) => {
+        render: (element: string, options: RenderCall['options']) => {
             calls.rendered.push({ element, options });
             return 'widget-1';
         },
@@ -86,9 +101,10 @@ describe('useTurnstile', () => {
             dispatchLoad();
         });
 
-        const options = calls.rendered[0]?.options as { callback: (token: string) => void };
+        const options = calls.rendered[0]?.options;
+        expect(options).toBeDefined();
         act(() => {
-            options.callback('a-token');
+            options?.callback('a-token');
         });
 
         expect(onToken).toHaveBeenCalledWith('a-token');
@@ -104,13 +120,11 @@ describe('useTurnstile', () => {
             dispatchLoad();
         });
 
-        const options = calls.rendered[0]?.options as {
-            'expired-callback': () => void;
-            callback: (token: string) => void;
-        };
+        const options = calls.rendered[0]?.options;
+        expect(options).toBeDefined();
         act(() => {
-            options.callback('a-token');
-            options['expired-callback']();
+            options?.callback('a-token');
+            options?.['expired-callback']?.();
         });
 
         expect(onToken).toHaveBeenLastCalledWith(null);
@@ -141,9 +155,10 @@ describe('useTurnstile', () => {
             dispatchLoad();
         });
 
-        const options = calls.rendered[0]?.options as { callback: (token: string) => void };
+        const options = calls.rendered[0]?.options;
+        expect(options).toBeDefined();
         act(() => {
-            options.callback('a-token');
+            options?.callback('a-token');
         });
         act(() => {
             hook.resetChallenge();
