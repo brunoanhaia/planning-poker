@@ -551,7 +551,6 @@ export class WebSocketHandler {
     private async refuseJoin(
         ws: ExtendedWebSocket,
         attempt: {
-            address: string;
             normalizedRoomId: string;
             now: number;
             provenUserId?: string;
@@ -559,8 +558,7 @@ export class WebSocketHandler {
             turnstileToken?: string | null;
         }
     ): Promise<boolean> {
-        const { address, normalizedRoomId, now, provenUserId, sessionToken, turnstileToken } =
-            attempt;
+        const { normalizedRoomId, now, provenUserId, sessionToken, turnstileToken } = attempt;
 
         // A kick revokes the token the client is holding, so the bar has to be
         // checked on the presented credential: without this the client would
@@ -663,7 +661,6 @@ export class WebSocketHandler {
         const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
 
         const isBarred = await this.refuseJoin(ws, {
-            address,
             normalizedRoomId,
             now,
             provenUserId,
