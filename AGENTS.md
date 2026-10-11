@@ -66,7 +66,7 @@ npm run format           # prettier across repo
 
 ## Environment Variables
 
-- Server: `PORT`, `ALLOWED_ORIGINS` (comma-separated), `TRUST_PROXY_HOPS` (proxy hops allowed to set `X-Forwarded-For`; defaults to `0`, the bundled compose stack sets `1` behind its Nginx), `CLIENT_ID_COOKIE_SECURE` (`true` adds `Secure` to the identity cookie for TLS deployments; leave it empty on plain HTTP, where a browser would drop the cookie)
+- Server: `PORT`, `ALLOWED_ORIGINS` (comma-separated), `TRUST_PROXY_HOPS` (proxy hops allowed to set `X-Forwarded-For`; defaults to `0`, the bundled compose stack sets `1` behind its Nginx), `CLIENT_ID_COOKIE_SECURE` (`true` adds `Secure` to the identity cookie for TLS deployments; leave it empty on plain HTTP, where a browser would drop the cookie), `CLOUDFLARE_ENABLED` (`true` takes the real client from `CF-Connecting-IP`, honoured only for requests arriving from a published Cloudflare range), `TURNSTILE_SECRET` (gates a fresh join with a Cloudflare challenge; empty = open joins). Client build-arg: `VITE_TURNSTILE_SITE_KEY` (empty = no widget)
 - Client: `VITE_WS_URL` (production WebSocket URL, e.g. `wss://...`; empty = same-origin via Nginx `/ws` proxy). Baked at build time (`--build-arg VITE_WS_URL=...`).
 - Compose: `SERVER_PORT`, `CLIENT_PORT` (host port mappings). See `.env.example`.
 

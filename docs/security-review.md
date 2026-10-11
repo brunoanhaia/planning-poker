@@ -122,6 +122,15 @@ never accumulate concurrency, so they walked straight past a concurrency-only ca
 Regression tests: `apps/server/tests/connectionLimiter.test.ts` and
 `apps/server/tests/wsUpgrade.test.ts`.
 
+**Behind Cloudflare the address is the real client.** Cloudflare replaces the peer with its
+own edge and the client in `CF-Connecting-IP`, so without that every client behind it would
+look like one address and the limits would answer a whole region with 429. The header is
+honoured only for requests that genuinely arrive from a published Cloudflare range, which
+makes the claim verifiable rather than configured: a client that reaches the listener
+directly and sets the header is still counted under its own address. `X-Forwarded-For` is
+not walked in front of Cloudflare, because the value a client sent before Cloudflare
+overwrote it is not worth honouring.
+
 **The ceilings are sized for a shared address, not against it.** An office, a school or a
 mobile carrier put hundreds of people behind one address, and a limit a crowd can reach
 answers that crowd with 429: `WS_MAX_CONNECTIONS_PER_IP` (300 concurrent) is sized for a
@@ -146,7 +155,8 @@ Failed joins are not written to the audit log, so the attack is invisible.
 ~1.1×10¹² candidates: at the ~1 400 guesses per second a single host could once reach,
 walking the keyspace takes about nine days _with no other control in the way_, against
 minutes before. That removes the reason to be aggressive with the per-address budget, so
-the remaining limits are a backstop rather than the defence.
+the remaining limits are a backstop rather than the defence. The length is pinned by
+`apps/server/tests/idGenerator.test.ts`, so a future shortening cannot slip through silently.
 
 **Fix, part two — `JoinFailureLimiter`** (`apps/server/src/joinFailureLimiter.ts`) charges a budget
 of **distinct** unknown codes per address, applies a cool-down when it is spent, and
@@ -169,6 +179,16 @@ and a carrier-grade NAT would let a single stranger do it to thousands of people
 room is therefore looked up _before_ the budget is consulted, so a code that matches a
 room never sees the budget at all — measured against a live server, 21 wrong codes from
 other users no longer stop a participant holding the correct one from joining.
+
+**Fix, part three — a challenge for the caller with no identity at all.** A participant
+that arrives with nothing but a room code cannot prove it is a browser, which is the one
+thing a code never asked. Cloudflare Turnstile (`apps/server/src/turnstile.ts`) answers it
+without another secret to keep, and its token is single-use, so a captured one cannot be
+replayed. It is opt-in through `TURNSTILE_SECRET` — no secret, no challenge, open joins —
+and is asked only of a participant that cannot already prove who it is, so a reconnecting
+client is never challenged twice. Verification fails closed, because failing open would let
+an attacker take the check offline by blocking it. Cloudflare publishes test keys, so the
+whole chain is exercisable without an account.
 
 ### SEC-06 — Identity cookie (Low)
 
