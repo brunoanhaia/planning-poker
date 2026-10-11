@@ -63,41 +63,68 @@ export const resolvePeerAddress = (
 };
 
 /**
- * Caps how many WebSocket connections one address may hold at the same time.
+ * Caps how many sockets one address may hold, and how fast it may open them.
  *
  * An upgrade never passes through the Express middleware, so the HTTP rate limit
  * does not cover it: a single host could otherwise open sockets until the
  * process ran out of file descriptors, and every other client would pay for it.
- * The cap is enforced on the handshake and released on disconnect, so a browser
- * with a few tabs is never affected while a flood is answered with `429` before
- * the connection is ever upgraded.
+ *
+ * Both limits are keyed on the peer address, which is a shared resource on
+ * purpose: an office, a school or a mobile carrier all put many people behind
+ * one address, and the ceilings are set high enough that a whole team connecting
+ * at once is not mistaken for a flood. The concurrency limit answers the "how
+ * many sockets can this address hold" question; the handshake limit answers the
+ * "how fast is this address opening them" one, because a flood is a burst rather
+ * than a crowd.
  */
 export class ConnectionLimiter {
     /** Live sockets per address. */
     private readonly open = new Map<string, number>();
+    /** Handshake timestamps inside the current window, per address. */
+    private readonly handshakes = new Map<string, number[]>();
 
     /**
      * @param maxConnections - Sockets one address may hold at the same time.
+     * @param maxHandshakesPerWindow - Connections one address may open per window.
+     * @param windowMs - Window the handshake allowance is spent in, in milliseconds.
+     * @param maxTrackedAddresses - Addresses held at once, so churn cannot grow the maps.
      */
-    constructor(private readonly maxConnections: number) {}
+    constructor(
+        private readonly maxConnections: number,
+        private readonly maxHandshakesPerWindow: number,
+        private readonly windowMs: number,
+        private readonly maxTrackedAddresses: number
+    ) {}
 
     /**
      * Reports whether an address still has room for another connection.
      *
      * @param address - The normalized peer address.
-     * @returns True while the address is below the cap.
+     * @param now - Current timestamp, in milliseconds.
+     * @returns True while the address is below both limits.
      */
-    public hasCapacity(address: string): boolean {
-        return this.count(address) < this.maxConnections;
+    public hasCapacity(address: string, now: number): boolean {
+        return (
+            this.count(address) < this.maxConnections &&
+            this.handshakesInWindow(address, now) < this.maxHandshakesPerWindow
+        );
     }
 
     /**
      * Records one more open socket for an address.
      *
      * @param address - The normalized peer address.
+     * @param now - Current timestamp, in milliseconds, for the handshake window.
      */
-    public acquire(address: string): void {
+    public acquire(address: string, now: number): void {
         this.open.set(address, this.count(address) + 1);
+
+        const windowStart = now - this.windowMs;
+        const recent = [...(this.handshakes.get(address) ?? []), now].filter(
+            (at) => at > windowStart
+        );
+        this.handshakes.set(address, recent);
+        this.evictOverflow();
     }
 
     /**
@@ -125,8 +152,31 @@ export class ConnectionLimiter {
         return this.open.get(address) ?? 0;
     }
 
-    /** Addresses currently holding a socket. Exposed for diagnostics and tests. */
+    /** Sockets one address opened inside the current window. */
+    private handshakesInWindow(address: string, now: number): number {
+        return (this.handshakes.get(address) ?? []).filter((at) => at > now - this.windowMs).length;
+    }
+
+    /** Addresses tracked in either map. Exposed for diagnostics and tests. */
     public get trackedAddresses(): number {
-        return this.open.size;
+        return Math.max(this.open.size, this.handshakes.size);
+    }
+
+    /**
+     * Drops the oldest tracked address once a map passes its bound.
+     *
+     * A `Map` keeps insertion order, so the first key is the one that was tracked
+     * longest ago and is therefore closest to having its window expire anyway.
+     */
+    private evictOverflow(): void {
+        [this.open, this.handshakes].forEach((tracked) => {
+            while (tracked.size > this.maxTrackedAddresses) {
+                const oldest = tracked.keys().next();
+                if (oldest.done) {
+                    return;
+                }
+                tracked.delete(oldest.value);
+            }
+        });
     }
 }

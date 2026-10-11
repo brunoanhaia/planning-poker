@@ -33,13 +33,27 @@ export const ROOM_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 /**
  * WebSocket connections one address may hold at the same time.
  *
- * A handful of tabs plus a reconnection is far below this, so it only ever
- * answers a flood.
+ * Sized for a whole organisation behind one address: every participant of a
+ * 100-person room is one socket, and a company spread over several rooms is
+ * several hundred. A flood reaches this ceiling long before a crowd does — the
+ * measured one was ~1 500 sockets in three seconds.
  */
-export const WS_MAX_CONNECTIONS_PER_IP = 20;
+export const WS_MAX_CONNECTIONS_PER_IP = 300;
 
-/** Failed room joins one address may spend inside {@link JOIN_FAILURE_WINDOW_MS}. */
-export const JOIN_FAILURE_LIMIT = 20;
+/**
+ * Connections one address may open inside {@link WS_CONNECTION_WINDOW_MS}.
+ *
+ * The backstop against short-lived sockets, which never accumulate concurrency
+ * and so would otherwise walk past the ceiling above. A large team arriving at
+ * once is a burst, not a flood; a flood is orders of magnitude faster.
+ */
+export const WS_MAX_CONNECTIONS_PER_WINDOW = 600;
+
+/** Window the handshake allowance is spent in, in milliseconds. */
+export const WS_CONNECTION_WINDOW_MS = 60 * 1000;
+
+/** Addresses the connection limiter holds at once, so churn cannot grow its maps. */
+export const WS_MAX_TRACKED_ADDRESSES = 5_000;
 
 /** Sliding window the failed-join budget is spent in, in milliseconds. */
 export const JOIN_FAILURE_WINDOW_MS = 60 * 1000;
@@ -54,3 +68,6 @@ export const JOIN_FAILURE_COOLDOWN_MS = 60 * 1000;
  * hourly sweep only reclaims them, so the tracked state needs a bound of its own.
  */
 export const JOIN_FAILURE_MAX_TRACKED_ADDRESSES = 5_000;
+
+/** Distinct unknown room codes one address may probe inside {@link JOIN_FAILURE_WINDOW_MS}. */
+export const JOIN_FAILURE_LIMIT = 30;

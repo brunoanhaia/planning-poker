@@ -196,17 +196,15 @@ describe('Message dispatch hardening', () => {
 });
 
 describe('Failed room joins', () => {
-    it('spends a budget of wrong codes and then bars the address', () => {
+    it('spends a budget of distinct wrong codes and then refuses the guesses', () => {
         const { connect } = boot();
 
-        // The budget is small enough to be spent inside one test, so the numbers
-        // below are the handler's own constants rather than the production ones.
         for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
-            send(connect(), 'JOIN_ROOM', { name: `Probe ${attempt}`, roomId: 'ZZZZZZ' });
+            send(connect(), 'JOIN_ROOM', { name: `Probe ${attempt}`, roomId: `CODE${attempt}` });
         }
 
         const last = connect();
-        send(last, 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
+        send(last, 'JOIN_ROOM', { name: 'Probe', roomId: 'ONEMORE' });
 
         expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
     });
@@ -224,6 +222,40 @@ describe('Failed room joins', () => {
         log.mockRestore();
     });
 
+    it('counts a code once however often it is retyped', () => {
+        // A shared address is not barred by its own users retyping one code.
+        const { connect } = boot();
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT * 2; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', { name: 'Retyper', roomId: 'ZZZZZZ' });
+        }
+
+        const honest = connect();
+        send(honest, 'JOIN_ROOM', { name: 'Honest', roomId: 'ZZZZZZ' });
+
+        expect(lastMessage(honest, 'ERROR')?.payload.code).toBe('ROOM_NOT_FOUND');
+    });
+
+    it('still admits a code that exists once the budget is spent', () => {
+        // The bar is for guessing, never for joining: a room that exists is
+        // looked up before the budget is consulted.
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', { name: `Probe ${attempt}`, roomId: `CODE${attempt}` });
+        }
+
+        const participant = connect();
+        send(participant, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        expect(lastMessage(participant, 'ERROR')).toBeUndefined();
+        expect(participantIdOf(participant)).toBeTruthy();
+    });
+
     it('does not let a successful join buy more misses', () => {
         // Room creation is open to anybody, so a reset on success would be an
         // oracle: spend the budget minus one on guesses, join a room of its own,
@@ -235,15 +267,14 @@ describe('Failed room joins', () => {
         const roomId = roomIdOf(host);
 
         for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT - 1; attempt += 1) {
-            send(connect(), 'JOIN_ROOM', { name: `Miss ${attempt}`, roomId: 'ZZZZZZ' });
+            send(connect(), 'JOIN_ROOM', { name: `Miss ${attempt}`, roomId: `CODE${attempt}` });
         }
 
-        // Joining its own room must not clear the address's misses.
         send(connect(), 'JOIN_ROOM', { name: 'Bob', roomId });
-        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
+        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'LASTONE' });
 
         const last = connect();
-        send(last, 'JOIN_ROOM', { name: 'Probe again', roomId: 'ZZZZZZ' });
+        send(last, 'JOIN_ROOM', { name: 'Probe again', roomId: 'ANOTHER' });
         expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
     });
 });

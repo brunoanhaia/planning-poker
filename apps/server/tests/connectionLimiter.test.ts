@@ -7,6 +7,10 @@ import {
     resolvePeerAddress,
 } from '../src/connectionLimiter.js';
 
+/** A limiter with a roomy concurrency ceiling and a modest handshake allowance. */
+const limiter = (maxConnections = 3, maxHandshakes = 2, windowMs = 60_000): ConnectionLimiter =>
+    new ConnectionLimiter(maxConnections, maxHandshakes, windowMs, 10);
+
 /** Builds the handshake shape the resolver reads. */
 const handshake = (options: {
     remoteAddress?: string;
@@ -98,60 +102,133 @@ describe('normalizeAddress', () => {
 
 describe('ConnectionLimiter', () => {
     it('admits connections up to the cap and refuses the next one', () => {
-        const limiter = new ConnectionLimiter(3);
+        const budget = limiter();
 
-        expect(limiter.hasCapacity('10.0.0.1')).toBe(true);
-        limiter.acquire('10.0.0.1');
-        limiter.acquire('10.0.0.1');
-        limiter.acquire('10.0.0.1');
+        expect(budget.hasCapacity('10.0.0.1', 1_000)).toBe(true);
+        budget.acquire('10.0.0.1', 1_000);
+        budget.acquire('10.0.0.1', 1_000);
+        budget.acquire('10.0.0.1', 1_000);
 
-        expect(limiter.count('10.0.0.1')).toBe(3);
-        expect(limiter.hasCapacity('10.0.0.1')).toBe(false);
+        expect(budget.count('10.0.0.1')).toBe(3);
+        expect(budget.hasCapacity('10.0.0.1', 1_000)).toBe(false);
     });
 
     it('frees a slot as soon as a socket closes', () => {
-        const limiter = new ConnectionLimiter(1);
-        limiter.acquire('10.0.0.1');
+        const budget = limiter(1, 10);
+        budget.acquire('10.0.0.1', 1_000);
 
-        limiter.release('10.0.0.1');
+        budget.release('10.0.0.1');
 
-        expect(limiter.hasCapacity('10.0.0.1')).toBe(true);
+        expect(budget.hasCapacity('10.0.0.1', 1_000)).toBe(true);
     });
 
     it('forgets an address whose last socket left', () => {
-        const limiter = new ConnectionLimiter(2);
-        limiter.acquire('10.0.0.1');
-        limiter.release('10.0.0.1');
+        const budget = limiter(2, 10);
+        budget.acquire('10.0.0.1', 1_000);
+        budget.release('10.0.0.1');
 
-        expect(limiter.count('10.0.0.1')).toBe(0);
-        expect(limiter.trackedAddresses).toBe(0);
+        // The socket is gone; the handshake record stays for its window, which
+        // is what caps how fast the same address may connect again.
+        expect(budget.count('10.0.0.1')).toBe(0);
     });
 
     it('never drops below zero when a socket is released twice', () => {
-        const limiter = new ConnectionLimiter(2);
-        limiter.acquire('10.0.0.1');
-        limiter.release('10.0.0.1');
-        limiter.release('10.0.0.1');
+        const budget = limiter(2, 10);
+        budget.acquire('10.0.0.1', 1_000);
+        budget.release('10.0.0.1');
+        budget.release('10.0.0.1');
 
-        expect(limiter.count('10.0.0.1')).toBe(0);
-        expect(limiter.trackedAddresses).toBe(0);
+        expect(budget.count('10.0.0.1')).toBe(0);
+        expect(budget.trackedAddresses).toBeGreaterThanOrEqual(1);
     });
 
     it('counts addresses independently', () => {
-        const limiter = new ConnectionLimiter(2);
-        limiter.acquire('10.0.0.1');
-        limiter.acquire('10.0.0.1');
-        limiter.acquire('10.0.0.2');
+        const budget = limiter(2, 10);
+        budget.acquire('10.0.0.1', 1_000);
+        budget.acquire('10.0.0.1', 1_000);
+        budget.acquire('10.0.0.2', 1_000);
 
-        expect(limiter.hasCapacity('10.0.0.1')).toBe(false);
-        expect(limiter.hasCapacity('10.0.0.2')).toBe(true);
-        expect(limiter.trackedAddresses).toBe(2);
+        expect(budget.hasCapacity('10.0.0.1', 1_000)).toBe(false);
+        expect(budget.hasCapacity('10.0.0.2', 1_000)).toBe(true);
+        expect(budget.trackedAddresses).toBe(2);
     });
 
     it('treats a mapped and a plain address as the same client', () => {
-        const limiter = new ConnectionLimiter(1);
-        limiter.acquire(normalizeAddress('::ffff:10.0.0.1'));
+        const budget = limiter(1, 10);
+        budget.acquire(normalizeAddress('::ffff:10.0.0.1'));
 
-        expect(limiter.hasCapacity(normalizeAddress('10.0.0.1'))).toBe(false);
+        expect(budget.hasCapacity(normalizeAddress('10.0.0.1'), 1_000)).toBe(false);
+    });
+});
+
+describe('ConnectionLimiter handshake allowance', () => {
+    it('lets a whole organisation connect at once', () => {
+        // A NAT'd office of three hundred opens a tab each in the same minute;
+        // that is a crowd, not a flood, and must not be answered with 429.
+        const budget = limiter(300, 600);
+        const now = 1_000;
+
+        for (let person = 0; person < 300; person += 1) {
+            budget.acquire('203.0.113.7', now);
+        }
+
+        expect(budget.count('203.0.113.7')).toBe(300);
+    });
+
+    it('refuses the socket that would pass the ceiling', () => {
+        const budget = limiter(300, 600);
+        const now = 1_000;
+
+        for (let person = 0; person < 300; person += 1) {
+            budget.acquire('203.0.113.7', now);
+        }
+
+        expect(budget.hasCapacity('203.0.113.7', now)).toBe(false);
+    });
+
+    it('still refuses a burst of short-lived sockets', () => {
+        // Sockets that close immediately never accumulate concurrency, so only the
+        // handshake rate catches a flood of short-lived connections.
+        const budget = limiter(300, 600);
+
+        for (let burst = 0; burst < 600; burst += 1) {
+            budget.acquire('198.51.100.9', 1_000);
+            budget.release('198.51.100.9');
+        }
+
+        expect(budget.hasCapacity('198.51.100.9', 1_000)).toBe(false);
+    });
+
+    it('refuses a burst of handshakes even under the concurrency ceiling', () => {
+        // Sockets that close immediately never accumulate concurrency, so only the
+        // handshake rate catches a flood of short-lived connections.
+        const budget = limiter(100, 120);
+
+        for (let burst = 0; burst < 120; burst += 1) {
+            budget.acquire('198.51.100.9', 1_000);
+            budget.release('198.51.100.9');
+        }
+
+        expect(budget.hasCapacity('198.51.100.9', 1_000)).toBe(false);
+    });
+
+    it('restores the allowance once the window elapses', () => {
+        const budget = limiter(100, 2, 60_000);
+
+        budget.acquire('10.0.0.1', 1_000);
+        budget.acquire('10.0.0.1', 1_100);
+        expect(budget.hasCapacity('10.0.0.1', 1_200)).toBe(false);
+
+        expect(budget.hasCapacity('10.0.0.1', 1_000 + 60_000 + 1)).toBe(true);
+    });
+
+    it('bounds how many addresses it tracks', () => {
+        const budget = new ConnectionLimiter(100, 1, 60_000, 10);
+
+        for (let address = 0; address < 200; address += 1) {
+            budget.acquire(`10.0.${address}.1`, 1_000);
+        }
+
+        expect(budget.trackedAddresses).toBe(10);
     });
 });

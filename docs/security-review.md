@@ -117,10 +117,18 @@ descriptor and memory exhaustion for every other client.
 
 **Fix:** `ConnectionLimiter` (`apps/server/src/connectionLimiter.ts`) counts open sockets
 per normalized peer address, enforced in `verifyClient` (429 before the upgrade) and
-released on `close`. Limit: `WS_MAX_CONNECTIONS_PER_IP` in
-`apps/server/src/constants.ts`. Regression tests:
-`apps/server/tests/connectionLimiter.test.ts` and
+released on `close`, alongside a handshake _rate_ that catches short-lived sockets — those
+never accumulate concurrency, so they walked straight past a concurrency-only cap.
+Regression tests: `apps/server/tests/connectionLimiter.test.ts` and
 `apps/server/tests/wsUpgrade.test.ts`.
+
+**The ceilings are sized for a shared address, not against it.** An office, a school or a
+mobile carrier put hundreds of people behind one address, and a limit a crowd can reach
+answers that crowd with 429: `WS_MAX_CONNECTIONS_PER_IP` (300 concurrent) is sized for a
+100-person room plus several more rooms behind the same NAT, and
+`WS_MAX_CONNECTIONS_PER_WINDOW` (600 per minute) for a large team arriving at once. Both
+sit an order of magnitude above any plausible human burst and far below the measured flood
+of 1 500 sockets in three seconds, and both are constants a deployment can move.
 
 ### SEC-05 — Room-code brute force (Medium)
 
@@ -134,16 +142,26 @@ socket.
 **1 376 guesses/second from a single host**, ~13 minutes to a live room at that rate.
 Failed joins are not written to the audit log, so the attack is invisible.
 
-**Fix:** `JoinFailureLimiter` (`apps/server/src/joinFailureLimiter.ts`) counts failed
-joins per address in a sliding window and applies a cool-down when the budget is spent;
-a successful join deliberately does **not** clear the counter, because room
-creation is open to anybody and a reset would hand a guessing client an oracle.
-Failed lookups are audited
-(`join.rejected.room-not-found`). The tracked state is itself bounded by
-`JOIN_FAILURE_MAX_TRACKED_ADDRESSES`, because a client cycling through distinct
-addresses leaves one record each and the hourly sweep only reclaims them. Regression
-tests: `apps/server/tests/joinFailureLimiter.test.ts` and
+**Fix:** `JoinFailureLimiter` (`apps/server/src/joinFailureLimiter.ts`) charges a budget
+of **distinct** unknown codes per address, applies a cool-down when it is spent, and
+audits every lookup that matched no room (`join.rejected.room-not-found`). The tracked
+state is bounded by `JOIN_FAILURE_MAX_TRACKED_ADDRESSES`, because a client cycling through
+distinct addresses leaves one record each and the hourly sweep only reclaims them.
+Regression tests: `apps/server/tests/joinFailureLimiter.test.ts` and
 `apps/server/tests/kickBanFlow.test.ts`.
+
+**Why distinct codes and not attempts:** a person who mistypes retypes the _same_ wrong
+code; a brute-forcer generates thousands of _different_ ones. Counting distinct codes
+collapses a whole office of typos into a single entry, so a shared address cannot be
+barred by its own users.
+
+**The budget never blocks a code that exists.** The first version counted _attempts_ and
+refused every join from a barred address, which punished everybody behind a shared
+address: one office's typos locked their colleagues out of the room they were entering,
+and a carrier-grade NAT would let a single stranger do it to thousands of people. The
+room is therefore looked up _before_ the budget is consulted, so a code that matches a
+room never sees the budget at all — measured against a live server, 21 wrong codes from
+other users no longer stop a participant holding the correct one from joining.
 
 ### SEC-06 — Identity cookie (Low)
 

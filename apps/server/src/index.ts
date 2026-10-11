@@ -22,7 +22,12 @@ import {
     parseClientId,
 } from './clientIdentity.js';
 import { ConnectionLimiter, resolvePeerAddress } from './connectionLimiter.js';
-import { WS_MAX_CONNECTIONS_PER_IP } from './constants.js';
+import {
+    WS_CONNECTION_WINDOW_MS,
+    WS_MAX_CONNECTIONS_PER_IP,
+    WS_MAX_CONNECTIONS_PER_WINDOW,
+    WS_MAX_TRACKED_ADDRESSES,
+} from './constants.js';
 import { WebSocketHandler } from './webSocketHandler.js';
 
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173'];
@@ -194,7 +199,12 @@ export const startServer = (options: StartServerOptions): RunningServer => {
 
     // Upgrades bypass Express, so the HTTP rate limit never sees them: this is
     // what stops one address from holding sockets until the process runs out.
-    const connections = new ConnectionLimiter(WS_MAX_CONNECTIONS_PER_IP);
+    const connections = new ConnectionLimiter(
+        WS_MAX_CONNECTIONS_PER_IP,
+        WS_MAX_CONNECTIONS_PER_WINDOW,
+        WS_CONNECTION_WINDOW_MS,
+        WS_MAX_TRACKED_ADDRESSES
+    );
     const trustProxyHops = options.trustProxyHops ?? 0;
 
     const wss = new WebSocketServer({
@@ -209,7 +219,7 @@ export const startServer = (options: StartServerOptions): RunningServer => {
                 return;
             }
             const address = resolvePeerAddress(info.req, trustProxyHops);
-            if (!connections.hasCapacity(address)) {
+            if (!connections.hasCapacity(address, Date.now())) {
                 auditLog({
                     action: 'connection.rejected.limit',
                     outcome: 'denied',

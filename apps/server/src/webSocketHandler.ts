@@ -222,7 +222,7 @@ export class WebSocketHandler {
             ws.remoteAddress = resolvePeerAddress(request, this.trustProxyHops);
             // The handshake already reserved one of this address's slots; the
             // same bookkeeping is what releases it again on disconnect.
-            this.connections.acquire(ws.remoteAddress);
+            this.connections.acquire(ws.remoteAddress, Date.now());
 
             ws.on('pong', () => {
                 ws.isAlive = true;
@@ -525,26 +525,16 @@ export class WebSocketHandler {
     /**
      * Handles joining an existing room and binds the session to the connection.
      *
-     * Two independent bars guard the door before the room is even looked up: the
-     * address budget of failed joins, which is what keeps a guessing client from
-     * walking the room-code keyspace, and the kick bans, which hold the client
-     * that was just removed.
+     * Three bars are checked, and only two of them stand in front of the door:
+     * the kick bans come first, the failed-join budget is spent only on codes
+     * that match no room, and the browser-profile bar is what survives a
+     * discarded session token.
      */
     private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
         const { avatar, color, name, roomId, sessionToken, userId } = payload;
 
         const address = ws.remoteAddress ?? 'unknown';
         const now = Date.now();
-        if (!this.joinFailures.allows(address, now)) {
-            auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
-            this.sendError(
-                ws,
-                'Too many attempts with a wrong room code. Try again in a minute.',
-                'RATE_LIMITED'
-            );
-            return;
-        }
-
         const normalizedRoomId = roomId.toUpperCase();
         const binding = sessionService.resolve(sessionToken);
         const isRoomBound = binding?.roomId === normalizedRoomId;
@@ -631,8 +621,20 @@ export class WebSocketHandler {
 
         if (!result) {
             // A code that matches no room is a guess, and it is the one signal a
-            // brute-force attempt cannot avoid producing.
-            this.joinFailures.recordFailure(address, now);
+            // brute-force attempt cannot avoid producing. The room was looked up
+            // first, so a code that exists never consults this budget: the bar is
+            // for guessing, not for joining, and a NAT'd team cannot be locked
+            // out of the room it is actually entering.
+            if (!this.joinFailures.allows(address, now)) {
+                auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
+                this.sendError(
+                    ws,
+                    'Too many wrong room codes from this network. Try again in a minute.',
+                    'RATE_LIMITED'
+                );
+                return;
+            }
+            this.joinFailures.recordFailure(address, normalizedRoomId, now);
             auditLog({
                 action: 'join.rejected.room-not-found',
                 outcome: 'denied',

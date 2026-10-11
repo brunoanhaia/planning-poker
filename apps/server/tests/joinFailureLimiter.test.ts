@@ -3,34 +3,49 @@ import { describe, expect, it } from 'vitest';
 import { JoinFailureLimiter } from '../src/joinFailureLimiter.js';
 
 /** A limiter with a small budget, driven by an explicit clock. */
-const budgetOf = (): JoinFailureLimiter => new JoinFailureLimiter(3, 60_000, 60_000);
+const budgetOf = (distinctCodes = 3): JoinFailureLimiter =>
+    new JoinFailureLimiter(distinctCodes, 60_000, 60_000, 10);
 
 describe('JoinFailureLimiter', () => {
     it('allows joins while the address stays inside its budget', () => {
         const budget = budgetOf();
 
-        budget.recordFailure('10.0.0.1', 1_000);
-        budget.recordFailure('10.0.0.1', 1_100);
+        budget.recordFailure('10.0.0.1', 'AAAAAA', 1_000);
+        budget.recordFailure('10.0.0.1', 'BBBBBB', 1_100);
 
         expect(budget.allows('10.0.0.1', 1_200)).toBe(true);
     });
 
-    it('bars the address once it spent the budget inside the window', () => {
+    it('bars the address once it probed its budget of distinct codes', () => {
         const budget = budgetOf();
 
-        budget.recordFailure('10.0.0.1', 1_000);
-        budget.recordFailure('10.0.0.1', 1_100);
-        budget.recordFailure('10.0.0.1', 2_000);
+        budget.recordFailure('10.0.0.1', 'AAAAAA', 1_000);
+        budget.recordFailure('10.0.0.1', 'BBBBBB', 1_100);
+        budget.recordFailure('10.0.0.1', 'CCCCCC', 2_000);
 
         expect(budget.allows('10.0.0.1', 2_100)).toBe(false);
         expect(budget.barredAddresses).toBe(1);
+    });
+
+    it('counts a code once however often it is retyped', () => {
+        // A person who mistypes retypes the same wrong code; that must not be
+        // counted as several guesses, or a shared address bars its own users.
+        const budget = budgetOf();
+
+        budget.recordFailure('10.0.0.1', 'AAAAAA', 1_000);
+        budget.recordFailure('10.0.0.1', 'AAAAAA', 1_100);
+        budget.recordFailure('10.0.0.1', 'AAAAAA', 1_200);
+
+        expect(budget.probedCodes('10.0.0.1')).toBe(1);
+        expect(budget.allows('10.0.0.1', 1_300)).toBe(true);
+        expect(budget.barredAddresses).toBe(0);
     });
 
     it('lets the address back once the cool-down expires', () => {
         const budget = budgetOf();
 
         for (let attempt = 0; attempt < 3; attempt += 1) {
-            budget.recordFailure('10.0.0.1', 1_000);
+            budget.recordFailure('10.0.0.1', `CODE${attempt}`, 1_000);
         }
         expect(budget.allows('10.0.0.1', 2_000)).toBe(false);
 
@@ -38,27 +53,29 @@ describe('JoinFailureLimiter', () => {
         expect(budget.barredAddresses).toBe(0);
     });
 
-    it('forgets misses that fell out of the window', () => {
-        const budget = new JoinFailureLimiter(3, 10_000, 60_000);
+    it('forgets codes that fell out of the window', () => {
+        const budget = budgetOf(3);
 
-        budget.recordFailure('10.0.0.1', 1_000);
-        budget.recordFailure('10.0.0.1', 1_100);
-        budget.recordFailure('10.0.0.1', 40_000);
+        budget.recordFailure('10.0.0.1', 'AAAAAA', 1_000);
+        budget.recordFailure('10.0.0.1', 'BBBBBB', 1_100);
+        budget.recordFailure('10.0.0.1', 'CCCCCC', 1_100 + 60_000 + 1);
 
-        // Only the last miss is still inside the window, so the address is not barred.
-        expect(budget.allows('10.0.0.1', 40_100)).toBe(true);
+        // Only the last code is still inside the window, so the address keeps its
+        // budget and is not barred.
+        expect(budget.probedCodes('10.0.0.1')).toBe(1);
+        expect(budget.allows('10.0.0.1', 1_000 + 60_000 + 2)).toBe(true);
         expect(budget.barredAddresses).toBe(0);
     });
 
-    it('lets the window, not a success, decay the misses', () => {
+    it('lets the window, not a success, decay the codes', () => {
         // A reset on success would be an oracle: room creation is open to
-        // anybody, so a guessing client could spend the budget, join a room of
-        // its own and start again with a full allowance.
+        // anybody, so a guessing client could spend the budget minus one, join a
+        // room of its own and start again.
         const budget = budgetOf();
 
-        budget.recordFailure('10.0.0.1', 1_000);
-        budget.recordFailure('10.0.0.1', 1_100);
-        budget.recordFailure('10.0.0.1', 2_000);
+        budget.recordFailure('10.0.0.1', 'AAAAAA', 1_000);
+        budget.recordFailure('10.0.0.1', 'BBBBBB', 1_100);
+        budget.recordFailure('10.0.0.1', 'CCCCCC', 2_000);
 
         expect(budget.allows('10.0.0.1', 2_100)).toBe(false);
         expect(budget.allows('10.0.0.1', 2_000 + 60_000 + 1)).toBe(true);
@@ -68,7 +85,7 @@ describe('JoinFailureLimiter', () => {
         const budget = budgetOf();
 
         for (let attempt = 0; attempt < 3; attempt += 1) {
-            budget.recordFailure('10.0.0.1', 1_000);
+            budget.recordFailure('10.0.0.1', `CODE${attempt}`, 1_000);
         }
 
         expect(budget.allows('10.0.0.1', 2_000)).toBe(false);
@@ -78,7 +95,7 @@ describe('JoinFailureLimiter', () => {
     it('drops what expired when swept', () => {
         const budget = budgetOf();
         for (let attempt = 0; attempt < 3; attempt += 1) {
-            budget.recordFailure('10.0.0.1', 1_000);
+            budget.recordFailure('10.0.0.1', `CODE${attempt}`, 1_000);
         }
 
         budget.sweep(1_000 + 60_000 + 1);
@@ -93,7 +110,7 @@ describe('JoinFailureLimiter', () => {
         const budget = new JoinFailureLimiter(3, 60_000, 60_000, 10);
 
         for (let address = 0; address < 200; address += 1) {
-            budget.recordFailure(`10.0.${address}.1`, 1_000);
+            budget.recordFailure(`10.0.${address}.1`, 'AAAAAA', 1_000);
         }
 
         expect(budget.trackedAddresses).toBe(10);
@@ -103,7 +120,7 @@ describe('JoinFailureLimiter', () => {
         const budget = new JoinFailureLimiter(1, 60_000, 60_000, 10);
 
         for (let address = 0; address < 50; address += 1) {
-            budget.recordFailure(`10.0.${address}.1`, 1_000);
+            budget.recordFailure(`10.0.${address}.1`, 'AAAAAA', 1_000);
         }
 
         expect(budget.barredAddresses).toBe(10);
@@ -113,16 +130,16 @@ describe('JoinFailureLimiter', () => {
         const budget = new JoinFailureLimiter(3, 60_000, 60_000, 5);
 
         for (let address = 0; address < 20; address += 1) {
-            budget.recordFailure(`10.0.${address}.1`, 1_000);
+            budget.recordFailure(`10.0.${address}.1`, `OLD${address}`, 1_000);
         }
         const newest = '10.0.19.1';
 
         expect(budget.trackedAddresses).toBe(5);
-        budget.recordFailure(newest, 2_000);
+        budget.recordFailure(newest, 'AAAAAA', 2_000);
 
-        // The newest address survives the eviction, and its miss is still counted.
-        budget.recordFailure(newest, 2_001);
-        budget.recordFailure(newest, 2_002);
+        // The newest address survives the eviction, and its codes are still counted.
+        budget.recordFailure(newest, 'BBBBBB', 2_001);
+        budget.recordFailure(newest, 'CCCCCC', 2_002);
         expect(budget.allows(newest, 2_003)).toBe(false);
     });
 });
