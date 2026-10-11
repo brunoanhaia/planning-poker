@@ -81,11 +81,11 @@ single `BULK_ADD_STORIES` frame, which the server rejects at 32 KiB — turning 
 admin action into SEC-01.
 
 **Fix:** the client now splits an import into frame-safe batches
-(`chunkStoriesForImport` in `apps/client/src/components/story-backlog/story-backlog.utils.ts`),
+(`chunkStoriesForImport` in `apps/client/src/utils/bulk-import.ts`),
 packs them by measured serialized size inside a byte budget, clamps every field to the
 server limits and keeps each batch at or below `MAX_BULK_STORIES`. The transport loop
 lives in the socket provider, so the component stays unchanged. Regression tests:
-`apps/client/src/components/story-backlog/story-backlog.utils.test.ts`.
+`apps/client/src/utils/bulk-import.test.ts`.
 
 ### SEC-03 — Prototype-chain dispatch (Medium)
 
@@ -106,7 +106,7 @@ Failed to parse WebSocket message: TypeError: schema.safeParse is not a function
 
 **Fix:** dispatch only honours own properties (`Object.hasOwn`) and non-object messages
 are rejected before lookup. Regression tests: `apps/server/tests/validation.test.ts` and
-`apps/server/tests/securityHardening.test.ts`.
+`apps/server/tests/kickBanFlow.test.ts`.
 
 ### SEC-04 — Connection flood (Medium)
 
@@ -136,7 +136,9 @@ Failed joins are not written to the audit log, so the attack is invisible.
 
 **Fix:** `JoinFailureLimiter` (`apps/server/src/joinFailureLimiter.ts`) counts failed
 joins per address in a sliding window and applies a cool-down when the budget is spent;
-a successful join clears the counter. Failed lookups are audited
+a successful join deliberately does **not** clear the counter, because room
+creation is open to anybody and a reset would hand a guessing client an oracle.
+Failed lookups are audited
 (`join.rejected.room-not-found`). Regression tests:
 `apps/server/tests/joinFailureLimiter.test.ts` and
 `apps/server/tests/kickBanFlow.test.ts`.
