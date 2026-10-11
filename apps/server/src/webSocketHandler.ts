@@ -377,6 +377,12 @@ export class WebSocketHandler {
      * inherited keys as well, so `type: "constructor"` would otherwise reach the
      * dispatch table and hand the handler a value that is not a handler at all.
      *
+     * Routes incoming WebSocket messages to domain operations.
+     *
+     * The lookup is restricted to own properties: a plain object index resolves
+     * inherited keys as well, so `type: "constructor"` would otherwise reach the
+     * dispatch table and hand the handler a value that is not a handler at all.
+     *
      * @param ws - The sender's WebSocket connection.
      * @param msg - The parsed incoming message.
      */
@@ -787,6 +793,15 @@ export class WebSocketHandler {
         }
 
         const room = roomManager.getRoom(session.roomId);
+        if (room?.isEnded) {
+            // A closed session takes no more votes: the result is final.
+            this.sendError(
+                ws,
+                'This session has ended, so no further votes are accepted.',
+                'SESSION_ENDED'
+            );
+            return;
+        }
         if (!room?.activeDeck.includes(payload.vote)) {
             this.sendError(ws, 'Vote value is not part of the active deck.');
             return;

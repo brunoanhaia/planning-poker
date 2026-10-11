@@ -122,7 +122,7 @@ const boot = () => {
     /**
      * Opens a connection the way the handler sees it.
      *
-     * @param options - Origin presence and the identity cookie, if any.
+     * @param options - Origin presence, the identity cookie and the peer address.
      */
     const connect = (options?: {
         clientId?: string;
@@ -132,7 +132,8 @@ const boot = () => {
         const hasOrigin = options?.hasOrigin ?? true;
         // A browser always carries the identity the server issued it, unless a
         // test explicitly asks for one that has none.
-        const clientId = options?.clientId ?? (hasOrigin ? 'default-client' : undefined);
+        const clientId =
+            options?.clientId ?? (hasOrigin ? '11111111-1111-4111-8111-111111111111' : undefined);
         const socket = new SocketDouble();
         socket.hasOrigin = hasOrigin;
         if (clientId) {
@@ -247,10 +248,42 @@ describe('Failed room joins', () => {
     });
 });
 
-/** Identities a browser would carry, shaped as the server mints them. */
-const HOST_CLIENT_ID = '11111111-1111-4111-8111-111111111111';
-const BOB_CLIENT_ID = '22222222-2222-4222-8222-222222222222';
-const CAROL_CLIENT_ID = '33333333-3333-4333-8333-333333333333';
+describe('Ended sessions', () => {
+    it('accepts no further votes once the host ended the session', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const bob = connect();
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        send(host, 'END_SESSION', {});
+        bob.sent.length = 0;
+
+        send(bob, 'VOTE', { vote: 5 });
+
+        const error = lastMessage(bob, 'ERROR');
+        expect(error?.payload.code).toBe('SESSION_ENDED');
+    });
+
+    it('takes no new participant once the session has ended', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        send(host, 'END_SESSION', {});
+
+        const latecomer = connect();
+        send(latecomer, 'JOIN_ROOM', { name: 'Late', roomId });
+
+        expect(lastMessage(latecomer, 'ERROR')?.payload.code).toBe('SESSION_ENDED');
+        expect(latecomer.userId).toBeUndefined();
+    });
+});
 
 describe('Kick ban, end to end', () => {
     it('refuses the rejoin the kicked client attempts with its own token', () => {
@@ -405,6 +438,11 @@ describe('Message throttle, end to end', () => {
         expect(host.closeCodes).toEqual([]);
     });
 });
+
+/** Identities a browser would carry, shaped as the server mints them. */
+const HOST_CLIENT_ID = '11111111-1111-4111-8111-111111111111';
+const BOB_CLIENT_ID = '22222222-2222-4222-8222-222222222222';
+const CAROL_CLIENT_ID = '33333333-3333-4333-8333-333333333333';
 
 describe('Kick ban against a browser profile', () => {
     it('still bars a rejoin that presents no token at all', () => {

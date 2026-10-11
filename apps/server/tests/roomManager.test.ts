@@ -147,6 +147,30 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(rm.getRoom(roomId)!.isEnded).toBe(true);
     });
 
+    it('should refuse a new participant once the session has ended', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.endSession(roomId, hostId);
+
+        const refused = rm.joinRoom(roomId, 'Latecomer', '🐱', '#10b981')!;
+        expect(refused.participant).toBeUndefined();
+        expect(refused.code).toBe('SESSION_ENDED');
+        expect(refused.error).toContain('ended');
+        expect(rm.getRoom(roomId)!.participants).toHaveLength(1);
+    });
+
+    it('should still let a participant of an ended session reconnect', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
+        const bobId = bobResult.participant!.id;
+
+        rm.endSession(roomId, hostId);
+
+        const reconnected = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6', bobId)!;
+        expect(reconnected.participant?.id).toBe(bobId);
+        expect(reconnected.participant?.isOnline).toBe(true);
+    });
+
     it('should only allow admin or co-host to reveal votes and reject non-admin', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
