@@ -52,6 +52,14 @@ describe('resolvePeerAddress behind Cloudflare', () => {
         expect(resolvePeerAddress(request, 0)).toBe('104.16.0.7');
     });
 
+    it('recognises an IPv4 edge reached over IPv6', () => {
+        // Node reports such a peer as `::ffff:…`, which never matches a range.
+        const request = handshake({ remoteAddress: '::ffff:104.16.0.7' });
+        request.headers['cf-connecting-ip'] = '203.0.113.7';
+
+        expect(resolvePeerAddress(request, 0)).toBe('203.0.113.7');
+    });
+
     it('ignores a forged header from an address that is not Cloudflare', () => {
         // A client that reaches the listener directly must not be able to pick its
         // own bucket by setting the header.

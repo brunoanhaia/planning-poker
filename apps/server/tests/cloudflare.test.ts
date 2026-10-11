@@ -36,7 +36,6 @@ describe('isCloudflareAddress', () => {
     it('treats anything it cannot parse as not Cloudflare', () => {
         expect(isCloudflareAddress(undefined)).toBe(false);
         expect(isCloudflareAddress('')).toBe(false);
-        expect(isCloudflareAddress('::ffff:104.16.0.1')).toBe(false);
         expect(isCloudflareAddress('2400:cb00::1')).toBe(false);
         expect(isCloudflareAddress('not-an-address')).toBe(false);
         expect(isCloudflareAddress('104.16.0.999')).toBe(false);

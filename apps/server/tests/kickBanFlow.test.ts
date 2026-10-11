@@ -166,7 +166,11 @@ const sendAndSettle = async (
     payload: unknown
 ): Promise<void> => {
     send(socket, type, payload);
-    await new Promise((resolve) => setImmediate(resolve));
+    // A microtask flush rather than a timer: this file also drives fake clocks,
+    // and `setImmediate` would never fire under them.
+    for (let tick = 0; tick < 25; tick += 1) {
+        await Promise.resolve();
+    }
 };
 
 afterEach(() => {
@@ -176,7 +180,7 @@ afterEach(() => {
 });
 
 describe('Message dispatch hardening', () => {
-    it('answers a type named after an inherited key instead of dispatching it', () => {
+    it('answers a type named after an inherited key instead of dispatching it', async () => {
         // A plain object index resolves inherited keys, so these would otherwise
         // reach the dispatch table and be called as if they were handlers.
         const { connect } = boot();
@@ -195,7 +199,7 @@ describe('Message dispatch hardening', () => {
         expect(messagesOf(host, 'ROOM_STATE')).toHaveLength(0);
     });
 
-    it('answers a message that is not a JSON object', () => {
+    it('answers a message that is not a JSON object', async () => {
         const { connect } = boot();
         const host = connect();
 
@@ -208,24 +212,27 @@ describe('Message dispatch hardening', () => {
 });
 
 describe('Failed room joins', () => {
-    it('spends a budget of distinct wrong codes and then refuses the guesses', () => {
+    it('spends a budget of distinct wrong codes and then refuses the guesses', async () => {
         const { connect } = boot();
 
         for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
-            send(connect(), 'JOIN_ROOM', { name: `Probe ${attempt}`, roomId: `CODE${attempt}` });
+            await sendAndSettle(connect(), 'JOIN_ROOM', {
+                name: `Probe ${attempt}`,
+                roomId: `CODE${attempt}`,
+            });
         }
 
         const last = connect();
-        send(last, 'JOIN_ROOM', { name: 'Probe', roomId: 'ONEMORE' });
+        await sendAndSettle(last, 'JOIN_ROOM', { name: 'Probe', roomId: 'ONEMORE' });
 
         expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
     });
 
-    it('audits a code that matched no room', () => {
+    it('audits a code that matched no room', async () => {
         const log = vi.spyOn(console, 'info').mockImplementation(() => {});
 
         const { connect } = boot();
-        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
+        await sendAndSettle(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
 
         const records = log.mock.calls.map((call) => JSON.parse(String(call[0])));
         expect(records).toContainEqual(
@@ -234,59 +241,65 @@ describe('Failed room joins', () => {
         log.mockRestore();
     });
 
-    it('counts a code once however often it is retyped', () => {
+    it('counts a code once however often it is retyped', async () => {
         // A shared address is not barred by its own users retyping one code.
         const { connect } = boot();
 
         for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT * 2; attempt += 1) {
-            send(connect(), 'JOIN_ROOM', { name: 'Retyper', roomId: 'ZZZZZZ' });
+            await sendAndSettle(connect(), 'JOIN_ROOM', { name: 'Retyper', roomId: 'ZZZZZZ' });
         }
 
         const honest = connect();
-        send(honest, 'JOIN_ROOM', { name: 'Honest', roomId: 'ZZZZZZ' });
+        await sendAndSettle(honest, 'JOIN_ROOM', { name: 'Honest', roomId: 'ZZZZZZ' });
 
         expect(lastMessage(honest, 'ERROR')?.payload.code).toBe('ROOM_NOT_FOUND');
     });
 
-    it('still admits a code that exists once the budget is spent', () => {
+    it('still admits a code that exists once the budget is spent', async () => {
         // The bar is for guessing, never for joining: a room that exists is
         // looked up before the budget is consulted.
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
-            send(connect(), 'JOIN_ROOM', { name: `Probe ${attempt}`, roomId: `CODE${attempt}` });
+            await sendAndSettle(connect(), 'JOIN_ROOM', {
+                name: `Probe ${attempt}`,
+                roomId: `CODE${attempt}`,
+            });
         }
 
         const participant = connect();
-        send(participant, 'JOIN_ROOM', { name: 'Bob', roomId });
+        await sendAndSettle(participant, 'JOIN_ROOM', { name: 'Bob', roomId });
 
         expect(lastMessage(participant, 'ERROR')).toBeUndefined();
         expect(participantIdOf(participant)).toBeTruthy();
     });
 
-    it('does not let a successful join buy more misses', () => {
+    it('does not let a successful join buy more misses', async () => {
         // Room creation is open to anybody, so a reset on success would be an
         // oracle: spend the budget minus one on guesses, join a room of its own,
         // and start again with a full allowance.
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT - 1; attempt += 1) {
-            send(connect(), 'JOIN_ROOM', { name: `Miss ${attempt}`, roomId: `CODE${attempt}` });
+            await sendAndSettle(connect(), 'JOIN_ROOM', {
+                name: `Miss ${attempt}`,
+                roomId: `CODE${attempt}`,
+            });
         }
 
-        send(connect(), 'JOIN_ROOM', { name: 'Bob', roomId });
-        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'LASTONE' });
+        await sendAndSettle(connect(), 'JOIN_ROOM', { name: 'Bob', roomId });
+        await sendAndSettle(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'LASTONE' });
 
         const last = connect();
-        send(last, 'JOIN_ROOM', { name: 'Probe again', roomId: 'ANOTHER' });
+        await sendAndSettle(last, 'JOIN_ROOM', { name: 'Probe again', roomId: 'ANOTHER' });
         expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
     });
 });
@@ -312,7 +325,7 @@ describe('Join challenge', () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const participant = connect();
@@ -326,7 +339,7 @@ describe('Join challenge', () => {
         const { connect } = boot({ turnstile: accepting() });
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const participant = connect();
@@ -340,7 +353,7 @@ describe('Join challenge', () => {
         const { connect } = boot({ turnstile: accepting() });
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const participant = connect();
@@ -358,7 +371,7 @@ describe('Join challenge', () => {
         const { connect } = boot({ turnstile: rejecting() });
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const participant = connect();
@@ -376,7 +389,7 @@ describe('Join challenge', () => {
         const { connect } = boot({ turnstile: accepting() });
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const first = connect();
@@ -401,7 +414,7 @@ describe('Join challenge', () => {
         const { connect } = boot({ turnstile: accepting() });
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const solved = connect();
@@ -427,36 +440,36 @@ describe('Join challenge', () => {
 });
 
 describe('Ended sessions', () => {
-    it('accepts no further votes once the host ended the session', () => {
+    it('accepts no further votes once the host ended the session', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const bob = connect();
-        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        await sendAndSettle(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
 
-        send(host, 'END_SESSION', {});
+        await sendAndSettle(host, 'END_SESSION', {});
         bob.sent.length = 0;
 
-        send(bob, 'VOTE', { vote: 5 });
+        await sendAndSettle(bob, 'VOTE', { vote: 5 });
 
         const error = lastMessage(bob, 'ERROR');
         expect(error?.payload.code).toBe('SESSION_ENDED');
     });
 
-    it('takes no new participant once the session has ended', () => {
+    it('takes no new participant once the session has ended', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
-        send(host, 'END_SESSION', {});
+        await sendAndSettle(host, 'END_SESSION', {});
 
         const latecomer = connect();
-        send(latecomer, 'JOIN_ROOM', { name: 'Late', roomId });
+        await sendAndSettle(latecomer, 'JOIN_ROOM', { name: 'Late', roomId });
 
         expect(lastMessage(latecomer, 'ERROR')?.payload.code).toBe('SESSION_ENDED');
         expect(latecomer.userId).toBeUndefined();
@@ -464,30 +477,30 @@ describe('Ended sessions', () => {
 });
 
 describe('Kick ban, end to end', () => {
-    it('refuses the rejoin the kicked client attempts with its own token', () => {
+    it('refuses the rejoin the kicked client attempts with its own token', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const hostToken = tokenOf(host);
         const roomId = roomIdOf(host);
         expect(roomId).toMatch(/^[A-Z0-9]{8}$/);
 
         const bob = connect();
-        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        await sendAndSettle(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
         const bobToken = tokenOf(bob);
         const bobId = participantIdOf(bob);
         expect(bobToken).toBeTruthy();
         expect(bobId).toBeDefined();
 
         // Alice kicks Bob, which revokes his token.
-        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+        await sendAndSettle(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
         expect(messagesOf(host, 'ERROR')).toHaveLength(0);
         expect(lastMessage(bob, 'KICKED')).toBeDefined();
 
         // Bob comes straight back with the very token that was just revoked.
         const bobAgain = connect();
-        send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId, sessionToken: bobToken });
+        await sendAndSettle(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId, sessionToken: bobToken });
 
         const error = lastMessage(bobAgain, 'ERROR');
         expect(error?.payload.code).toBe('BANNED');
@@ -497,31 +510,35 @@ describe('Kick ban, end to end', () => {
         expect(hostToken).toBeTruthy();
     });
 
-    it('lets the same client back once the bar expires', () => {
+    it('lets the same client back once the bar expires', async () => {
         vi.useFakeTimers();
         try {
             const { connect } = boot();
 
             const host = connect();
-            send(host, 'CREATE_ROOM', { name: 'Alice' });
+            await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
             const roomId = roomIdOf(host);
 
             const bob = connect();
-            send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+            await sendAndSettle(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
             const bobToken = tokenOf(bob);
             const bobId = participantIdOf(bob);
 
-            send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+            await sendAndSettle(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
             // Still barred with the very token that was revoked.
             const barred = connect();
-            send(barred, 'JOIN_ROOM', { name: 'Bob', roomId, sessionToken: bobToken });
+            await sendAndSettle(barred, 'JOIN_ROOM', {
+                name: 'Bob',
+                roomId,
+                sessionToken: bobToken,
+            });
             expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
 
             vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
 
             const bobAgain = connect();
-            send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+            await sendAndSettle(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
             expect(lastMessage(bobAgain, 'ERROR')?.payload.code).toBeUndefined();
             expect(lastMessage(bobAgain, 'SESSION')).toBeDefined();
             expect(bobAgain.userId).toBeTruthy();
@@ -531,15 +548,15 @@ describe('Kick ban, end to end', () => {
         }
     });
 
-    it('does not bar a client that was never in the room', () => {
+    it('does not bar a client that was never in the room', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const stranger = connect();
-        send(stranger, 'JOIN_ROOM', {
+        await sendAndSettle(stranger, 'JOIN_ROOM', {
             name: 'Stranger',
             roomId,
             sessionToken: 'a-token-the-server-never-issued',
@@ -553,18 +570,18 @@ describe('Kick ban, end to end', () => {
 });
 
 describe('Message throttle, end to end', () => {
-    it('disconnects the socket instead of answering every message', () => {
+    it('disconnects the socket instead of answering every message', async () => {
         const { connect } = boot();
 
         // Creating the room already spends one message of the allowance.
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
 
         const spent = 1;
         for (let i = spent; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
-            send(host, 'TOGGLE_AUTO_REVEAL', {});
+            await sendAndSettle(host, 'TOGGLE_AUTO_REVEAL', {});
         }
-        send(host, 'TOGGLE_AUTO_REVEAL', {});
+        await sendAndSettle(host, 'TOGGLE_AUTO_REVEAL', {});
 
         expect(messagesOf(host, 'ERROR')).toHaveLength(1);
         expect(lastMessage(host, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
@@ -573,43 +590,43 @@ describe('Message throttle, end to end', () => {
 
         // Whatever the socket keeps sending is never answered again.
         for (let i = 0; i < 5; i += 1) {
-            send(host, 'TOGGLE_AUTO_REVEAL', {});
+            await sendAndSettle(host, 'TOGGLE_AUTO_REVEAL', {});
         }
         expect(messagesOf(host, 'ERROR')).toHaveLength(1);
         expect(host.closeCodes).toEqual([1008]);
     });
 
-    it('ignores frames that arrive once the socket is closing', () => {
+    it('ignores frames that arrive once the socket is closing', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
 
         // Spend the whole allowance and go one frame over, which closes it.
         for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
-            send(host, 'TOGGLE_AUTO_REVEAL', {});
+            await sendAndSettle(host, 'TOGGLE_AUTO_REVEAL', {});
         }
-        send(host, 'TOGGLE_AUTO_REVEAL', {});
+        await sendAndSettle(host, 'TOGGLE_AUTO_REVEAL', {});
         expect(messagesOf(host, 'ERROR')).toHaveLength(1);
 
         // Whatever is still in flight must not reach the audit log again.
         const auditLines = vi.spyOn(console, 'info').mockImplementation(() => undefined);
         for (let i = 0; i < 5; i += 1) {
-            send(host, 'TOGGLE_AUTO_REVEAL', {});
+            await sendAndSettle(host, 'TOGGLE_AUTO_REVEAL', {});
         }
         auditLines.mockRestore();
 
         expect(messagesOf(host, 'ERROR')).toHaveLength(1);
     });
 
-    it('does not disconnect a socket that stays inside the allowance', () => {
+    it('does not disconnect a socket that stays inside the allowance', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
 
         for (let i = 0; i < WS_THROTTLE_MAX_MESSAGES - 1; i += 1) {
-            send(host, 'TOGGLE_AUTO_REVEAL', {});
+            await sendAndSettle(host, 'TOGGLE_AUTO_REVEAL', {});
         }
 
         expect(messagesOf(host, 'ERROR')).toHaveLength(0);
@@ -623,69 +640,69 @@ const BOB_CLIENT_ID = '22222222-2222-4222-8222-222222222222';
 const CAROL_CLIENT_ID = '33333333-3333-4333-8333-333333333333';
 
 describe('Kick ban against a browser profile', () => {
-    it('still bars a rejoin that presents no token at all', () => {
+    it('still bars a rejoin that presents no token at all', async () => {
         const { connect } = boot();
 
         const host = connect({ clientId: HOST_CLIENT_ID });
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const bob = connect({ clientId: BOB_CLIENT_ID });
-        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        await sendAndSettle(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
         const bobId = participantIdOf(bob);
 
-        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+        await sendAndSettle(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
         // A fresh tab: no Origin-less escape, no token, same browser.
         const bobAgain = connect({ clientId: BOB_CLIENT_ID });
-        send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+        await sendAndSettle(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
 
         expect(lastMessage(bobAgain, 'ERROR')?.payload.code).toBe('BANNED');
         expect(bobAgain.userId).toBeUndefined();
     });
 
-    it('lets a different browser through', () => {
+    it('lets a different browser through', async () => {
         const { connect } = boot();
 
         const host = connect({ clientId: HOST_CLIENT_ID });
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
         const bob = connect({ clientId: BOB_CLIENT_ID });
-        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+        await sendAndSettle(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
         const bobId = participantIdOf(bob);
 
-        send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+        await sendAndSettle(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
         const newcomer = connect({ clientId: CAROL_CLIENT_ID });
-        send(newcomer, 'JOIN_ROOM', { name: 'Carol', roomId });
+        await sendAndSettle(newcomer, 'JOIN_ROOM', { name: 'Carol', roomId });
 
         expect(lastMessage(newcomer, 'SESSION')).toBeDefined();
         expect(newcomer.userId).toBeTruthy();
     });
 
-    it('releases the profile once the bar expires', () => {
+    it('releases the profile once the bar expires', async () => {
         vi.useFakeTimers();
         try {
             const { connect } = boot();
 
             const host = connect({ clientId: HOST_CLIENT_ID });
-            send(host, 'CREATE_ROOM', { name: 'Alice' });
+            await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
             const roomId = roomIdOf(host);
 
             const bob = connect({ clientId: BOB_CLIENT_ID });
-            send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+            await sendAndSettle(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
             const bobId = participantIdOf(bob);
 
-            send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
+            await sendAndSettle(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
             const barred = connect({ clientId: BOB_CLIENT_ID });
-            send(barred, 'JOIN_ROOM', { name: 'Bob', roomId });
+            await sendAndSettle(barred, 'JOIN_ROOM', { name: 'Bob', roomId });
             expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
 
             vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
 
             const bobAgain = connect({ clientId: BOB_CLIENT_ID });
-            send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
+            await sendAndSettle(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
 
             expect(lastMessage(bobAgain, 'SESSION')).toBeDefined();
             expect(bobAgain.userId).not.toBe(bobId);
@@ -696,11 +713,11 @@ describe('Kick ban against a browser profile', () => {
 });
 
 describe('Throttle before parsing', () => {
-    it('charges a malformed frame against the budget', () => {
+    it('charges a malformed frame against the budget', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
 
         // Creating the room already spent one message of the allowance.
         for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
@@ -715,11 +732,11 @@ describe('Throttle before parsing', () => {
         expect(host.closeCodes).toEqual([1008]);
     });
 
-    it('charges an unknown message type against the budget', () => {
+    it('charges an unknown message type against the budget', async () => {
         const { connect } = boot();
 
         const host = connect();
-        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        await sendAndSettle(host, 'CREATE_ROOM', { name: 'Alice' });
 
         for (let i = 1; i < WS_THROTTLE_MAX_MESSAGES; i += 1) {
             host.emit('message', JSON.stringify({ payload: {}, type: 'NOT_A_TYPE' }));

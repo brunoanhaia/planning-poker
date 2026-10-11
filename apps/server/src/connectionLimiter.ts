@@ -51,7 +51,9 @@ export const resolvePeerAddress = (
     // so it is checked before everything else: the address it forwards is the one
     // to use, and `X-Forwarded-For` is then ignored, because what a client sent
     // before Cloudflare overwrote it is not a claim worth honouring.
-    if (isCloudflareAddress(request.socket.remoteAddress)) {
+    // The peer is normalized first, because Node reports an IPv4 client reached
+    // over IPv6 as `::ffff:…` and that form would never match a Cloudflare range.
+    if (isCloudflareAddress(normalizeAddress(request.socket.remoteAddress))) {
         const clientIp = readCloudflareClientIp(request.headers);
         if (clientIp) {
             return normalizeAddress(clientIp);

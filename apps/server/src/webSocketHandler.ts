@@ -537,6 +537,113 @@ export class WebSocketHandler {
     }
 
     /**
+     * Turns away a join that the room has not even been asked about yet.
+     *
+     * Every bar here stands in front of the door rather than inside the room:
+     * the kick bans, the requirement that a non-browser client proves who it is,
+     * and the challenge for a caller that cannot prove anything. A join that
+     * reaches the room is past all of them.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param attempt - What the join presented, and where it came from.
+     * @returns True when the join was turned away and must go no further.
+     */
+    private async refuseJoin(
+        ws: ExtendedWebSocket,
+        attempt: {
+            address: string;
+            normalizedRoomId: string;
+            now: number;
+            provenUserId?: string;
+            sessionToken?: string | null;
+            turnstileToken?: string | null;
+        }
+    ): Promise<boolean> {
+        const { address, normalizedRoomId, now, provenUserId, sessionToken, turnstileToken } =
+            attempt;
+
+        // A kick revokes the token the client is holding, so the bar has to be
+        // checked on the presented credential: without this the client would
+        // come back with a dead token, have no identity to match, and be
+        // handed a brand-new participant.
+        const tokenBan = sessionToken ? this.bans.tokenBanFor(sessionToken, now) : null;
+        if (tokenBan) {
+            this.rejectBanned(ws, tokenBan.roomId, tokenBan.userId);
+            return true;
+        }
+
+        // The bar that survives the revoked token: a browser that was just
+        // kicked can reconnect with a new tab, no token and a fresh name, and
+        // would otherwise be admitted as a brand-new participant.
+        if (ws.clientId && this.bans.isClientBanned(normalizedRoomId, ws.clientId, now)) {
+            this.rejectBanned(ws, normalizedRoomId);
+            return true;
+        }
+
+        // A browser with no identity cookie cannot be named by a kick ban —
+        // in development the page is served from the Vite origin while the
+        // socket reaches this server directly, so the cookie is not shared.
+        // Refusing the join would break that setup, and the ban is advisory
+        // anyway: the identity makes the bar hold, its absence makes it lapse.
+        // Non-browser clients (no Origin) must still prove identity with a
+        // valid session token bound to this room.
+        if (!ws.hasOrigin && !provenUserId) {
+            auditLog({ action: 'join.rejected.token-missing', outcome: 'denied' });
+            this.sendError(
+                ws,
+                'A valid session token is required to join from a non-browser client.'
+            );
+            return true;
+        }
+
+        // Same bar, reached when the join still proves its identity with a live
+        // token — for instance a ban issued without the token being revoked.
+        if (provenUserId && this.bans.isBanned(normalizedRoomId, provenUserId, now)) {
+            this.rejectBanned(ws, normalizedRoomId, provenUserId);
+            return true;
+        }
+
+        // A caller that cannot prove who it is — a fresh participant, arriving
+        // with nothing but a room code — has to show it is a browser first. A
+        // reconnecting participant holds a valid token and is not asked again.
+        if (!provenUserId && this.turnstile.enabled) {
+            const human = await this.turnstile.verify(turnstileToken, ws.remoteAddress);
+            if (!human) {
+                auditLog({ action: 'join.rejected.challenge', outcome: 'denied' });
+                this.sendError(
+                    ws,
+                    'The join challenge could not be verified. Reload the page and try again.',
+                    'CHALLENGE_FAILED'
+                );
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Audits and answers a join from a participant a kick barred.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param roomId - The room the bar was issued in.
+     * @param userId - The participant the bar names, when the join proved one.
+     */
+    private rejectBanned(ws: ExtendedWebSocket, roomId: string, userId?: string): void {
+        auditLog({
+            action: 'join.rejected.banned',
+            outcome: 'denied',
+            roomId,
+            userId,
+        });
+        this.sendError(
+            ws,
+            'You were removed from this session. Try again in a few minutes.',
+            'BANNED'
+        );
+    }
+
+    /**
      * Handles joining an existing room and binds the session to the connection.
      *
      * Three bars are checked, and only two of them stand in front of the door:
@@ -555,90 +662,16 @@ export class WebSocketHandler {
         const isUserBound = !userId || binding?.userId === userId;
         const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
 
-        // A kick revokes the token the client is holding, so the bar has to be
-        // checked on the presented credential: without this the client would
-        // come back with a dead token, have no identity to match, and be
-        // handed a brand-new participant.
-        const tokenBan = sessionToken ? this.bans.tokenBanFor(sessionToken, now) : null;
-        if (tokenBan) {
-            auditLog({
-                action: 'join.rejected.banned',
-                outcome: 'denied',
-                roomId: tokenBan.roomId,
-                userId: tokenBan.userId,
-            });
-            this.sendError(
-                ws,
-                'You were removed from this session. Try again in a few minutes.',
-                'BANNED'
-            );
+        const isBarred = await this.refuseJoin(ws, {
+            address,
+            normalizedRoomId,
+            now,
+            provenUserId,
+            sessionToken,
+            turnstileToken,
+        });
+        if (isBarred) {
             return;
-        }
-
-        // The bar that survives the revoked token: a browser that was just
-        // kicked can reconnect with a new tab, no token and a fresh name, and
-        // would otherwise be admitted as a brand-new participant.
-        if (ws.clientId && this.bans.isClientBanned(normalizedRoomId, ws.clientId, now)) {
-            auditLog({
-                action: 'join.rejected.banned',
-                outcome: 'denied',
-                roomId: normalizedRoomId,
-            });
-            this.sendError(
-                ws,
-                'You were removed from this session. Try again in a few minutes.',
-                'BANNED'
-            );
-            return;
-        }
-
-        // A browser with no identity cookie cannot be named by a kick ban —
-        // in development the page is served from the Vite origin while the
-        // socket reaches this server directly, so the cookie is not shared.
-        // Refusing the join would break that setup, and the ban is advisory
-        // anyway: the identity makes the bar hold, its absence makes it lapse.
-        // Non-browser clients (no Origin) must still prove identity with a
-        // valid session token bound to this room.
-        if (!ws.hasOrigin && !provenUserId) {
-            auditLog({ action: 'join.rejected.token-missing', outcome: 'denied' });
-            this.sendError(
-                ws,
-                'A valid session token is required to join from a non-browser client.'
-            );
-            return;
-        }
-
-        // Same bar, reached when the join still proves its identity with a live
-        // token — for instance a ban issued without the token being revoked.
-        if (provenUserId && this.bans.isBanned(normalizedRoomId, provenUserId, now)) {
-            auditLog({
-                action: 'join.rejected.banned',
-                outcome: 'denied',
-                roomId: normalizedRoomId,
-                userId: provenUserId,
-            });
-            this.sendError(
-                ws,
-                'You were removed from this session. Try again in a few minutes.',
-                'BANNED'
-            );
-            return;
-        }
-
-        // A caller that cannot prove who it is — a fresh participant, arriving with
-        // nothing but a room code — has to show it is a browser first. A
-        // reconnecting participant holds a valid token and is not asked again.
-        if (!provenUserId && this.turnstile.enabled) {
-            const human = await this.turnstile.verify(turnstileToken, ws.remoteAddress);
-            if (!human) {
-                auditLog({ action: 'join.rejected.challenge', outcome: 'denied' });
-                this.sendError(
-                    ws,
-                    'The join challenge could not be verified. Reload the page and try again.',
-                    'CHALLENGE_FAILED'
-                );
-                return;
-            }
         }
 
         const result = roomManager.joinRoom(
