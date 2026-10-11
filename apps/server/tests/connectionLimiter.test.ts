@@ -22,6 +22,46 @@ const handshake = (options: {
         socket: { remoteAddress: options.remoteAddress ?? '127.0.0.1' },
     }) as unknown as http.IncomingMessage;
 
+describe('resolvePeerAddress behind Cloudflare', () => {
+    it('uses the address Cloudflare forwarded, with no configured hops', () => {
+        // The claim is verifiable from the peer itself, so it needs no setting.
+        const request = handshake({
+            remoteAddress: '104.16.0.7',
+            forwardedFor: '1.2.3.4',
+        });
+        request.headers['cf-connecting-ip'] = '203.0.113.7';
+
+        expect(resolvePeerAddress(request, 0)).toBe('203.0.113.7');
+    });
+
+    it('ignores X-Forwarded-For once Cloudflare forwarded the client', () => {
+        // What a client sent before Cloudflare overwrote it is not a claim worth
+        // honouring, so the chain is not walked in front of Cloudflare.
+        const request = handshake({
+            remoteAddress: '104.16.0.7',
+            forwardedFor: '10.0.0.9, 1.2.3.4',
+        });
+        request.headers['cf-connecting-ip'] = '203.0.113.7';
+
+        expect(resolvePeerAddress(request, 2)).toBe('203.0.113.7');
+    });
+
+    it('falls back to the edge when Cloudflare forwarded nothing', () => {
+        const request = handshake({ remoteAddress: '104.16.0.7' });
+
+        expect(resolvePeerAddress(request, 0)).toBe('104.16.0.7');
+    });
+
+    it('ignores a forged header from an address that is not Cloudflare', () => {
+        // A client that reaches the listener directly must not be able to pick its
+        // own bucket by setting the header.
+        const request = handshake({ remoteAddress: '203.0.113.9' });
+        request.headers['cf-connecting-ip'] = '1.2.3.4';
+
+        expect(resolvePeerAddress(request, 0)).toBe('203.0.113.9');
+    });
+});
+
 describe('resolvePeerAddress', () => {
     it('reads the entry the closest trusted proxy appended', () => {
         // The bundled Nginx overwrites the header with the address it accepted.

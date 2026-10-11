@@ -1,5 +1,7 @@
 import http from 'node:http';
 
+import { isCloudflareAddress, readCloudflareClientIp } from './cloudflare.js';
+
 /**
  * Peer address of a connection, normalized so the same client counts once.
  *
@@ -31,6 +33,12 @@ export const normalizeAddress = (address: string | undefined): string => {
  * A listener with no trusted hop never reads the header at all, so a client that
  * reaches it directly cannot pick its own bucket.
  *
+ * Cloudflare is the exception that proves the rule: it replaces the peer address
+ * with its own edge and the client in `CF-Connecting-IP`, so that header is read
+ * only when the socket really comes from a Cloudflare range. `X-Forwarded-For` is
+ * ignored in front of Cloudflare, because the client controls what it sent before
+ * Cloudflare overwrote it, and the value Cloudflare set is the one to trust.
+ *
  * @param request - The handshake request.
  * @param trustProxyHops - Proxy hops in front of this server that may be trusted.
  * @returns The normalized client address.
@@ -39,6 +47,17 @@ export const resolvePeerAddress = (
     request: http.IncomingMessage,
     trustProxyHops: number
 ): string => {
+    // Cloudflare is verified from the peer itself rather than from configuration,
+    // so it is checked before everything else: the address it forwards is the one
+    // to use, and `X-Forwarded-For` is then ignored, because what a client sent
+    // before Cloudflare overwrote it is not a claim worth honouring.
+    if (isCloudflareAddress(request.socket.remoteAddress)) {
+        const clientIp = readCloudflareClientIp(request.headers);
+        if (clientIp) {
+            return normalizeAddress(clientIp);
+        }
+    }
+
     if (trustProxyHops < 1) {
         return normalizeAddress(request.socket.remoteAddress);
     }
