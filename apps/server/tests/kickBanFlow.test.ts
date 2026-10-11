@@ -152,6 +152,38 @@ afterEach(() => {
     }
 });
 
+describe('Message dispatch hardening', () => {
+    it('answers a type named after an inherited key instead of dispatching it', () => {
+        // A plain object index resolves inherited keys, so these would otherwise
+        // reach the dispatch table and be called as if they were handlers.
+        const { connect } = boot();
+        const host = connect();
+
+        ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'].forEach((type) => {
+            host.emit('message', JSON.stringify({ payload: { x: 1 }, type }));
+        });
+
+        const errors = messagesOf(host, 'ERROR');
+        expect(errors).toHaveLength(5);
+        errors.forEach((error) => {
+            expect(error.payload.message).toContain('Unknown action type:');
+            expect(error.payload.code).toBe('FORBIDDEN');
+        });
+        expect(messagesOf(host, 'ROOM_STATE')).toHaveLength(0);
+    });
+
+    it('answers a message that is not a JSON object', () => {
+        const { connect } = boot();
+        const host = connect();
+
+        host.emit('message', JSON.stringify('just a string'));
+        host.emit('message', '42');
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(2);
+        expect(lastMessage(host, 'ERROR')?.payload.message).toContain('JSON object');
+    });
+});
+
 describe('Kick ban, end to end', () => {
     it('refuses the rejoin the kicked client attempts with its own token', () => {
         const { connect } = boot();

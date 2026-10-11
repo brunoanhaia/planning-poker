@@ -334,13 +334,24 @@ export class WebSocketHandler {
     /**
      * Routes incoming WebSocket messages to domain operations.
      *
+     * The lookup is restricted to own properties: a plain object index resolves
+     * inherited keys as well, so `type: "constructor"` would otherwise reach the
+     * dispatch table and hand the handler a value that is not a handler at all.
+     *
      * @param ws - The sender's WebSocket connection.
      * @param msg - The parsed incoming message.
      */
     private handleMessage(ws: ExtendedWebSocket, msg: WSMessage): void {
-        const handler = this.messageHandlers[msg.type];
+        if (typeof msg !== 'object' || msg === null) {
+            this.sendError(ws, 'Invalid message format. Expected a JSON object.', 'FORBIDDEN');
+            return;
+        }
+
+        const handler = Object.hasOwn(this.messageHandlers, msg.type)
+            ? this.messageHandlers[msg.type]
+            : undefined;
         if (!handler) {
-            this.sendError(ws, `Unknown action type: ${msg.type}`, 'FORBIDDEN');
+            this.sendError(ws, `Unknown action type: ${String(msg.type)}`, 'FORBIDDEN');
             return;
         }
 

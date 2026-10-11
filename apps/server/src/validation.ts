@@ -159,12 +159,16 @@ export interface ValidationResult {
  * On success the parsed (and normalized, e.g. trimmed) value is returned so
  * callers can dispatch sanitized data instead of the raw client payload.
  *
+ * The schema lookup is restricted to own properties, so a type named after an
+ * inherited key (`constructor`, `toString`, …) reads as "no schema" instead of
+ * resolving to something on `Object.prototype`.
+ *
  * @param type - The WebSocket message type.
  * @param payload - The raw, untrusted payload received from the client.
  * @returns A result carrying the parsed data, or a human-readable error message.
  */
 export const validatePayload = (type: WSMessageType, payload: unknown): ValidationResult => {
-    const schema = MESSAGE_SCHEMAS[type];
+    const schema = Object.hasOwn(MESSAGE_SCHEMAS, type) ? MESSAGE_SCHEMAS[type] : undefined;
     if (!schema) {
         return { data: payload, success: true };
     }
