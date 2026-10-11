@@ -1,6 +1,7 @@
 import { DeckType, RoomState, WSMessageType } from '@planitpoker/shared';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
 import { SocketContext, SocketContextValue } from './socket-context';
 
 /** Reconnection delay applied whenever the socket drops. */
@@ -238,8 +239,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
 
     const bulkAddStories = useCallback(
-        (stories: { description?: string; title: string }[]) => {
-            send('BULK_ADD_STORIES', { stories });
+        (stories: ImportableStory[]) => {
+            // A full import is several times larger than one WebSocket frame
+            // accepts, so it travels as a sequence of frame-sized messages.
+            chunkStoriesForImport(stories).forEach((batch) => {
+                send('BULK_ADD_STORIES', { stories: batch });
+            });
         },
         [send]
     );

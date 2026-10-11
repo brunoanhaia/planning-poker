@@ -6,7 +6,7 @@ import {
     PlusOutlined,
     UploadOutlined,
 } from '@ant-design/icons';
-import { EstimateValue, RoomState, Story } from '@planitpoker/shared';
+import { EstimateValue, MAX_STORIES_PER_ROOM, RoomState, Story } from '@planitpoker/shared';
 import {
     App as AntApp,
     Badge,
@@ -133,14 +133,27 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const handleBulkImport = () => {
-        const stories = parseBulkStories(bulkText);
+        const parsed = parseBulkStories(bulkText);
+        // A room holds a bounded backlog, and the import travels as a bounded
+        // number of frames, so the paste is capped at what the room can still
+        // take instead of overflowing both.
+        const capacity = Math.max(0, MAX_STORIES_PER_ROOM - roomState.stories.length);
+        const stories = parsed.slice(0, capacity);
         if (stories.length === 0) {
+            void message.warning(
+                `The backlog already holds its maximum of ${MAX_STORIES_PER_ROOM} stories. Delete a story before importing.`
+            );
             return;
         }
         bulkAddStories(stories);
         setBulkText('');
         setIsBulkOpen(false);
         void message.success(`Imported ${stories.length} stories.`);
+        if (parsed.length > stories.length) {
+            void message.warning(
+                `The backlog holds at most ${MAX_STORIES_PER_ROOM} stories; ${parsed.length - stories.length} were skipped.`
+            );
+        }
     };
 
     const openScoreDraft = (story: Story) => {
