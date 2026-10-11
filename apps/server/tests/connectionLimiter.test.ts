@@ -155,7 +155,7 @@ describe('ConnectionLimiter', () => {
 
     it('treats a mapped and a plain address as the same client', () => {
         const budget = limiter(1, 10);
-        budget.acquire(normalizeAddress('::ffff:10.0.0.1'));
+        budget.acquire(normalizeAddress('::ffff:10.0.0.1'), 1_000);
 
         expect(budget.hasCapacity(normalizeAddress('10.0.0.1'), 1_000)).toBe(false);
     });

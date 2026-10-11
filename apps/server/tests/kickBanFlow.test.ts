@@ -114,7 +114,7 @@ const boot = () => {
     } as unknown as WebSocketServer;
 
     const handler = new WebSocketHandler(wss, {
-        connections: new ConnectionLimiter(64),
+        connections: new ConnectionLimiter(64, 1_000, 60_000, 100),
         trustProxyHops: 0,
     });
     handlers.push(handler);

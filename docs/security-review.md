@@ -128,7 +128,8 @@ answers that crowd with 429: `WS_MAX_CONNECTIONS_PER_IP` (300 concurrent) is siz
 100-person room plus several more rooms behind the same NAT, and
 `WS_MAX_CONNECTIONS_PER_WINDOW` (600 per minute) for a large team arriving at once. Both
 sit an order of magnitude above any plausible human burst and far below the measured flood
-of 1 500 sockets in three seconds, and both are constants a deployment can move.
+of 1 500 sockets in three seconds. They are source-level constants, so moving them is a
+code change and a redeployment, not a deployment setting.
 
 ### SEC-05 — Room-code brute force (Medium)
 
@@ -151,9 +152,10 @@ Regression tests: `apps/server/tests/joinFailureLimiter.test.ts` and
 `apps/server/tests/kickBanFlow.test.ts`.
 
 **Why distinct codes and not attempts:** a person who mistypes retypes the _same_ wrong
-code; a brute-forcer generates thousands of _different_ ones. Counting distinct codes
-collapses a whole office of typos into a single entry, so a shared address cannot be
-barred by its own users.
+code; a brute-forcer generates thousands of _different_ ones. The same code therefore
+counts once however often it is submitted, while every new unknown code spends another
+entry of the budget — which collapses a whole office of typos into a single entry, so a
+shared address cannot be barred by its own users.
 
 **The budget never blocks a code that exists.** The first version counted _attempts_ and
 refused every join from a barred address, which punished everybody behind a shared
