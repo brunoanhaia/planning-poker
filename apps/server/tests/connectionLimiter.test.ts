@@ -222,6 +222,22 @@ describe('ConnectionLimiter handshake allowance', () => {
         expect(budget.hasCapacity('10.0.0.1', 1_000 + 60_000 + 1)).toBe(true);
     });
 
+    it('keeps the handshake history of an address that is still connected', () => {
+        // Forgetting it would hand a connected address a fresh rate allowance, so
+        // a map past its bound is preferred over evicting a live address.
+        const budget = new ConnectionLimiter(10, 2, 60_000, 3);
+
+        for (let address = 0; address < 10; address += 1) {
+            budget.acquire(`10.0.${address}.1`, 1_000);
+        }
+
+        expect(budget.trackedAddresses).toBe(10);
+        budget.acquire('10.0.0.1', 1_001);
+
+        // Still charged for its history: two handshakes inside the window.
+        expect(budget.hasCapacity('10.0.0.1', 1_002)).toBe(false);
+    });
+
     it('bounds the handshake history it keeps', () => {
         // Sockets that closed leave only their handshake history, and that is
         // what the bound exists for.

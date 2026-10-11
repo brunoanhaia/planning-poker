@@ -165,25 +165,29 @@ export class ConnectionLimiter {
     /**
      * Drops the oldest handshake history once it passes its bound.
      *
-     * Only the handshake map is bounded. An entry in `open` always stands for at
-     * least one live socket — a count that reaches zero is deleted the moment it
-     * does — so evicting one would lose live state: the address would read as
-     * empty and be handed a second full allowance, quietly doubling the ceiling
-     * for whoever connected first. The handshake history, by contrast, is
-     * transient and left behind by addresses that have already gone, which is
-     * exactly what needs the bound. `open` is bounded by the connections it
-     * counts, one entry per live socket at most.
+     * Only the handshake map is bounded, and only entries whose address no longer
+     * holds a socket. An entry in `open` always stands for at least one live
+     * socket — a count that reaches zero is deleted the moment it does — so
+     * evicting one would lose live state: the address would read as empty and be
+     * handed a second full allowance, quietly doubling the ceiling for whoever
+     * connected first. For the same reason the handshake history of a connected
+     * address is kept even past the bound: forgetting it would hand that address a
+     * fresh rate allowance while it is still talking to us. When every tracked
+     * address is connected, the map is bounded by the connections it counts
+     * instead — one entry per live socket at most.
      *
      * A `Map` keeps insertion order, so the first key is the one that was tracked
      * longest ago and is therefore closest to having its window expire anyway.
      */
     private evictOverflow(): void {
         while (this.handshakes.size > this.maxTrackedAddresses) {
-            const oldest = this.handshakes.keys().next();
-            if (oldest.done) {
+            const disconnected = [...this.handshakes.keys()].find(
+                (address) => this.count(address) === 0
+            );
+            if (disconnected === undefined) {
                 return;
             }
-            this.handshakes.delete(oldest.value);
+            this.handshakes.delete(disconnected);
         }
     }
 }
