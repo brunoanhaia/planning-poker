@@ -29,3 +29,11 @@ export const DEFAULT_PARTICIPANT_COLOR = '#3b82f6';
 
 /** How often the idle-room sweep runs, in milliseconds (every hour). */
 export const ROOM_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * WebSocket connections one address may hold at the same time.
+ *
+ * A handful of tabs plus a reconnection is far below this, so it only ever
+ * answers a flood.
+ */
+export const WS_MAX_CONNECTIONS_PER_IP = 20;

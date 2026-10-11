@@ -9,6 +9,7 @@ import {
     issueClientId,
     parseClientId,
 } from '../src/clientIdentity.js';
+import { WS_MAX_CONNECTIONS_PER_IP } from '../src/constants.js';
 import { startServer } from '../src/index.js';
 
 const running: { current?: Awaited<ReturnType<typeof startServer>> } = {};
@@ -228,6 +229,55 @@ describe('WebSocket upgrade', () => {
         joiner.close();
         expect(answer).toBe('SESSION');
     });
+
+    it('refuses sockets beyond the per-address cap', async () => {
+        // An upgrade never passes through the HTTP rate limiter, so this is the
+        // only thing standing between one host and the file descriptor limit.
+        // Earlier tests share this listener and address, so their sockets are
+        // given a moment to finish closing before the cap is measured.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        const sockets = Array.from(
+            { length: WS_MAX_CONNECTIONS_PER_IP + 1 },
+            () => new WebSocket(url(), { headers: { origin: 'http://localhost:5173' } })
+        );
+        const outcomes = await Promise.all(
+            sockets.map(
+                (socket) =>
+                    new Promise<string>((resolve) => {
+                        socket.on('open', () => resolve('open'));
+                        socket.on('error', (error: Error) => resolve(error.message));
+                        setTimeout(() => resolve('timeout'), 2000);
+                    })
+            )
+        );
+
+        // Waiting for the close to complete releases the cap slots, so the
+        // next test in this file still finds a listener it can connect to.
+        await Promise.all(
+            sockets.map(
+                (socket) =>
+                    new Promise<void>((resolve) => {
+                        // The refused socket is already closed by the time it is
+                        // answered, so it never emits another `close`.
+                        if (
+                            socket.readyState === WebSocket.CLOSING ||
+                            socket.readyState === WebSocket.CLOSED
+                        ) {
+                            resolve();
+                            return;
+                        }
+                        socket.on('close', () => resolve());
+                        socket.close();
+                    })
+            )
+        );
+
+        expect(outcomes.filter((outcome) => outcome === 'open')).toHaveLength(
+            WS_MAX_CONNECTIONS_PER_IP
+        );
+        expect(outcomes.filter((outcome) => outcome.includes('429'))).toHaveLength(1);
+    }, 15_000);
 });
 
 describe('Handshake identity hook', () => {

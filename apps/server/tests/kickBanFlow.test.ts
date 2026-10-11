@@ -2,6 +2,7 @@ import { KICK_BAN_DURATION_MS, WS_THROTTLE_MAX_MESSAGES } from '@planitpoker/sha
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocketServer } from 'ws';
 
+import { ConnectionLimiter } from '../src/connectionLimiter.js';
 import { WebSocketHandler } from '../src/webSocketHandler.js';
 
 /** One message the handler sent to a socket double. */
@@ -111,7 +112,10 @@ const boot = () => {
         }),
     } as unknown as WebSocketServer;
 
-    const handler = new WebSocketHandler(wss);
+    const handler = new WebSocketHandler(wss, {
+        connections: new ConnectionLimiter(64),
+        trustProxyHops: 0,
+    });
     handlers.push(handler);
 
     /**
@@ -119,7 +123,11 @@ const boot = () => {
      *
      * @param options - Origin presence and the identity cookie, if any.
      */
-    const connect = (options?: { clientId?: string; hasOrigin?: boolean }): SocketDouble => {
+    const connect = (options?: {
+        clientId?: string;
+        hasOrigin?: boolean;
+        remoteAddress?: string;
+    }): SocketDouble => {
         const hasOrigin = options?.hasOrigin ?? true;
         // A browser always carries the identity the server issued it, unless a
         // test explicitly asks for one that has none.
@@ -135,6 +143,7 @@ const boot = () => {
                 ...(hasOrigin ? { origin: 'http://localhost:5173' } : {}),
                 ...(clientId ? { cookie: `pip_client=${clientId}` } : {}),
             },
+            socket: { remoteAddress: options?.remoteAddress ?? '127.0.0.1' },
         });
         return socket;
     };

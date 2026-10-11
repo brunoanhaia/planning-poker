@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 
+import { auditLog } from './auditLogger.js';
 import {
     buildClientIdCookie,
     CLIENT_ID_COOKIE,
@@ -20,6 +21,8 @@ import {
     issueClientId,
     parseClientId,
 } from './clientIdentity.js';
+import { ConnectionLimiter, resolvePeerAddress } from './connectionLimiter.js';
+import { WS_MAX_CONNECTIONS_PER_IP } from './constants.js';
 import { WebSocketHandler } from './webSocketHandler.js';
 
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173'];
@@ -110,6 +113,8 @@ export interface StartServerOptions {
 
 /** A started server, its HTTP listener and the socket handler it created. */
 export interface RunningServer {
+    /** Per-address cap on open sockets, so a caller can read or drain it. */
+    connections: ConnectionLimiter;
     handler: WebSocketHandler;
     server: http.Server;
 }
@@ -186,18 +191,34 @@ export const startServer = (options: StartServerOptions): RunningServer => {
     });
 
     const server = http.createServer(app);
+
+    // Upgrades bypass Express, so the HTTP rate limit never sees them: this is
+    // what stops one address from holding sockets until the process runs out.
+    const connections = new ConnectionLimiter(WS_MAX_CONNECTIONS_PER_IP);
+    const trustProxyHops = options.trustProxyHops ?? 0;
+
     const wss = new WebSocketServer({
         maxPayload: WS_MAX_PAYLOAD_BYTES,
         server,
         verifyClient: (info, done) => {
-            if (isOriginAllowed(info.origin, allowedOrigins)) {
-                done(true);
+            if (!isOriginAllowed(info.origin, allowedOrigins)) {
+                console.warn(
+                    `Rejected WebSocket connection from disallowed origin: ${info.origin ?? '<none>'}`
+                );
+                done(false, 403, 'Forbidden');
                 return;
             }
-            console.warn(
-                `Rejected WebSocket connection from disallowed origin: ${info.origin ?? '<none>'}`
-            );
-            done(false, 403, 'Forbidden');
+            const address = resolvePeerAddress(info.req, trustProxyHops);
+            if (!connections.hasCapacity(address)) {
+                auditLog({
+                    action: 'connection.rejected.limit',
+                    outcome: 'denied',
+                });
+                console.warn(`Rejected WebSocket connection from ${address}: too many sockets`);
+                done(false, 429, 'Too many connections');
+                return;
+            }
+            done(true);
         },
     });
 
@@ -211,9 +232,9 @@ export const startServer = (options: StartServerOptions): RunningServer => {
         }
     });
 
-    const handler = new WebSocketHandler(wss);
+    const handler = new WebSocketHandler(wss, { connections, trustProxyHops });
 
-    return { handler, server: server.listen(port) };
+    return { connections, handler, server: server.listen(port) };
 };
 
 /**

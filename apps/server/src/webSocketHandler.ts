@@ -24,6 +24,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { auditLog } from './auditLogger.js';
 import { BanService } from './banService.js';
 import { parseClientId } from './clientIdentity.js';
+import { ConnectionLimiter, resolvePeerAddress } from './connectionLimiter.js';
 import {
     DEFAULT_AVATAR,
     DEFAULT_HOST_COLOR,
@@ -47,6 +48,8 @@ interface ExtendedWebSocket extends WebSocket {
     hasOrigin?: boolean;
     /** Stable identity of the browser profile, from its first-party cookie. */
     clientId?: string;
+    /** Peer address of the connection, normalized for the abuse controls. */
+    remoteAddress?: string;
 }
 
 interface RoomSession {
@@ -86,6 +89,14 @@ export const isActiveOwner = (activeSocket: unknown, candidate: unknown): boolea
  */
 export const shouldCleanupOnClose = (activeSocket: unknown, closingSocket: unknown): boolean =>
     isActiveOwner(activeSocket, closingSocket);
+
+/** Dependencies the handler needs to account for the sockets it serves. */
+export interface WebSocketHandlerOptions {
+    /** Caps how many sockets one address may hold at the same time. */
+    connections: ConnectionLimiter;
+    /** Proxy hops in front of this server that may be trusted on the handshake. */
+    trustProxyHops: number;
+}
 
 type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
 
@@ -128,6 +139,10 @@ export class WebSocketHandler {
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private timerInterval: NodeJS.Timeout | null = null;
     private readonly wss: WebSocketServer;
+    /** Caps how many sockets one address may hold at the same time. */
+    private readonly connections: ConnectionLimiter;
+    /** Proxy hops in front of this server that may be trusted on the handshake. */
+    private readonly trustProxyHops: number;
     /** Tracks the live socket per `roomId:userId` so stale sockets cannot tear down a newer session. */
     private readonly activeSockets: Map<string, ExtendedWebSocket> = new Map();
     /** Caps how many messages a single socket may send inside a window. */
@@ -141,8 +156,14 @@ export class WebSocketHandler {
     private readonly bans = new BanService();
     private cleanupInterval: NodeJS.Timeout | null = null;
 
-    constructor(wss: WebSocketServer) {
+    /**
+     * @param wss - The server whose connections this handler serves.
+     * @param options - Connection accounting and the proxy hops to trust.
+     */
+    constructor(wss: WebSocketServer, options: WebSocketHandlerOptions) {
         this.wss = wss;
+        this.connections = options.connections;
+        this.trustProxyHops = options.trustProxyHops;
         this.init();
         this.startTimerTicker();
         this.startCleanupTicker();
@@ -185,6 +206,10 @@ export class WebSocketHandler {
             // identity is whatever the browser sent. Minting one for a cookieless
             // client happens in `startServer`, which owns the upgrade.
             ws.clientId = parseClientId(request.headers.cookie) ?? undefined;
+            ws.remoteAddress = resolvePeerAddress(request, this.trustProxyHops);
+            // The handshake already reserved one of this address's slots; the
+            // same bookkeeping is what releases it again on disconnect.
+            this.connections.acquire(ws.remoteAddress);
 
             ws.on('pong', () => {
                 ws.isAlive = true;
@@ -224,6 +249,9 @@ export class WebSocketHandler {
 
             ws.on('close', () => {
                 this.throttle.forget(ws);
+                if (ws.remoteAddress) {
+                    this.connections.release(ws.remoteAddress);
+                }
                 if (!ws.roomId || !ws.userId) {
                     return;
                 }
