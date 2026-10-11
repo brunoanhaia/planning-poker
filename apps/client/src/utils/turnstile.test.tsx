@@ -4,15 +4,18 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useTurnstile } from './turnstile';
 
-/** A harness that renders the hook and exposes the element it produced. */
+/** A harness that renders the hook and exposes what it produced. */
 const renderHook = (onToken: (token: string | null) => void) => {
     let element: React.ReactElement | null = null;
+    let resetChallenge = (): void => {};
     const Probe: React.FC = () => {
-        element = useTurnstile(onToken);
-        return element ?? null;
+        const hook = useTurnstile(onToken);
+        element = hook.challenge;
+        resetChallenge = hook.reset;
+        return hook.challenge ?? null;
     };
     const view = render(<Probe />);
-    return { element, unmount: view.unmount };
+    return { element, resetChallenge: () => resetChallenge(), unmount: view.unmount };
 };
 
 /** Installs a Turnstile API double that records what the hook asked of it. */
@@ -126,5 +129,27 @@ describe('useTurnstile', () => {
         view.unmount();
 
         expect(calls.removed).toEqual(['widget-1']);
+    });
+
+    it('resets the widget and clears the token its caller holds', async () => {
+        (import.meta.env as Record<string, unknown>).VITE_TURNSTILE_SITE_KEY = 'site-key';
+        const calls = installApi();
+        const onToken = vi.fn();
+
+        const hook = renderHook(onToken);
+        await act(async () => {
+            dispatchLoad();
+        });
+
+        const options = calls.rendered[0]?.options as { callback: (token: string) => void };
+        act(() => {
+            options.callback('a-token');
+        });
+        act(() => {
+            hook.resetChallenge();
+        });
+
+        expect(calls.reset).toEqual(['widget-1']);
+        expect(onToken).toHaveBeenLastCalledWith(null);
     });
 });

@@ -207,6 +207,9 @@ export const startServer = (options: StartServerOptions): RunningServer => {
         WS_MAX_TRACKED_ADDRESSES
     );
     const trustProxyHops = options.trustProxyHops ?? 0;
+    // Read here rather than inside the resolver, so the resolver stays a pure
+    // function of what it is given and the environment is read once.
+    const cloudflareEnabled = process.env.CLOUDFLARE_ENABLED === 'true';
 
     const wss = new WebSocketServer({
         maxPayload: WS_MAX_PAYLOAD_BYTES,
@@ -219,7 +222,11 @@ export const startServer = (options: StartServerOptions): RunningServer => {
                 done(false, 403, 'Forbidden');
                 return;
             }
-            const address = resolvePeerAddress(info.req, trustProxyHops);
+            const address = resolvePeerAddress({
+                cloudflareEnabled,
+                request: info.req,
+                trustProxyHops,
+            });
             if (!connections.hasCapacity(address, Date.now())) {
                 auditLog({
                     action: 'connection.rejected.limit',
@@ -246,7 +253,12 @@ export const startServer = (options: StartServerOptions): RunningServer => {
     // No secret means no challenge: development and self-hosted deployments keep
     // their open joins, and gating is a deployment decision rather than a mode.
     const turnstile = new TurnstileVerifier(process.env.TURNSTILE_SECRET);
-    const handler = new WebSocketHandler(wss, { connections, trustProxyHops, turnstile });
+    const handler = new WebSocketHandler(wss, {
+        cloudflareEnabled,
+        connections,
+        trustProxyHops,
+        turnstile,
+    });
 
     return { connections, handler, server: server.listen(port) };
 };

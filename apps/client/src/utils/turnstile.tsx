@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Reads the public site key baked into the bundle; empty means the challenge is off.
@@ -60,12 +60,18 @@ const useTurnstileApi = (): TurnstileApi | null => {
             document.head.append(script);
         }
 
+        // The script may already have run before this effect, in which case the
+        // API is there now and the listener would never fire for it. Reading it
+        // first and handing it over through the load event keeps the state update
+        // out of the synchronous part of the effect.
         const onReady = (): void => {
-            if (!isCancelled) {
-                setApi(readApi());
+            const apiNow = readApi();
+            if (!isCancelled && apiNow) {
+                setApi(apiNow);
             }
         };
         script.addEventListener('load', onReady);
+        queueMicrotask(onReady);
 
         return () => {
             isCancelled = true;
@@ -92,7 +98,7 @@ const useTurnstileApi = (): TurnstileApi | null => {
  */
 export const useTurnstile = (
     onToken: (token: string | null) => void
-): React.ReactElement | null => {
+): { challenge: React.ReactElement | null; reset: () => void } => {
     const api = useTurnstileApi();
     const siteKey = readSiteKey();
     const holderRef = useRef<HTMLDivElement>(null);
@@ -133,11 +139,20 @@ export const useTurnstile = (
         };
     }, [api, siteKey]);
 
+    // A token is single-use, so the widget is reset after every submission: a join
+    // that failed must be retried with a fresh challenge rather than a spent one.
+    const reset = useCallback((): void => {
+        if (widgetIdRef.current) {
+            api?.reset(widgetIdRef.current);
+        }
+        callbackRef.current(null);
+    }, [api]);
+
     if (!siteKey) {
-        return null;
+        return { challenge: null, reset };
     }
 
-    return <div id={WIDGET_ID} ref={holderRef} />;
+    return { challenge: <div id={WIDGET_ID} ref={holderRef} />, reset };
 };
 
 /** Turnstile renders itself into the element carrying this id. */

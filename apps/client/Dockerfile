@@ -10,7 +10,9 @@ WORKDIR /app
 # VITE_WS_URL is baked at build time. Leave empty to use same-origin
 # (window.location.host), which pairs with the Nginx /ws proxy in compose.
 ARG VITE_WS_URL=""
+ARG VITE_TURNSTILE_SITE_KEY=""
 ENV VITE_WS_URL=${VITE_WS_URL}
+ENV VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY}
 
 # NOTE: only the workspaces needed to build the client are installed.
 # apps/server (Express/ws) and apps/e2e (Playwright) must not bloat this

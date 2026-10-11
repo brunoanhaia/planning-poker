@@ -1,4 +1,15 @@
 /**
+ * How long an accepted token is remembered, to refuse a replayed one.
+ *
+ * Cloudflare refuses a token it already accepted for five minutes; matching that
+ * window is enough to catch a replay without holding the token for longer.
+ */
+const CONSUMED_TOKEN_TTL_MS = 5 * 60 * 1000;
+
+/** Bound on the siteverify call, so a stalled response cannot stall a join. */
+const VERIFICATION_TIMEOUT_MS = 5_000;
+
+/**
  * Verifies the Cloudflare Turnstile challenge a client solved before joining.
  *
  * Turnstile answers the question "is this a browser" without another secret to
@@ -18,8 +29,14 @@
  * availability over that can leave the secret empty.
  */
 export class TurnstileVerifier {
-    /** Cache of tokens already accepted, so a replayed one is refused immediately. */
-    private readonly consumed = new Set<string>();
+    /**
+     * Tokens already accepted, with when they were, so a replayed one is refused.
+     *
+     * Bounded by a TTL rather than by the process lifetime: a token that Cloudflare
+     * accepted is refused by Cloudflare itself for five minutes, so remembering it
+     * for longer only grows the set without buying anything.
+     */
+    private readonly consumed = new Map<string, number>();
 
     /**
      * @param secret - The Turnstile secret key; empty disables verification.
@@ -45,14 +62,18 @@ export class TurnstileVerifier {
      * @returns True when verification is disabled, the token is absent while
      *   disabled, or Cloudflare accepted it.
      */
-    public async verify(token: string | null | undefined, remoteIp?: string): Promise<boolean> {
+    public async verify(
+        token: string | null | undefined,
+        remoteIp?: string,
+        now: number = Date.now()
+    ): Promise<boolean> {
         if (!this.secret) {
             return true;
         }
         if (!token) {
             return false;
         }
-        if (this.consumed.has(token)) {
+        if (this.isConsumed(token, now)) {
             return false;
         }
 
@@ -61,11 +82,15 @@ export class TurnstileVerifier {
             body.set('remoteip', remoteIp);
         }
 
+        // A bounded timeout: a stalled siteverify must not leave the join waiting
+        // forever, and the failure mode of refusing the join is the safe one.
+        const timeout = AbortSignal.timeout(VERIFICATION_TIMEOUT_MS);
         try {
             const response = await this.fetchImpl(this.verifyUrl, {
                 body,
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
                 method: 'POST',
+                signal: timeout,
             });
             const verdict: unknown = await response.json();
             const accepted =
@@ -74,7 +99,8 @@ export class TurnstileVerifier {
                 (verdict as { success?: unknown }).success === true;
 
             if (accepted) {
-                this.consumed.add(token);
+                this.consumed.set(token, now);
+                this.evictExpired(now);
             }
             return accepted;
         } catch (error) {
@@ -82,5 +108,26 @@ export class TurnstileVerifier {
             console.error('Turnstile verification could not be completed:', error);
             return false;
         }
+    }
+
+    /**
+     * Reports whether a token was already accepted inside its window.
+     *
+     * @param token - The token presented by the join attempt.
+     * @param now - Current timestamp, in milliseconds.
+     * @returns True while the token is remembered.
+     */
+    private isConsumed(token: string, now: number): boolean {
+        const acceptedAt = this.consumed.get(token);
+        return acceptedAt !== undefined && now - acceptedAt < CONSUMED_TOKEN_TTL_MS;
+    }
+
+    /** Drops the tokens whose window has elapsed. */
+    private evictExpired(now: number): void {
+        this.consumed.forEach((acceptedAt, token) => {
+            if (now - acceptedAt >= CONSUMED_TOKEN_TTL_MS) {
+                this.consumed.delete(token);
+            }
+        });
     }
 }

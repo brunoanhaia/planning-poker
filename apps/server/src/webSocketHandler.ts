@@ -102,6 +102,8 @@ export interface WebSocketHandlerOptions {
     connections: ConnectionLimiter;
     /** Proxy hops in front of this server that may be trusted on the handshake. */
     trustProxyHops: number;
+    /** True when the real client arrives in `CF-Connecting-IP` from a Cloudflare edge. */
+    cloudflareEnabled: boolean;
     /** Proves a join came from a browser; a no-op verifier leaves joins open. */
     turnstile: TurnstileVerifier;
 }
@@ -151,6 +153,8 @@ export class WebSocketHandler {
     private readonly connections: ConnectionLimiter;
     /** Proxy hops in front of this server that may be trusted on the handshake. */
     private readonly trustProxyHops: number;
+    /** True when the deployment sits behind Cloudflare and asks for its client header. */
+    private readonly cloudflareEnabled: boolean;
     /** Tracks the live socket per `roomId:userId` so stale sockets cannot tear down a newer session. */
     private readonly activeSockets: Map<string, ExtendedWebSocket> = new Map();
     /** Caps how many messages a single socket may send inside a window. */
@@ -181,6 +185,7 @@ export class WebSocketHandler {
         this.wss = wss;
         this.connections = options.connections;
         this.trustProxyHops = options.trustProxyHops;
+        this.cloudflareEnabled = options.cloudflareEnabled;
         this.turnstile = options.turnstile;
         this.init();
         this.startTimerTicker();
@@ -225,7 +230,11 @@ export class WebSocketHandler {
             // identity is whatever the browser sent. Minting one for a cookieless
             // client happens in `startServer`, which owns the upgrade.
             ws.clientId = parseClientId(request.headers.cookie) ?? undefined;
-            ws.remoteAddress = resolvePeerAddress(request, this.trustProxyHops);
+            ws.remoteAddress = resolvePeerAddress({
+                cloudflareEnabled: this.cloudflareEnabled,
+                request,
+                trustProxyHops: this.trustProxyHops,
+            });
             // The handshake already reserved one of this address's slots; the
             // same bookkeeping is what releases it again on disconnect.
             this.connections.acquire(ws.remoteAddress, Date.now());

@@ -7,6 +7,13 @@ import {
     resolvePeerAddress,
 } from '../src/connectionLimiter.js';
 
+/** Resolves an address the way the server does, Cloudflare in front or not. */
+const resolve = (
+    request: http.IncomingMessage,
+    trustProxyHops: number,
+    cloudflare = false
+): string => resolvePeerAddress({ cloudflareEnabled: cloudflare, request, trustProxyHops });
+
 /** A limiter with a roomy concurrency ceiling and a modest handshake allowance. */
 const limiter = (maxConnections = 3, maxHandshakes = 2, windowMs = 60_000): ConnectionLimiter =>
     new ConnectionLimiter(maxConnections, maxHandshakes, windowMs, 10);
@@ -31,7 +38,7 @@ describe('resolvePeerAddress behind Cloudflare', () => {
         });
         request.headers['cf-connecting-ip'] = '203.0.113.7';
 
-        expect(resolvePeerAddress(request, 0)).toBe('203.0.113.7');
+        expect(resolve(request, 0, true)).toBe('203.0.113.7');
     });
 
     it('ignores X-Forwarded-For once Cloudflare forwarded the client', () => {
@@ -43,13 +50,13 @@ describe('resolvePeerAddress behind Cloudflare', () => {
         });
         request.headers['cf-connecting-ip'] = '203.0.113.7';
 
-        expect(resolvePeerAddress(request, 2)).toBe('203.0.113.7');
+        expect(resolve(request, 2, true)).toBe('203.0.113.7');
     });
 
     it('falls back to the edge when Cloudflare forwarded nothing', () => {
         const request = handshake({ remoteAddress: '104.16.0.7' });
 
-        expect(resolvePeerAddress(request, 0)).toBe('104.16.0.7');
+        expect(resolve(request, 0, true)).toBe('104.16.0.7');
     });
 
     it('recognises an IPv4 edge reached over IPv6', () => {
@@ -57,7 +64,16 @@ describe('resolvePeerAddress behind Cloudflare', () => {
         const request = handshake({ remoteAddress: '::ffff:104.16.0.7' });
         request.headers['cf-connecting-ip'] = '203.0.113.7';
 
-        expect(resolvePeerAddress(request, 0)).toBe('203.0.113.7');
+        expect(resolve(request, 0, true)).toBe('203.0.113.7');
+    });
+
+    it('ignores the header entirely when Cloudflare is not in front', () => {
+        // Even from a real Cloudflare address, a deployment that did not say it
+        // sits behind one must not read the header.
+        const request = handshake({ remoteAddress: '104.16.0.7' });
+        request.headers['cf-connecting-ip'] = '203.0.113.7';
+
+        expect(resolve(request, 0, false)).toBe('104.16.0.7');
     });
 
     it('ignores a forged header from an address that is not Cloudflare', () => {
@@ -66,7 +82,7 @@ describe('resolvePeerAddress behind Cloudflare', () => {
         const request = handshake({ remoteAddress: '203.0.113.9' });
         request.headers['cf-connecting-ip'] = '1.2.3.4';
 
-        expect(resolvePeerAddress(request, 0)).toBe('203.0.113.9');
+        expect(resolve(request, 0, true)).toBe('203.0.113.9');
     });
 });
 
@@ -75,7 +91,7 @@ describe('resolvePeerAddress', () => {
         // The bundled Nginx overwrites the header with the address it accepted.
         const request = handshake({ forwardedFor: '203.0.113.7', remoteAddress: '10.0.0.4' });
 
-        expect(resolvePeerAddress(request, 1)).toBe('203.0.113.7');
+        expect(resolve(request, 1)).toBe('203.0.113.7');
     });
 
     it('steps one entry further out for every extra trusted hop', () => {
@@ -85,9 +101,9 @@ describe('resolvePeerAddress', () => {
             remoteAddress: '10.0.0.2',
         });
 
-        expect(resolvePeerAddress(request, 1)).toBe('10.0.0.4');
-        expect(resolvePeerAddress(request, 2)).toBe('10.0.0.9');
-        expect(resolvePeerAddress(request, 3)).toBe('203.0.113.7');
+        expect(resolve(request, 1)).toBe('10.0.0.4');
+        expect(resolve(request, 2)).toBe('10.0.0.9');
+        expect(resolve(request, 3)).toBe('203.0.113.7');
     });
 
     it('trims the entries it reads', () => {
@@ -96,40 +112,40 @@ describe('resolvePeerAddress', () => {
             remoteAddress: '10.0.0.2',
         });
 
-        expect(resolvePeerAddress(request, 1)).toBe('10.0.0.4');
-        expect(resolvePeerAddress(request, 2)).toBe('203.0.113.7');
+        expect(resolve(request, 1)).toBe('10.0.0.4');
+        expect(resolve(request, 2, true)).toBe('203.0.113.7');
     });
 
     it('falls back to the earliest claim when the chain is shorter than the hops', () => {
         const request = handshake({ forwardedFor: '203.0.113.7', remoteAddress: '10.0.0.2' });
 
-        expect(resolvePeerAddress(request, 3)).toBe('203.0.113.7');
+        expect(resolve(request, 3)).toBe('203.0.113.7');
     });
 
     it('ignores the header when no hop is trusted', () => {
         const request = handshake({ forwardedFor: '203.0.113.7', remoteAddress: '10.0.0.4' });
 
-        expect(resolvePeerAddress(request, 0)).toBe('10.0.0.4');
+        expect(resolve(request, 0)).toBe('10.0.0.4');
     });
 
     it('cannot be steered by a client-supplied header without a trusted hop', () => {
         // A listener reached directly must not let a client pick its own bucket.
         const request = handshake({ forwardedFor: '198.51.100.9', remoteAddress: '192.0.2.5' });
 
-        expect(resolvePeerAddress(request, 0)).toBe('192.0.2.5');
-        expect(resolvePeerAddress(request, 0)).not.toBe('198.51.100.9');
+        expect(resolve(request, 0)).toBe('192.0.2.5');
+        expect(resolve(request, 0)).not.toBe('198.51.100.9');
     });
 
     it('falls back to the socket when a trusted hop sent no header', () => {
         const request = handshake({ remoteAddress: '10.0.0.4' });
 
-        expect(resolvePeerAddress(request, 1)).toBe('10.0.0.4');
+        expect(resolve(request, 1)).toBe('10.0.0.4');
     });
 
     it('normalizes an IPv4 client reached over IPv6', () => {
         const request = handshake({ remoteAddress: '::ffff:203.0.113.7' });
 
-        expect(resolvePeerAddress(request, 0)).toBe('203.0.113.7');
+        expect(resolve(request, 0, true)).toBe('203.0.113.7');
     });
 });
 

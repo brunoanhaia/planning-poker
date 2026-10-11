@@ -39,21 +39,30 @@ export const normalizeAddress = (address: string | undefined): string => {
  * ignored in front of Cloudflare, because the client controls what it sent before
  * Cloudflare overwrote it, and the value Cloudflare set is the one to trust.
  *
+ * The behaviour is opt-in through the caller's configuration: a deployment
+ * without Cloudflare in front never reads the header, even from a Cloudflare
+ * address, so the default stays "this listener is reached directly".
+ *
  * @param request - The handshake request.
  * @param trustProxyHops - Proxy hops in front of this server that may be trusted.
  * @returns The normalized client address.
  */
-export const resolvePeerAddress = (
-    request: http.IncomingMessage,
-    trustProxyHops: number
-): string => {
+export const resolvePeerAddress = ({
+    cloudflareEnabled,
+    request,
+    trustProxyHops,
+}: {
+    cloudflareEnabled: boolean;
+    request: http.IncomingMessage;
+    trustProxyHops: number;
+}): string => {
     // Cloudflare is verified from the peer itself rather than from configuration,
     // so it is checked before everything else: the address it forwards is the one
     // to use, and `X-Forwarded-For` is then ignored, because what a client sent
     // before Cloudflare overwrote it is not a claim worth honouring.
     // The peer is normalized first, because Node reports an IPv4 client reached
     // over IPv6 as `::ffff:…` and that form would never match a Cloudflare range.
-    if (isCloudflareAddress(normalizeAddress(request.socket.remoteAddress))) {
+    if (cloudflareEnabled && isCloudflareAddress(normalizeAddress(request.socket.remoteAddress))) {
         const clientIp = readCloudflareClientIp(request.headers);
         if (clientIp) {
             return normalizeAddress(clientIp);

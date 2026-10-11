@@ -165,6 +165,9 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const bobId = bobResult.participant!.id;
 
         rm.endSession(roomId, hostId);
+        // The reload path that matters is the offline one: the participant drops,
+        // then comes back with the token it kept.
+        rm.leaveRoom(roomId, bobId);
 
         const reconnected = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6', bobId)!;
         expect(reconnected.participant?.id).toBe(bobId);

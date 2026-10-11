@@ -20,13 +20,16 @@ export interface JoinSessionFormProps {
 export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({ initialRoomCode, onSubmit }) => {
     const [roomCode, setRoomCode] = useState(initialRoomCode);
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-    const challenge = useTurnstile(setTurnstileToken);
+    const { challenge, resetChallenge } = useTurnstile(setTurnstileToken);
 
     const isComplete = roomCode.trim().length === ROOM_CODE_LENGTH;
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
         onSubmit(roomCode.trim().toUpperCase(), turnstileToken);
+        // The token is single-use: the next attempt needs a fresh challenge,
+        // whether this one was accepted or refused.
+        resetChallenge();
     };
 
     return (
