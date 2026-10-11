@@ -33,6 +33,7 @@ import {
     HEARTBEAT_INTERVAL_MS,
     JOIN_FAILURE_COOLDOWN_MS,
     JOIN_FAILURE_LIMIT,
+    JOIN_FAILURE_MAX_TRACKED_ADDRESSES,
     JOIN_FAILURE_WINDOW_MS,
     ROOM_CLEANUP_INTERVAL_MS,
     TIMER_TICK_INTERVAL_MS,
@@ -162,7 +163,8 @@ export class WebSocketHandler {
     private readonly joinFailures = new JoinFailureLimiter(
         JOIN_FAILURE_LIMIT,
         JOIN_FAILURE_WINDOW_MS,
-        JOIN_FAILURE_COOLDOWN_MS
+        JOIN_FAILURE_COOLDOWN_MS,
+        JOIN_FAILURE_MAX_TRACKED_ADDRESSES
     );
     private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -371,12 +373,6 @@ export class WebSocketHandler {
     }
 
     /**
-     * Routes incoming WebSocket messages to domain operations.
-     *
-     * The lookup is restricted to own properties: a plain object index resolves
-     * inherited keys as well, so `type: "constructor"` would otherwise reach the
-     * dispatch table and hand the handler a value that is not a handler at all.
-     *
      * Routes incoming WebSocket messages to domain operations.
      *
      * The lookup is restricted to own properties: a plain object index resolves

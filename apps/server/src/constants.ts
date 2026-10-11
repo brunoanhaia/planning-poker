@@ -46,3 +46,11 @@ export const JOIN_FAILURE_WINDOW_MS = 60 * 1000;
 
 /** How long an address that exhausted its failed-join budget is barred, in milliseconds. */
 export const JOIN_FAILURE_COOLDOWN_MS = 60 * 1000;
+
+/**
+ * Addresses the failed-join limiter holds at once.
+ *
+ * A client cycling through distinct addresses leaves one record each, and the
+ * hourly sweep only reclaims them, so the tracked state needs a bound of its own.
+ */
+export const JOIN_FAILURE_MAX_TRACKED_ADDRESSES = 5_000;

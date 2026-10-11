@@ -86,4 +86,43 @@ describe('JoinFailureLimiter', () => {
         expect(budget.barredAddresses).toBe(0);
         expect(budget.allows('10.0.0.1', 1_000 + 60_000 + 1)).toBe(true);
     });
+
+    it('bounds how many addresses it tracks', () => {
+        // A client cycling through distinct addresses leaves one record each, so
+        // the tracked state needs a ceiling of its own.
+        const budget = new JoinFailureLimiter(3, 60_000, 60_000, 10);
+
+        for (let address = 0; address < 200; address += 1) {
+            budget.recordFailure(`10.0.${address}.1`, 1_000);
+        }
+
+        expect(budget.trackedAddresses).toBe(10);
+    });
+
+    it('bounds the barred addresses too', () => {
+        const budget = new JoinFailureLimiter(1, 60_000, 60_000, 10);
+
+        for (let address = 0; address < 50; address += 1) {
+            budget.recordFailure(`10.0.${address}.1`, 1_000);
+        }
+
+        expect(budget.barredAddresses).toBe(10);
+    });
+
+    it('keeps serving the address it just heard from', () => {
+        const budget = new JoinFailureLimiter(3, 60_000, 60_000, 5);
+
+        for (let address = 0; address < 20; address += 1) {
+            budget.recordFailure(`10.0.${address}.1`, 1_000);
+        }
+        const newest = '10.0.19.1';
+
+        expect(budget.trackedAddresses).toBe(5);
+        budget.recordFailure(newest, 2_000);
+
+        // The newest address survives the eviction, and its miss is still counted.
+        budget.recordFailure(newest, 2_001);
+        budget.recordFailure(newest, 2_002);
+        expect(budget.allows(newest, 2_003)).toBe(false);
+    });
 });

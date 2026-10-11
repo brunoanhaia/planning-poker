@@ -140,9 +140,13 @@ export const StoryBacklog: React.FC = () => {
         const capacity = Math.max(0, MAX_STORIES_PER_ROOM - roomState.stories.length);
         const stories = parsed.slice(0, capacity);
         if (stories.length === 0) {
-            void message.warning(
-                `The backlog already holds its maximum of ${MAX_STORIES_PER_ROOM} stories. Delete a story before importing.`
-            );
+            // Nothing usable in the paste is a different problem from a full
+            // backlog, and telling an admin the wrong one wastes their time.
+            const nothingToImport = parsed.length === 0;
+            const warning = nothingToImport
+                ? 'No story could be read. Give each line a title, as "Title; Description".'
+                : `The backlog already holds its maximum of ${MAX_STORIES_PER_ROOM} stories. Delete a story before importing.`;
+            void message.warning(warning);
             return;
         }
         bulkAddStories(stories);

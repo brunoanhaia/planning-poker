@@ -139,8 +139,10 @@ joins per address in a sliding window and applies a cool-down when the budget is
 a successful join deliberately does **not** clear the counter, because room
 creation is open to anybody and a reset would hand a guessing client an oracle.
 Failed lookups are audited
-(`join.rejected.room-not-found`). Regression tests:
-`apps/server/tests/joinFailureLimiter.test.ts` and
+(`join.rejected.room-not-found`). The tracked state is itself bounded by
+`JOIN_FAILURE_MAX_TRACKED_ADDRESSES`, because a client cycling through distinct
+addresses leaves one record each and the hourly sweep only reclaims them. Regression
+tests: `apps/server/tests/joinFailureLimiter.test.ts` and
 `apps/server/tests/kickBanFlow.test.ts`.
 
 ### SEC-06 — Identity cookie (Low)
@@ -149,9 +151,11 @@ Failed lookups are audited
 arbitrary (and arbitrarily long) string as a ban-map key, and the cookie was never sent
 with `Secure`, so on an HTTP deployment the identity could travel in clear text.
 
-**Fix:** only server-minted UUIDs are accepted (anything else reads as "no identity"),
-and the `Secure` attribute is available through `CLIENT_ID_COOKIE_SECURE=true` for TLS
-deployments. It stays off by default so the plain-HTTP compose stack keeps working.
+**Fix:** only values shaped like the UUIDs the server mints are accepted — the check is
+on the format, not on the value, so it bounds what a client can plant as a ban-map key
+rather than proving provenance. Anything else reads as "no identity". The `Secure`
+attribute is available through `CLIENT_ID_COOKIE_SECURE=true` for TLS deployments; it
+stays off by default so the plain-HTTP compose stack keeps working.
 Regression tests: `apps/server/tests/clientIdentity.test.ts`.
 
 ### SEC-07 — Ended sessions stay open (Low)

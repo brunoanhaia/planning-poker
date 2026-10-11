@@ -70,9 +70,9 @@ export const buildClientIdCookie = (value: string, secure = SECURE_COOKIE): stri
 /**
  * Reads the client identity out of a `Cookie` request header.
  *
- * Only a value the server could have minted counts: a scripted client can send
- * any header it likes, and accepting arbitrary text would let it plant whatever
- * it wanted — including an unbounded string — as a key in the ban map.
+ * Only a value shaped like the ones the server mints counts: a scripted client
+ * can send any header it likes, and accepting arbitrary text would let it plant
+ * whatever it wanted — including an unbounded string — as a key in the ban map.
  *
  * @param cookieHeader - The raw header, e.g. `pip_client=<uuid>; other=1`.
  * @returns The identifier, or null when the header carries none the server issued.

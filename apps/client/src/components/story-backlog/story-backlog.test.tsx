@@ -102,4 +102,23 @@ describe('StoryBacklog bulk import', () => {
         expect(bulkAddStories).not.toHaveBeenCalled();
         expect(screen.getByRole('button', { name: 'Import Stories' })).toBeInTheDocument();
     });
+
+    it('blames the paste, not the backlog, when nothing can be read', () => {
+        const bulkAddStories = vi.fn();
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ bulkAddStories, roomState: roomWithStories(0) })
+        );
+        render(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        // Lines with no title parse to nothing, which is a different problem from
+        // a full backlog and must not be reported as one.
+        runImport('; description only\n   ');
+
+        expect(bulkAddStories).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: 'Import Stories' })).toBeInTheDocument();
+    });
 });
