@@ -16,20 +16,20 @@ silently come back. Findings are ordered by severity, not by discovery order.
 
 ## 1. Findings
 
-| ID | Severity | Finding | Status |
-| --- | --- | --- | --- |
-| SEC-01 | Critical | Unhandled `error` event on a WebSocket connection terminates the whole process | Fixed |
-| SEC-02 | High | The documented bulk-import size cannot fit in one frame — every full import kills the server | Fixed |
-| SEC-03 | Medium | Message dispatch resolves prototype-chain keys (`constructor`, `__proto__`, …) | Fixed |
-| SEC-04 | Medium | No per-address connection cap and no handshake rate limit (connection flood) | Fixed |
-| SEC-05 | Medium | Room codes can be brute-forced at ~1.4k guesses/second from one host | Fixed |
-| SEC-06 | Low | Identity cookie accepts any value (unbounded key in the ban map) and is never `Secure` | Fixed |
-| SEC-07 | Low | Ended sessions still accept joins and votes | Fixed |
-| SEC-08 | Info | One `VOTE` on a full backlog broadcasts ~420 KiB to every participant | Accepted |
-| SEC-09 | Info | A kicked browser returns by clearing one cookie (advisory ban) | Accepted |
-| SEC-10 | Info | `MAX_ROOMS` can be filled to deny room creation for 24 h | Accepted |
-| SEC-11 | Info | Origin-less clients may create rooms | Accepted |
-| SEC-12 | Info | Session tokens have no expiry; they live as long as the room | Accepted |
+| ID     | Severity | Finding                                                                                      | Status   |
+| ------ | -------- | -------------------------------------------------------------------------------------------- | -------- |
+| SEC-01 | Critical | Unhandled `error` event on a WebSocket connection terminates the whole process               | Fixed    |
+| SEC-02 | High     | The documented bulk-import size cannot fit in one frame — every full import kills the server | Fixed    |
+| SEC-03 | Medium   | Message dispatch resolves prototype-chain keys (`constructor`, `__proto__`, …)               | Fixed    |
+| SEC-04 | Medium   | No per-address connection cap and no handshake rate limit (connection flood)                 | Fixed    |
+| SEC-05 | Medium   | Room codes can be brute-forced at ~1.4k guesses/second from one host                         | Fixed    |
+| SEC-06 | Low      | Identity cookie accepts any value (unbounded key in the ban map) and is never `Secure`       | Fixed    |
+| SEC-07 | Low      | Ended sessions still accept joins and votes                                                  | Fixed    |
+| SEC-08 | Info     | One `VOTE` on a full backlog broadcasts ~420 KiB to every participant                        | Accepted |
+| SEC-09 | Info     | A kicked browser returns by clearing one cookie (advisory ban)                               | Accepted |
+| SEC-10 | Info     | `MAX_ROOMS` can be filled to deny room creation for 24 h                                     | Accepted |
+| SEC-11 | Info     | Origin-less clients may create rooms                                                         | Accepted |
+| SEC-12 | Info     | Session tokens have no expiry; they live as long as the room                                 | Accepted |
 
 ---
 
@@ -45,11 +45,14 @@ unhandled exception, terminating the process. No origin, token or room was requi
 **Reproduction** (unauthenticated, no session, no allowed origin needed):
 
 ```js
-const ws = new WebSocket('ws://127.0.0.1:5055');           // no Origin header at all
+const ws = new WebSocket('ws://127.0.0.1:5055'); // no Origin header at all
 
 // One frame over WS_MAX_PAYLOAD_BYTES (32 768): the envelope around the payload
 // is 44 bytes, so this message is 32 769 bytes on the wire.
-const oversized = JSON.stringify({ payload: { name: 'A'.repeat(32_769 - 44) }, type: 'CREATE_ROOM' });
+const oversized = JSON.stringify({
+    payload: { name: 'A'.repeat(32_769 - 44) },
+    type: 'CREATE_ROOM',
+});
 ws.on('open', () => ws.send(oversized));
 ```
 
@@ -178,19 +181,19 @@ bars would punish the whole room behind a shared proxy.
 ### SEC-10 — Room-creation denial of service (Info, accepted)
 
 Creating 1 000 rooms (`MAX_ROOMS`) blocks legitimate room creation for at least the 24 h
-idle TTL, because the sweep only drops a room once the TTL has passed *and* every
+idle TTL, because the sweep only drops a room once the TTL has passed _and_ every
 participant is offline — so a participant who stays connected can hold a slot longer than
 that. Nothing in the per-address controls removes this: the connection cap (SEC-04)
 bounds how many sockets an address holds **at the same time**, not how many rooms it can
 create in total, and a room outlives the socket that made it — a client that reconnects
 can keep creating rooms until `MAX_ROOMS` is reached. Accepted: rooms are a few hundred
-bytes each and the failure mode is denial of *new room creation*, not data loss.
+bytes each and the failure mode is denial of _new room creation_, not data loss.
 
 ### SEC-11 — Origin-less room creation (Info, accepted)
 
 A client with no `Origin` header may call `CREATE_ROOM` — room creation is open to
 anyone by design, and the origin gate exists to stop cross-site WebSocket hijacking of
-*existing* rooms (which still requires a valid session token). A per-address connection
+_existing_ rooms (which still requires a valid session token). A per-address connection
 cap bounds concurrent sockets only; a client that reconnects can still create rooms until
 `MAX_ROOMS` is reached (SEC-10).
 
