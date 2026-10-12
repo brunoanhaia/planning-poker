@@ -11,7 +11,7 @@ import { DEFAULT_AVATAR, DEFAULT_PARTICIPANT_COLOR } from './constants.js';
 import { generateUserId } from './idGenerator.js';
 
 /** Why a join attempt was refused. */
-export type JoinRejection = 'ROOM_FULL' | 'ROOM_LOCKED';
+export type JoinRejection = 'ROOM_FULL' | 'ROOM_LOCKED' | 'SESSION_ENDED';
 
 export interface JoinParticipantResult {
     /** Machine-readable reason, when the join was refused. */
@@ -48,6 +48,16 @@ export const joinParticipant = (
             existingParticipant.color = color || existingParticipant.color;
             return { participant: existingParticipant, roomState: room };
         }
+    }
+
+    // Ending the session is the host's way of closing the room for good. A
+    // reconnecting participant keeps its identity, but a room nobody may enter
+    // anymore must not take a new one in either.
+    if (room.isEnded) {
+        return {
+            code: 'SESSION_ENDED',
+            error: 'This session has ended. Ask the host for a new room.',
+        };
     }
 
     if (room.isLocked) {

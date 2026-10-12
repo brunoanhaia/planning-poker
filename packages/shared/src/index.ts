@@ -296,6 +296,7 @@ export type ErrorCode =
     | 'ROOM_LIMIT_REACHED'
     | 'ROOM_LOCKED'
     | 'ROOM_NOT_FOUND'
+    | 'SESSION_ENDED'
     | 'STORY_LIMIT_REACHED';
 
 export interface ErrorPayload {

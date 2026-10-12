@@ -13,7 +13,7 @@ const AVATAR_STORAGE_KEY = 'planit_avatar';
 const COLOR_STORAGE_KEY = 'planit_color';
 
 /** Exact length of a room code, and therefore of the join deep link. */
-const ROOM_CODE_LENGTH = 6;
+const ROOM_CODE_LENGTH = 8;
 
 /** Reads the room code from a `#ABC123` deep link, when one is present. */
 const readRoomCodeFromHash = (): string => {

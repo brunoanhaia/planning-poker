@@ -1,3 +1,4 @@
+import { WSMessageType } from '@planitpoker/shared';
 import { describe, expect, it } from 'vitest';
 
 import { validatePayload } from '../src/validation.js';
@@ -133,5 +134,19 @@ describe('WebSocket payload validation', () => {
         expect(
             validatePayload('UPDATE_STORY_ESTIMATE', { estimate: 5, storyId: 'story_1' }).success
         ).toBe(true);
+    });
+
+    it('treats a type named after an inherited key as having no schema', () => {
+        // `MESSAGE_SCHEMAS` is a plain object, so a naive lookup resolves
+        // `Object.prototype` properties and hands the caller something that is
+        // not a schema at all.
+        const inherited = ['constructor', 'toString', 'hasOwnProperty', 'valueOf'];
+
+        inherited.forEach((type) => {
+            expect(validatePayload(type as WSMessageType, { vote: 5 })).toEqual({
+                data: { vote: 5 },
+                success: true,
+            });
+        });
     });
 });

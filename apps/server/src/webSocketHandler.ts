@@ -24,15 +24,21 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { auditLog } from './auditLogger.js';
 import { BanService } from './banService.js';
 import { parseClientId } from './clientIdentity.js';
+import { ConnectionLimiter, resolvePeerAddress } from './connectionLimiter.js';
 import {
     DEFAULT_AVATAR,
     DEFAULT_HOST_COLOR,
     DEFAULT_PARTICIPANT_COLOR,
     DEFAULT_TIMER_DURATION_SECONDS,
     HEARTBEAT_INTERVAL_MS,
+    JOIN_FAILURE_COOLDOWN_MS,
+    JOIN_FAILURE_LIMIT,
+    JOIN_FAILURE_MAX_TRACKED_ADDRESSES,
+    JOIN_FAILURE_WINDOW_MS,
     ROOM_CLEANUP_INTERVAL_MS,
     TIMER_TICK_INTERVAL_MS,
 } from './constants.js';
+import { JoinFailureLimiter } from './joinFailureLimiter.js';
 import { roomManager } from './roomManager.js';
 import { sessionService } from './sessionService.js';
 import { isBacklogFull } from './storyService.js';
@@ -47,6 +53,8 @@ interface ExtendedWebSocket extends WebSocket {
     hasOrigin?: boolean;
     /** Stable identity of the browser profile, from its first-party cookie. */
     clientId?: string;
+    /** Peer address of the connection, normalized for the abuse controls. */
+    remoteAddress?: string;
 }
 
 interface RoomSession {
@@ -86,6 +94,16 @@ export const isActiveOwner = (activeSocket: unknown, candidate: unknown): boolea
  */
 export const shouldCleanupOnClose = (activeSocket: unknown, closingSocket: unknown): boolean =>
     isActiveOwner(activeSocket, closingSocket);
+
+/** Dependencies the handler needs to account for the sockets it serves. */
+export interface WebSocketHandlerOptions {
+    /** Caps how many sockets one address may hold at the same time. */
+    connections: ConnectionLimiter;
+    /** Proxy hops in front of this server that may be trusted on the handshake. */
+    trustProxyHops: number;
+    /** True when the real client arrives in `CF-Connecting-IP` from a Cloudflare edge. */
+    cloudflareEnabled: boolean;
+}
 
 type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
 
@@ -128,6 +146,12 @@ export class WebSocketHandler {
     private heartbeatInterval: NodeJS.Timeout | null = null;
     private timerInterval: NodeJS.Timeout | null = null;
     private readonly wss: WebSocketServer;
+    /** Caps how many sockets one address may hold at the same time. */
+    private readonly connections: ConnectionLimiter;
+    /** Proxy hops in front of this server that may be trusted on the handshake. */
+    private readonly trustProxyHops: number;
+    /** True when the deployment sits behind Cloudflare and asks for its client header. */
+    private readonly cloudflareEnabled: boolean;
     /** Tracks the live socket per `roomId:userId` so stale sockets cannot tear down a newer session. */
     private readonly activeSockets: Map<string, ExtendedWebSocket> = new Map();
     /** Caps how many messages a single socket may send inside a window. */
@@ -139,10 +163,24 @@ export class WebSocketHandler {
     private readonly clientIdByUser = new Map<string, string>();
     /** Bars a kicked participant from re-entering the room immediately. */
     private readonly bans = new BanService();
+    /** Budget of failed room joins granted to one address. */
+    private readonly joinFailures = new JoinFailureLimiter(
+        JOIN_FAILURE_LIMIT,
+        JOIN_FAILURE_WINDOW_MS,
+        JOIN_FAILURE_COOLDOWN_MS,
+        JOIN_FAILURE_MAX_TRACKED_ADDRESSES
+    );
     private cleanupInterval: NodeJS.Timeout | null = null;
 
-    constructor(wss: WebSocketServer) {
+    /**
+     * @param wss - The server whose connections this handler serves.
+     * @param options - Connection accounting, the proxy hops to trust, the challenge verifier.
+     */
+    constructor(wss: WebSocketServer, options: WebSocketHandlerOptions) {
         this.wss = wss;
+        this.connections = options.connections;
+        this.trustProxyHops = options.trustProxyHops;
+        this.cloudflareEnabled = options.cloudflareEnabled;
         this.init();
         this.startTimerTicker();
         this.startCleanupTicker();
@@ -155,6 +193,7 @@ export class WebSocketHandler {
         this.cleanupInterval = setInterval(() => {
             const now = Date.now();
             this.bans.sweep(now);
+            this.joinFailures.sweep(now);
             roomManager.sweepIdleRooms(now).forEach((roomId) => {
                 auditLog({ action: 'room.dropped.idle', outcome: 'allowed', roomId });
             });
@@ -171,6 +210,13 @@ export class WebSocketHandler {
      * Initializes WebSocket listeners and client heartbeat interval.
      */
     private init(): void {
+        // A failure on the server object itself — not on one connection — must
+        // not take the process down either: there is no socket to terminate, so
+        // the record is the whole response.
+        this.wss.on('error', (error: Error) => {
+            console.error('WebSocket server error:', error.message);
+        });
+
         this.wss.on('connection', (ws: ExtendedWebSocket, request: http.IncomingMessage) => {
             ws.isAlive = true;
             ws.hasOrigin = Boolean(request.headers.origin);
@@ -178,9 +224,27 @@ export class WebSocketHandler {
             // identity is whatever the browser sent. Minting one for a cookieless
             // client happens in `startServer`, which owns the upgrade.
             ws.clientId = parseClientId(request.headers.cookie) ?? undefined;
+            ws.remoteAddress = resolvePeerAddress({
+                cloudflareEnabled: this.cloudflareEnabled,
+                request,
+                trustProxyHops: this.trustProxyHops,
+            });
+            // The handshake already reserved one of this address's slots; the
+            // same bookkeeping is what releases it again on disconnect.
+            this.connections.acquire(ws.remoteAddress, Date.now());
 
             ws.on('pong', () => {
                 ws.isAlive = true;
+            });
+
+            // `ws` reports a frame it refuses to read — over the payload cap, or
+            // one it cannot parse — as an `error` event on the connection. With
+            // no listener, Node turns that into an unhandled exception and the
+            // whole process dies, which makes a single oversized frame a remote
+            // denial of service. Answering it here keeps the blast radius to
+            // the offending socket.
+            ws.on('error', (error: Error) => {
+                this.reportConnectionError(ws, error);
             });
 
             ws.on('message', (message: string) => {
@@ -207,6 +271,9 @@ export class WebSocketHandler {
 
             ws.on('close', () => {
                 this.throttle.forget(ws);
+                if (ws.remoteAddress) {
+                    this.connections.release(ws.remoteAddress);
+                }
                 if (!ws.roomId || !ws.userId) {
                     return;
                 }
@@ -293,15 +360,48 @@ export class WebSocketHandler {
     }
 
     /**
+     * Reports a failed connection without letting it reach the process.
+     *
+     * Every receiver failure — an oversized frame, a frame that cannot be read —
+     * arrives here. The socket is terminated, which is what the peer already
+     * expects, and the record is what an operator needs: which participant, if
+     * any, was behind it.
+     *
+     * @param ws - The connection that failed.
+     * @param error - The failure reported by `ws`.
+     */
+    private reportConnectionError(ws: ExtendedWebSocket, error: Error): void {
+        auditLog({
+            action: 'socket.error',
+            outcome: 'denied',
+            roomId: ws.roomId,
+            userId: ws.userId,
+        });
+        console.error('WebSocket connection error:', error.message);
+        ws.terminate();
+    }
+
+    /**
      * Routes incoming WebSocket messages to domain operations.
+     *
+     * The lookup is restricted to own properties: a plain object index resolves
+     * inherited keys as well, so `type: "constructor"` would otherwise reach the
+     * dispatch table and hand the handler a value that is not a handler at all.
      *
      * @param ws - The sender's WebSocket connection.
      * @param msg - The parsed incoming message.
      */
     private handleMessage(ws: ExtendedWebSocket, msg: WSMessage): void {
-        const handler = this.messageHandlers[msg.type];
+        if (typeof msg !== 'object' || msg === null) {
+            this.sendError(ws, 'Invalid message format. Expected a JSON object.', 'FORBIDDEN');
+            return;
+        }
+
+        const handler = Object.hasOwn(this.messageHandlers, msg.type)
+            ? this.messageHandlers[msg.type]
+            : undefined;
         if (!handler) {
-            this.sendError(ws, `Unknown action type: ${msg.type}`, 'FORBIDDEN');
+            this.sendError(ws, `Unknown action type: ${String(msg.type)}`, 'FORBIDDEN');
             return;
         }
 
@@ -432,17 +532,28 @@ export class WebSocketHandler {
     }
 
     /**
-     * Handles joining an existing room and binds the session to the connection.
+     * Turns away a join that the room has not even been asked about yet.
+     *
+     * Every bar here stands in front of the door rather than inside the room:
+     * the kick bans, the requirement that a non-browser client proves who it is,
+     * and the challenge for a caller that cannot prove anything. A join that
+     * reaches the room is past all of them.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param attempt - What the join presented, and where it came from.
+     * @returns True when the join was turned away and must go no further.
      */
-    private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
-        const { avatar, color, name, roomId, sessionToken, userId } = payload;
-
-        const normalizedRoomId = roomId.toUpperCase();
-        const binding = sessionService.resolve(sessionToken);
-        const isRoomBound = binding?.roomId === normalizedRoomId;
-        const isUserBound = !userId || binding?.userId === userId;
-        const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
-        const now = Date.now();
+    private refuseJoin(
+        ws: ExtendedWebSocket,
+        attempt: {
+            normalizedRoomId: string;
+            now: number;
+            provenUserId?: string;
+            sessionToken?: string | null;
+            turnstileToken?: string | null;
+        }
+    ): boolean {
+        const { normalizedRoomId, now, provenUserId, sessionToken } = attempt;
 
         // A kick revokes the token the client is holding, so the bar has to be
         // checked on the presented credential: without this the client would
@@ -450,35 +561,16 @@ export class WebSocketHandler {
         // handed a brand-new participant.
         const tokenBan = sessionToken ? this.bans.tokenBanFor(sessionToken, now) : null;
         if (tokenBan) {
-            auditLog({
-                action: 'join.rejected.banned',
-                outcome: 'denied',
-                roomId: tokenBan.roomId,
-                userId: tokenBan.userId,
-            });
-            this.sendError(
-                ws,
-                'You were removed from this session. Try again in a few minutes.',
-                'BANNED'
-            );
-            return;
+            this.rejectBanned(ws, tokenBan.roomId, tokenBan.userId);
+            return true;
         }
 
         // The bar that survives the revoked token: a browser that was just
         // kicked can reconnect with a new tab, no token and a fresh name, and
         // would otherwise be admitted as a brand-new participant.
         if (ws.clientId && this.bans.isClientBanned(normalizedRoomId, ws.clientId, now)) {
-            auditLog({
-                action: 'join.rejected.banned',
-                outcome: 'denied',
-                roomId: normalizedRoomId,
-            });
-            this.sendError(
-                ws,
-                'You were removed from this session. Try again in a few minutes.',
-                'BANNED'
-            );
-            return;
+            this.rejectBanned(ws, normalizedRoomId);
+            return true;
         }
 
         // A browser with no identity cookie cannot be named by a kick ban —
@@ -494,23 +586,66 @@ export class WebSocketHandler {
                 ws,
                 'A valid session token is required to join from a non-browser client.'
             );
-            return;
+            return true;
         }
 
         // Same bar, reached when the join still proves its identity with a live
         // token — for instance a ban issued without the token being revoked.
         if (provenUserId && this.bans.isBanned(normalizedRoomId, provenUserId, now)) {
-            auditLog({
-                action: 'join.rejected.banned',
-                outcome: 'denied',
-                roomId: normalizedRoomId,
-                userId: provenUserId,
-            });
-            this.sendError(
-                ws,
-                'You were removed from this session. Try again in a few minutes.',
-                'BANNED'
-            );
+            this.rejectBanned(ws, normalizedRoomId, provenUserId);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Audits and answers a join from a participant a kick barred.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param roomId - The room the bar was issued in.
+     * @param userId - The participant the bar names, when the join proved one.
+     */
+    private rejectBanned(ws: ExtendedWebSocket, roomId: string, userId?: string): void {
+        auditLog({
+            action: 'join.rejected.banned',
+            outcome: 'denied',
+            roomId,
+            userId,
+        });
+        this.sendError(
+            ws,
+            'You were removed from this session. Try again in a few minutes.',
+            'BANNED'
+        );
+    }
+
+    /**
+     * Handles joining an existing room and binds the session to the connection.
+     *
+     * Three bars are checked, and only two of them stand in front of the door:
+     * the kick bans come first, the failed-join budget is spent only on codes
+     * that match no room, and the browser-profile bar is what survives a
+     * discarded session token.
+     */
+    private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
+        const { avatar, color, name, roomId, sessionToken, userId } = payload;
+
+        const address = ws.remoteAddress ?? 'unknown';
+        const now = Date.now();
+        const normalizedRoomId = roomId.toUpperCase();
+        const binding = sessionService.resolve(sessionToken);
+        const isRoomBound = binding?.roomId === normalizedRoomId;
+        const isUserBound = !userId || binding?.userId === userId;
+        const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
+
+        const isBarred = this.refuseJoin(ws, {
+            normalizedRoomId,
+            now,
+            provenUserId,
+            sessionToken,
+        });
+        if (isBarred) {
             return;
         }
 
@@ -523,6 +658,26 @@ export class WebSocketHandler {
         );
 
         if (!result) {
+            // A code that matches no room is a guess, and it is the one signal a
+            // brute-force attempt cannot avoid producing. The room was looked up
+            // first, so a code that exists never consults this budget: the bar is
+            // for guessing, not for joining, and a NAT'd team cannot be locked
+            // out of the room it is actually entering.
+            if (!this.joinFailures.allows(address, now)) {
+                auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
+                this.sendError(
+                    ws,
+                    'Too many wrong room codes from this network. Try again in a minute.',
+                    'RATE_LIMITED'
+                );
+                return;
+            }
+            this.joinFailures.recordFailure(address, normalizedRoomId, now);
+            auditLog({
+                action: 'join.rejected.room-not-found',
+                outcome: 'denied',
+                roomId: normalizedRoomId,
+            });
             this.sendError(
                 ws,
                 `Room "${roomId}" not found. Please check room code.`,
@@ -530,7 +685,6 @@ export class WebSocketHandler {
             );
             return;
         }
-
         if (result.error) {
             this.sendError(ws, result.error, result.code);
             return;
@@ -675,6 +829,15 @@ export class WebSocketHandler {
         }
 
         const room = roomManager.getRoom(session.roomId);
+        if (room?.isEnded) {
+            // A closed session takes no more votes: the result is final.
+            this.sendError(
+                ws,
+                'This session has ended, so no further votes are accepted.',
+                'SESSION_ENDED'
+            );
+            return;
+        }
         if (!room?.activeDeck.includes(payload.vote)) {
             this.sendError(ws, 'Vote value is not part of the active deck.');
             return;
