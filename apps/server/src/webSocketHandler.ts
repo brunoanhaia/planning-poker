@@ -43,7 +43,6 @@ import { roomManager } from './roomManager.js';
 import { sessionService } from './sessionService.js';
 import { isBacklogFull } from './storyService.js';
 import { MessageThrottle } from './throttle.js';
-import { TurnstileVerifier } from './turnstile.js';
 import { validatePayload } from './validation.js';
 
 interface ExtendedWebSocket extends WebSocket {
@@ -104,11 +103,9 @@ export interface WebSocketHandlerOptions {
     trustProxyHops: number;
     /** True when the real client arrives in `CF-Connecting-IP` from a Cloudflare edge. */
     cloudflareEnabled: boolean;
-    /** Proves a join came from a browser; a no-op verifier leaves joins open. */
-    turnstile: TurnstileVerifier;
 }
 
-type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void | Promise<void>;
+type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
 
 /**
  * Handles real-time WebSocket connections, message routing, and room state broadcasting.
@@ -166,8 +163,6 @@ export class WebSocketHandler {
     private readonly clientIdByUser = new Map<string, string>();
     /** Bars a kicked participant from re-entering the room immediately. */
     private readonly bans = new BanService();
-    /** Proves a join came from a browser, when a secret is configured. */
-    private readonly turnstile: TurnstileVerifier;
     /** Budget of failed room joins granted to one address. */
     private readonly joinFailures = new JoinFailureLimiter(
         JOIN_FAILURE_LIMIT,
@@ -186,7 +181,6 @@ export class WebSocketHandler {
         this.connections = options.connections;
         this.trustProxyHops = options.trustProxyHops;
         this.cloudflareEnabled = options.cloudflareEnabled;
-        this.turnstile = options.turnstile;
         this.init();
         this.startTimerTicker();
         this.startCleanupTicker();
@@ -417,15 +411,7 @@ export class WebSocketHandler {
             return;
         }
 
-        // Most handlers are synchronous. The join may await the challenge check,
-        // so its rejection is answered rather than left floating.
-        const outcome = handler(ws, validation.data);
-        if (outcome instanceof Promise) {
-            outcome.catch((error: unknown) => {
-                console.error(`Failed to handle ${String(msg.type)}:`, error);
-                this.sendError(ws, 'That request could not be completed.');
-            });
-        }
+        handler(ws, validation.data);
     }
 
     /**
@@ -557,7 +543,7 @@ export class WebSocketHandler {
      * @param attempt - What the join presented, and where it came from.
      * @returns True when the join was turned away and must go no further.
      */
-    private async refuseJoin(
+    private refuseJoin(
         ws: ExtendedWebSocket,
         attempt: {
             normalizedRoomId: string;
@@ -566,8 +552,8 @@ export class WebSocketHandler {
             sessionToken?: string | null;
             turnstileToken?: string | null;
         }
-    ): Promise<boolean> {
-        const { normalizedRoomId, now, provenUserId, sessionToken, turnstileToken } = attempt;
+    ): boolean {
+        const { normalizedRoomId, now, provenUserId, sessionToken } = attempt;
 
         // A kick revokes the token the client is holding, so the bar has to be
         // checked on the presented credential: without this the client would
@@ -610,22 +596,6 @@ export class WebSocketHandler {
             return true;
         }
 
-        // A caller that cannot prove who it is — a fresh participant, arriving
-        // with nothing but a room code — has to show it is a browser first. A
-        // reconnecting participant holds a valid token and is not asked again.
-        if (!provenUserId && this.turnstile.enabled) {
-            const human = await this.turnstile.verify(turnstileToken, ws.remoteAddress);
-            if (!human) {
-                auditLog({ action: 'join.rejected.challenge', outcome: 'denied' });
-                this.sendError(
-                    ws,
-                    'The join challenge could not be verified. Reload the page and try again.',
-                    'CHALLENGE_FAILED'
-                );
-                return true;
-            }
-        }
-
         return false;
     }
 
@@ -658,8 +628,8 @@ export class WebSocketHandler {
      * that match no room, and the browser-profile bar is what survives a
      * discarded session token.
      */
-    private async handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): Promise<void> {
-        const { avatar, color, name, roomId, sessionToken, turnstileToken, userId } = payload;
+    private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
+        const { avatar, color, name, roomId, sessionToken, userId } = payload;
 
         const address = ws.remoteAddress ?? 'unknown';
         const now = Date.now();
@@ -669,12 +639,11 @@ export class WebSocketHandler {
         const isUserBound = !userId || binding?.userId === userId;
         const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
 
-        const isBarred = await this.refuseJoin(ws, {
+        const isBarred = this.refuseJoin(ws, {
             normalizedRoomId,
             now,
             provenUserId,
             sessionToken,
-            turnstileToken,
         });
         if (isBarred) {
             return;

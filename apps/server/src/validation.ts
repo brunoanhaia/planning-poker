@@ -70,7 +70,6 @@ const joinRoomSchema = z.object({
     name: nameSchema,
     roomId: z.string().trim().min(1).max(MAX_NAME_LENGTH),
     sessionToken: z.string().trim().min(1).optional().nullable(),
-    turnstileToken: z.string().trim().min(1).optional().nullable(),
     userId: z.string().trim().min(1).optional().nullable(),
 });
 

@@ -180,15 +180,28 @@ room is therefore looked up _before_ the budget is consulted, so a code that mat
 room never sees the budget at all — measured against a live server, 21 wrong codes from
 other users no longer stop a participant holding the correct one from joining.
 
-**Fix, part three — a challenge for the caller with no identity at all.** A participant
-that arrives with nothing but a room code cannot prove it is a browser, which is the one
-thing a code never asked. Cloudflare Turnstile (`apps/server/src/turnstile.ts`) answers it
-without another secret to keep, and its token is single-use, so a captured one cannot be
-replayed. It is opt-in through `TURNSTILE_SECRET` — no secret, no challenge, open joins —
-and is asked only of a participant that cannot already prove who it is, so a reconnecting
-client is never challenged twice. Verification fails closed, because failing open would let
-an attacker take the check offline by blocking it. Cloudflare publishes test keys, so the
-whole chain is exercisable without an account.
+**A join challenge was evaluated and rejected.** Cloudflare Turnstile would have asked a
+participant that arrives with nothing but a room code to prove it is a browser, with a
+token that cannot be replayed. It was built, reviewed and then removed, and the reason is
+worth recording rather than leaving as an unexplained gap: **the longer room code already
+answers this finding.** Eight characters is ~1.1×10¹² candidates, about nine days of
+guessing with no other control in the way, so the challenge was defending against an attack
+that had stopped being practical.
+
+What it cost was out of proportion to that. It forced the join handler onto an asynchronous
+path, which took the handler's cognitive complexity over the limit and required extracting
+its bars into a method of their own; it added ~900 lines across verifier, widget, shared
+types, environment, compose and tests; and the async path is where seven defects came from,
+several of them functional — a missing early return that admitted a participant the join had
+just refused, a render target that was not a selector so the widget never appeared at all,
+a spent token reused on retry, a script-load race, and a destructuring error that only
+`tsc` caught. By comparison the code length is a ~73-line change that has produced no
+defects at all.
+
+The part of Cloudflare that stays is the address (`CF-Connecting-IP`), because per-address
+limits genuinely cannot work without it. If a deployment needs a challenge — a public
+instance under sustained automated pressure — the hook points are the join bar in
+`refuseJoin` and the error code list, not a rewrite.
 
 ### SEC-06 — Identity cookie (Low)
 

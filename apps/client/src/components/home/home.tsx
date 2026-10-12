@@ -58,12 +58,12 @@ export const Home: React.FC = () => {
         createRoom(displayName.trim(), avatar, color, title || undefined, deckType, customDeck);
     };
 
-    const handleJoin = (roomCode: string, turnstileToken: string | null) => {
+    const handleJoin = (roomCode: string) => {
         if (!hasDisplayName) {
             return;
         }
         persistProfile();
-        joinRoom(roomCode, displayName.trim(), avatar, color, turnstileToken);
+        joinRoom(roomCode, displayName.trim(), avatar, color);
     };
 
     return (

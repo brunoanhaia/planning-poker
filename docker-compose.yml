@@ -35,7 +35,6 @@ services:
             # Nginx stack reaches the server through its own proxy, so
             # TRUST_PROXY_HOPS is what applies there.
             - CLOUDFLARE_ENABLED=${CLOUDFLARE_ENABLED:-}
-            - TURNSTILE_SECRET=${TURNSTILE_SECRET:-}
         healthcheck:
             test:
                 [
@@ -56,8 +55,6 @@ services:
             args:
                 # Empty = same-origin (recommended with compose). Set to reach an external backend.
                 VITE_WS_URL: '${VITE_WS_URL:-}'
-                # Pairs with TURNSTILE_SECRET on the server; empty = no challenge widget.
-                VITE_TURNSTILE_SITE_KEY: '${VITE_TURNSTILE_SITE_KEY:-}'
         image: planitpoker-client:local
         container_name: planitpoker-client
         restart: unless-stopped

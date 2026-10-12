@@ -28,7 +28,6 @@ import {
     WS_MAX_CONNECTIONS_PER_WINDOW,
     WS_MAX_TRACKED_ADDRESSES,
 } from './constants.js';
-import { TurnstileVerifier } from './turnstile.js';
 import { WebSocketHandler } from './webSocketHandler.js';
 
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173'];
@@ -250,15 +249,7 @@ export const startServer = (options: StartServerOptions): RunningServer => {
         }
     });
 
-    // No secret means no challenge: development and self-hosted deployments keep
-    // their open joins, and gating is a deployment decision rather than a mode.
-    const turnstile = new TurnstileVerifier(process.env.TURNSTILE_SECRET);
-    const handler = new WebSocketHandler(wss, {
-        cloudflareEnabled,
-        connections,
-        trustProxyHops,
-        turnstile,
-    });
+    const handler = new WebSocketHandler(wss, { cloudflareEnabled, connections, trustProxyHops });
 
     return { connections, handler, server: server.listen(port) };
 };
