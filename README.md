@@ -48,7 +48,7 @@ The interface ships in English, Brazilian Portuguese and Spanish, on top of `i18
 1. Create `apps/client/src/i18n/locales/<code>.ts` exporting a `Dictionary` (the compiler lists every missing key), plus its `<code>_one`/`<code>_other` forms where the English has them.
 2. Add the code to `Language`/`LANGUAGES` in `packages/shared/src/index.ts` and register the loader in `i18n/dictionary.ts`; add the Ant Design locale in `app/app.tsx`.
 3. Add its native name under `language.<code>` in every dictionary and run the client tests — the key-set, plural and provider specs fail if something is missing.
-4. Append the new module to `sonar.cpd.exclusions` in `.sonarcloud.properties`. The copy-paste detector ignores string literals, so parallel catalogs always look duplicated; the i18n test fails if a locale is forgotten there.
+4. Append the new module to `sonar.cpd.exclusions` in `.sonarcloud.properties`. The copy-paste detector ignores string literals, so parallel catalogs always look duplicated; `apps/server/tests/translationCatalogs.test.ts` fails if a locale is forgotten there.
 
 ### Voting Rounds and Summary
 
