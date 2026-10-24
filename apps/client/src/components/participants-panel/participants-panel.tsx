@@ -37,7 +37,7 @@ export const ParticipantsPanel: React.FC = () => {
             styles={{ body: { padding: 0 } }}
             title={
                 <Typography.Text>
-                    {t('participants.title', { count: participants.length })}
+                    {t('participants.title', { total: participants.length })}
                 </Typography.Text>
             }
         >

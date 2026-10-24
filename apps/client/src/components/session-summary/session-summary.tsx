@@ -111,7 +111,7 @@ export const SessionSummary: React.FC<SessionSummaryProps> = ({ onClose, open })
 
                 {unestimated > 0 && (
                     <Typography.Text type="secondary">
-                        {t('summary.unestimated', { count: unestimated })}
+                        {t('summary.unestimated', { total: unestimated })}
                     </Typography.Text>
                 )}
 

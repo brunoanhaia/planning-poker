@@ -37,19 +37,21 @@ export const en = {
     'backlog.import.placeholder':
         'User Login API; Implement OAuth authentication\nDashboard Widgets; Build responsive metrics cards',
     'backlog.import.title': 'Bulk Import User Stories',
-    'backlog.imported': 'Imported {count} stories.',
+    'backlog.imported_one': 'Imported {count} story.',
+    'backlog.imported_other': 'Imported {count} stories.',
     'backlog.imported.none':
         'No story could be read. Give each line a title, as "Title; Description".',
     'backlog.imported.skipped': 'The backlog holds at most {max} stories; {skipped} were skipped.',
     'backlog.new': 'New Story Details',
-    'backlog.rounds': '{count} rounds',
+    'backlog.rounds_one': '{count} round',
+    'backlog.rounds_other': '{count} rounds',
     'backlog.save': 'Save Story',
     'backlog.saveScore': 'Save Score',
     'backlog.score': 'Score: {value}',
     'backlog.status.done': 'Done',
     'backlog.status.estimating': 'Estimating',
     'backlog.status.pending': 'Pending',
-    'backlog.title': 'Story Backlog ({count})',
+    'backlog.title': 'Story Backlog ({total})',
     'backlog.titleLabel': 'Story Title',
 
     'common.cancel': 'Cancel',
@@ -140,6 +142,7 @@ export const en = {
     'join.submit': 'Join Room Now',
 
     'language.en': 'English',
+    'language.es': 'Español',
     'language.label': 'Language',
     'language.pt-BR': 'Português (Brasil)',
 
@@ -176,7 +179,7 @@ export const en = {
     'participants.menu.promote': 'Promote to Co-Admin',
     'participants.menu.transfer': 'Transfer Primary Host',
     'participants.spectator': 'Spectator',
-    'participants.title': 'Participants ({count})',
+    'participants.title': 'Participants ({total})',
     'participants.voted': 'Voted',
     'participants.you': '(you)',
 
@@ -213,8 +216,8 @@ export const en = {
     'results.stdev': 'Std. deviation',
     'results.title': 'Estimation Results',
     'results.topVote': 'Top Vote',
-    'results.votes': '{count} votes',
-    'results.votes.one': '{count} vote',
+    'results.votes_one': '{count} vote',
+    'results.votes_other': '{count} votes',
     'results.voters': 'Voters',
     'results.allEstimated': 'All stories in the backlog have been estimated!',
 
@@ -246,7 +249,7 @@ export const en = {
     'summary.stories': 'Stories',
     'summary.subtitle': 'Round-by-round breakdown of “{title}”.',
     'summary.title': 'Session Summary',
-    'summary.unestimated': 'Not estimated: {count}.',
+    'summary.unestimated': 'Not estimated: {total}.',
 
     'breakdown.title': 'Breakdown: {title}',
     'breakdown.estimate': 'Estimate',
@@ -288,20 +291,22 @@ export const ptBR: Dictionary = {
     'backlog.import.placeholder':
         'API de Login; Implementar autenticação OAuth\nWidgets do Painel; Construir cartões de métricas responsivos',
     'backlog.import.title': 'Importar Histórias de Usuário em Massa',
-    'backlog.imported': '{count} histórias importadas.',
+    'backlog.imported_one': '{count} história importada.',
+    'backlog.imported_other': '{count} histórias importadas.',
     'backlog.imported.none':
         'Nenhuma história pôde ser lida. Dê um título a cada linha, como "Título; Descrição".',
     'backlog.imported.skipped':
         'O backlog comporta no máximo {max} histórias; {skipped} foram ignoradas.',
     'backlog.new': 'Detalhes da Nova História',
-    'backlog.rounds': '{count} rodadas',
+    'backlog.rounds_one': '{count} rodada',
+    'backlog.rounds_other': '{count} rodadas',
     'backlog.save': 'Salvar História',
     'backlog.saveScore': 'Salvar Pontuação',
     'backlog.score': 'Pontos: {value}',
     'backlog.status.done': 'Concluída',
     'backlog.status.estimating': 'Em estimativa',
     'backlog.status.pending': 'Pendente',
-    'backlog.title': 'Backlog de Histórias ({count})',
+    'backlog.title': 'Backlog de Histórias ({total})',
     'backlog.titleLabel': 'Título da História',
 
     'common.cancel': 'Cancelar',
@@ -392,6 +397,7 @@ export const ptBR: Dictionary = {
     'join.submit': 'Entrar na Sala Agora',
 
     'language.en': 'English',
+    'language.es': 'Español',
     'language.label': 'Idioma',
     'language.pt-BR': 'Português (Brasil)',
 
@@ -428,7 +434,7 @@ export const ptBR: Dictionary = {
     'participants.menu.promote': 'Promover a Co-Admin',
     'participants.menu.transfer': 'Transferir Anfitrião Principal',
     'participants.spectator': 'Observador',
-    'participants.title': 'Participantes ({count})',
+    'participants.title': 'Participantes ({total})',
     'participants.voted': 'Votou',
     'participants.you': '(você)',
 
@@ -466,8 +472,8 @@ export const ptBR: Dictionary = {
     'results.stdev': 'Desvio padrão',
     'results.title': 'Resultados da Estimativa',
     'results.topVote': 'Voto Mais Frequente',
-    'results.votes': '{count} votos',
-    'results.votes.one': '{count} voto',
+    'results.votes_one': '{count} voto',
+    'results.votes_other': '{count} votos',
     'results.voters': 'Votantes',
     'results.allEstimated': 'Todas as histórias do backlog foram estimadas!',
 
@@ -499,15 +505,46 @@ export const ptBR: Dictionary = {
     'summary.stories': 'Histórias',
     'summary.subtitle': 'Detalhamento rodada a rodada de “{title}”.',
     'summary.title': 'Sumário da Sessão',
-    'summary.unestimated': 'Não estimadas: {count}.',
+    'summary.unestimated': 'Não estimadas: {total}.',
 
     'breakdown.title': 'Detalhamento: {title}',
     'breakdown.estimate': 'Estimativa',
     'breakdown.rounds': '{count} rodadas reveladas',
 };
 
-/** Every dictionary the interface can be rendered in. */
-export const DICTIONARIES: Record<Language, Dictionary> = { en, 'pt-BR': ptBR };
+/** Every dictionary the interface can be rendered in without a network round trip. */
+export const INLINE_DICTIONARIES: Partial<Record<Language, Dictionary>> = {
+    en,
+    'pt-BR': ptBR,
+};
+
+/**
+ * Loaders for the dictionaries that ship as their own chunk.
+ *
+ * English is inlined because it is the fallback, and Brazilian Portuguese
+ * because it is the audience the product already had; anything added later is
+ * fetched when it is picked, so the initial bundle does not grow with each
+ * language.
+ */
+export const LOCALE_LOADERS: Partial<Record<Language, () => Promise<{ default: Dictionary }>>> = {
+    es: () => import('./locales/es'),
+};
+
+/** Plural categories CLDR defines; a dictionary may use any subset. */
+type PluralSuffix = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
+
+/**
+ * Strips an i18next plural suffix, turning `backlog.rounds_other` into the key
+ * callers actually write (`backlog.rounds`).
+ */
+type StripPluralSuffix<Key extends string> = Key extends `${infer Base}_${infer Suffix}`
+    ? Suffix extends PluralSuffix
+        ? Base
+        : Key
+    : Key;
+
+/** Keys a component may pass to `t`: a literal key, or the base of a plural. */
+export type TranslationKey = keyof Dictionary | StripPluralSuffix<keyof Dictionary>;
 
 /** Translation of a deck name, which the shared package only carries in English. */
 export const deckLabelKey = (deckType: DeckType): keyof Dictionary =>

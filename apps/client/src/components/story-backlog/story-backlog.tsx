@@ -196,7 +196,7 @@ export const StoryBacklog: React.FC = () => {
                 styles={{ body: { padding: 0 } }}
                 title={
                     <Typography.Text>
-                        {t('backlog.title', { count: roomState.stories.length })}
+                        {t('backlog.title', { total: roomState.stories.length })}
                     </Typography.Text>
                 }
             >

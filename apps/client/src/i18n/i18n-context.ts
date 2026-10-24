@@ -1,11 +1,11 @@
 import { Language } from '@planitpoker/shared';
 import { createContext } from 'react';
 
-import { Dictionary } from './dictionary';
+import { TranslationKey } from './dictionary';
 
 /** Interpolates `{placeholder}` markers in a translated string. */
 export type Translate = (
-    key: keyof Dictionary,
+    key: TranslationKey,
     params?: Record<number | string, number | string>
 ) => string;
 
@@ -13,9 +13,9 @@ export type Translate = (
 export interface I18nContextValue {
     /** Language currently rendering the interface. */
     language: Language;
-    /** Switches the interface language and persists the choice. */
+    /** Switches the interface language, loading its dictionary if needed. */
     setLanguage: (language: Language) => void;
-    /** Translates a dictionary key, interpolating any placeholders. */
+    /** Translates a key, interpolating placeholders and plural forms. */
     t: Translate;
 }
 

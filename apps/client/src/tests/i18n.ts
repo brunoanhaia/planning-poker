@@ -1,10 +1,13 @@
-import { en } from '../i18n/dictionary';
+import i18n from 'i18next';
+
 import { Translate } from '../i18n/i18n-context';
 
 /**
- * Translator bound to the English dictionary, for tests that assert copy.
+ * Translator bound to the running i18next instance, for tests that call a pure
+ * helper instead of rendering a component.
  *
- * The English strings are the contract the tests check, so they are read from
- * the shipped dictionary instead of being duplicated in each spec.
+ * `src/setupTests.ts` initialises i18next with the shipped dictionaries before
+ * any spec runs, so this reads the same English copy the UI would.
  */
-export const enTranslate: Translate = (key) => en[key];
+export const enTranslate: Translate = (key, params) =>
+    i18n.t(key as string, params ?? {}) as string;

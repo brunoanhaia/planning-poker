@@ -12,16 +12,17 @@ vi.mock('canvas-confetti', () => ({
  */
 vi.mock('./i18n/use-translation', async () => {
     // `vi.mock` is hoisted above the static imports, so the factory cannot close
-    // over them; the modules are loaded inside the factory instead.
-    const { en } = await import('./i18n/dictionary');
-    const { interpolate } = await import('./i18n/interpolate');
+    // over them; the provider is imported here to initialise i18next with the
+    // shipped dictionaries, and the hook is bound to that instance.
+    await import('./i18n/i18n-provider');
+    const { default: i18n } = await import('i18next');
 
     return {
         useTranslation: () => ({
             language: 'en' as const,
             setLanguage: vi.fn(),
-            t: (key: keyof typeof en, params?: Record<number | string, number | string>) =>
-                interpolate(en[key] ?? String(key), params),
+            t: (key: string, params?: Record<number | string, number | string>) =>
+                i18n.t(key, params ?? {}) as string,
         }),
     };
 });

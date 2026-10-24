@@ -35,12 +35,19 @@ The client renders entirely with [Ant Design](https://ant.design) 6 components �
 
 ### Internationalization
 
-The interface ships in English and Brazilian Portuguese.
+The interface ships in English, Brazilian Portuguese and Spanish, on top of `i18next` + `react-i18next`.
 
-- **Dictionaries**: `apps/client/src/i18n/dictionary.ts` holds both languages; the English entry defines the key type, so a key that Portuguese forgets fails the build.
-- **Usage**: components read copy through `useTranslation()` (`t('backlog.add')`), interpolate with `{placeholders}`, and never render a literal string. Deck names and server error codes go through explicit maps (`deckLabelKey`, `ERROR_KEYS`) so a new `DeckType` or `ErrorCode` cannot be silently untranslated.
+- **Dictionaries**: English (`dictionary.ts`, the source of truth for the key type) and Brazilian Portuguese are bundled inline; every other language lives in `i18n/locales/<code>.ts` and is fetched as its own chunk when picked. A stored language survives a reload even when its chunk has not been loaded yet — the provider reads the wanted language once, before anything writes to storage.
+- **Usage**: components read copy through `useTranslation()` (`t('backlog.add')`), interpolate with `{placeholders}` (configured as the i18next prefix/suffix), and never render a literal string. Deck names and server error codes go through explicit maps (`deckLabelKey`, `ERROR_KEYS`) so a new `DeckType` or `ErrorCode` cannot be silently untranslated.
+- **Plurals**: keys carry CLDR categories — `results.votes_one` / `results.votes_other` — and `Intl.PluralRules` picks the form from the `count` parameter. Callers write the base key (`t('results.votes', { count })`). A language whose rules have more categories (Polish, Russian, Arabic) only adds the extra suffixes.
 - **Picker and persistence**: `components/language-switcher/` renders the menu; the choice is stored in `localStorage` (`planit_language`), the browser preference decides the first visit, and Ant Design's own locale (`ConfigProvider`) follows the same value.
 - **Server failures**: the server keeps sending an English `message` for its logs, and the client renders the localized text of the accompanying `ErrorCode`.
+
+#### Adding a language
+
+1. Create `apps/client/src/i18n/locales/<code>.ts` exporting a `Dictionary` (the compiler lists every missing key), plus its `<code>_one`/`<code>_other` forms where the English has them.
+2. Add the code to `Language`/`LANGUAGES` in `packages/shared/src/index.ts` and register the loader in `i18n/dictionary.ts`; add the Ant Design locale in `app/app.tsx`.
+3. Add its native name under `language.<code>` in every dictionary and run the client tests — the key-set, plural and provider specs fail if something is missing.
 
 ### Voting Rounds and Summary
 

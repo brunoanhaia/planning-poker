@@ -244,9 +244,7 @@ export const ResultsPanel: React.FC = () => {
                                         <Flex gap={8} vertical>
                                             <Flex gap={8} justify="space-between" wrap>
                                                 <Typography.Text>
-                                                    {count === 1
-                                                        ? t('results.votes.one', { count })
-                                                        : t('results.votes', { count })}
+                                                    {t('results.votes', { count })}
                                                 </Typography.Text>
                                                 <Typography.Text type="secondary">
                                                     {`${percent}%`}

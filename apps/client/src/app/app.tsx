@@ -1,5 +1,6 @@
 import { App as AntApp, ConfigProvider } from 'antd';
 import enUS from 'antd/locale/en_US';
+import esES from 'antd/locale/es_ES';
 import ptBR from 'antd/locale/pt_BR';
 import React, { useEffect, useMemo, useState } from 'react';
 
@@ -9,7 +10,7 @@ import { I18nProvider, useTranslation } from '../i18n';
 import { ColorMode, getAppTheme, readStoredColorMode, storeColorMode } from '../theme/app-theme';
 
 /** Ant Design locale packages, one per interface language. */
-const ANT_LOCALES = { en: enUS, 'pt-BR': ptBR } as const;
+const ANT_LOCALES = { en: enUS, 'pt-BR': ptBR, es: esES } as const;
 
 /**
  * The translated shell: Ant Design is configured in the active language, so its
