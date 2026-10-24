@@ -259,4 +259,20 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(rm.getRoom(roomId)!.isEnded).toBe(true);
         expect(rm.getRoom(roomId)!.endedAt).toBeTypeOf('number');
     });
+
+    it('records the round when auto-reveal flips the flag inside the last vote', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+
+        const story = rm.getRoom(roomId)!.stories[0];
+        expect(rm.getRoom(roomId)!.votesRevealed).toBe(true);
+        expect(story.rounds).toHaveLength(1);
+        expect(story.rounds[0].votes).toHaveLength(1);
+
+        // A manual reveal afterwards must not append a second copy of the round.
+        rm.revealVotes(roomId, hostId);
+        expect(rm.getRoom(roomId)!.stories[0].rounds).toHaveLength(1);
+    });
 });

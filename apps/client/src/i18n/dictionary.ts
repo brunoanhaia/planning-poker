@@ -1,7 +1,8 @@
-import { DeckType, ErrorCode, Language } from '@planitpoker/shared';
+import { DeckType, ErrorCode } from '@planitpoker/shared';
 
 import enJson from '../assets/locales/en.json';
 import ptBRJson from '../assets/locales/pt-BR.json';
+import { Language } from './languages';
 
 /**
  * Shape every translation must implement, derived from the English catalog.
@@ -53,9 +54,17 @@ type StripPluralSuffix<Key extends string> = Key extends `${infer Base}_${infer 
 /** Keys a component may pass to `t`: a literal key, or the base of a plural. */
 export type TranslationKey = keyof Dictionary | StripPluralSuffix<keyof Dictionary>;
 
+/** Translation key per deck, so a new `DeckType` cannot ship untranslated. */
+const DECK_KEYS: Record<DeckType, keyof Dictionary> = {
+    custom: 'deck.type.custom',
+    fibonacci: 'deck.type.fibonacci',
+    modified_fibonacci: 'deck.type.modified_fibonacci',
+    powers_of_2: 'deck.type.powers_of_2',
+    tshirt: 'deck.type.tshirt',
+};
+
 /** Translation of a deck name, which the shared package only carries in English. */
-export const deckLabelKey = (deckType: DeckType): keyof Dictionary =>
-    `deck.type.${deckType}` as keyof Dictionary;
+export const deckLabelKey = (deckType: DeckType): keyof Dictionary => DECK_KEYS[deckType];
 
 /**
  * Translation key per server error code.
@@ -83,6 +92,15 @@ export const ERROR_KEYS: Record<ErrorCode, keyof Dictionary> = {
     UNKNOWN_ACTION: 'error.UNKNOWN_ACTION',
 };
 
-/** Translation key of a server error code, defaulting to the generic message. */
-export const errorKey = (code: ErrorCode | undefined): keyof Dictionary =>
-    code ? ERROR_KEYS[code] : 'error.generic';
+/**
+ * Translation key of a server error code, defaulting to the generic message.
+ *
+ * A tab left open across a deploy can receive a code this build does not know,
+ * so the lookup tolerates a missing entry instead of rendering `undefined`.
+ */
+export const errorKey = (code: ErrorCode | undefined): keyof Dictionary => {
+    if (code === undefined) {
+        return 'error.generic';
+    }
+    return (ERROR_KEYS as Partial<Record<string, keyof Dictionary>>)[code] ?? 'error.generic';
+};

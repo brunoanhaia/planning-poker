@@ -192,6 +192,7 @@
     "results.voters": "Voters",
     "results.votes_one": "{{count}} vote",
     "results.votes_other": "{{count}} votes",
+    "results.share.aria": "Share of votes for {{vote}}",
     "settings.apply": "Apply Settings",
     "settings.autoReveal": "Auto-Reveal Votes",
     "settings.autoReveal.hint": "Automatically flip cards when everyone has voted",

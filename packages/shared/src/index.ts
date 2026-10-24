@@ -52,15 +52,6 @@ export const MAX_STORIES_PER_ROOM = 200;
  */
 export const MAX_ROUNDS_PER_STORY = 10;
 
-/** Interface languages the client ships translations for. */
-export type Language = 'en' | 'pt-BR' | 'es';
-
-/** Languages offered in the interface, in the order the picker shows them. */
-export const LANGUAGES = ['en', 'pt-BR', 'es'] as const satisfies readonly Language[];
-
-/** Local-storage key that persists the chosen interface language. */
-export const LANGUAGE_STORAGE_KEY = 'planit_language';
-
 /** Largest WebSocket frame the server accepts, in bytes. */
 export const WS_MAX_PAYLOAD_BYTES = 32 * 1024;
 

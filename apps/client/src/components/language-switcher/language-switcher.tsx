@@ -1,8 +1,8 @@
 import { GlobalOutlined } from '@ant-design/icons';
-import { LANGUAGES, Language } from '@planitpoker/shared';
 import { Button, Dropdown, MenuProps, Tooltip } from 'antd';
 import React from 'react';
 
+import { LANGUAGES, Language } from '../../i18n/languages';
 import { useTranslation } from '../../i18n/use-translation';
 
 /**

@@ -192,6 +192,7 @@
     "results.voters": "Votantes",
     "results.votes_one": "{{count}} voto",
     "results.votes_other": "{{count}} votos",
+    "results.share.aria": "Proporción de votos para {{vote}}",
     "settings.apply": "Aplicar Configuración",
     "settings.autoReveal": "Revelar Votos Automáticamente",
     "settings.autoReveal.hint": "Voltea las cartas cuando todos hayan votado",

@@ -1,10 +1,10 @@
-import { LANGUAGE_STORAGE_KEY, Language, LANGUAGES } from '@planitpoker/shared';
 import i18n from 'i18next';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { initReactI18next } from 'react-i18next';
 
-import { Dictionary, INLINE_DICTIONARIES, LOCALE_LOADERS, TranslationKey } from './dictionary';
+import { Dictionary, INLINE_DICTIONARIES, LOCALE_LOADERS } from './dictionary';
 import { I18nContext, I18nContextValue, Translate } from './i18n-context';
+import { LANGUAGE_STORAGE_KEY, Language, LANGUAGES } from './languages';
 
 /** Language used when neither the browser nor storage names a supported one. */
 const FALLBACK_LANGUAGE: Language = 'en';
@@ -149,10 +149,12 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         storeLanguage(next);
     }, []);
 
-    const t = useCallback<Translate>(
-        (key, params) => i18n.t(key as TranslationKey, params ?? {}) as string,
-        []
-    );
+    // A translator bound to the active language: its identity changes with the
+    // language, so any `useMemo` that depends on `t` re-translates on a switch.
+    const t = useMemo<Translate>(() => {
+        const fixed = i18n.getFixedT(language);
+        return (key, params) => fixed(key, params ?? {}) as string;
+    }, [language]);
 
     const value = useMemo<I18nContextValue>(
         () => ({ language, setLanguage: changeLanguage, t }),

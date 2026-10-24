@@ -50,7 +50,9 @@ export const SessionSummary: React.FC<SessionSummaryProps> = ({ onClose, open })
     const { roomState } = useSocket();
     const { t } = useTranslation();
 
-    if (!roomState) {
+    // The room keeps broadcasting while the dialog is closed (the countdown ticks
+    // every second), so the aggregate is only built when it can be seen.
+    if (!roomState || !open) {
         return null;
     }
 

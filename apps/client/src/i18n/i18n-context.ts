@@ -1,7 +1,7 @@
-import { Language } from '@planitpoker/shared';
 import { createContext } from 'react';
 
 import { TranslationKey } from './dictionary';
+import { Language } from './languages';
 
 /** Interpolates `{placeholder}` markers in a translated string. */
 export type Translate = (

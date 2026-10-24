@@ -461,7 +461,16 @@ export class RoomManager {
         if (!room) {
             return null;
         }
-        return submitVoteForParticipant(room, userId, vote);
+
+        // Auto-reveal flips the flag from inside the vote, so the round has to be
+        // recorded here: the following manual reveal would see it already true
+        // and skip the snapshot.
+        const wasRevealed = room.votesRevealed;
+        const updated = submitVoteForParticipant(room, userId, vote);
+        if (updated && !wasRevealed && updated.votesRevealed) {
+            this.recordRound(updated);
+        }
+        return updated;
     }
 
     /**

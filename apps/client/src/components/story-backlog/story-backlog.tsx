@@ -26,9 +26,10 @@ import {
 import React, { Fragment, useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { Translate } from '../../i18n/i18n-context';
 import { useTranslation } from '../../i18n/use-translation';
 import { DeckChipPicker } from '../deck-chip-picker/deck-chip-picker';
-import { StoryBreakdownModal } from '../story-breakdown/story-breakdown';
+import { StoryBreakdownModal } from '../story-breakdown-modal/story-breakdown-modal';
 import { buildBacklogCsvFilename, escapeCsvCell, parseBulkStories } from './story-backlog.utils';
 
 /** CSV columns emitted by the export, in order. */
@@ -54,9 +55,7 @@ const toFinalEstimate = (value: string): number | string => {
 };
 
 /** Renders the story lifecycle as a status badge. */
-const StoryStatusBadge: React.FC<{ status: Story['status'] }> = ({ status }) => {
-    const { t } = useTranslation();
-
+const renderStoryStatus = (status: Story['status'], t: Translate): React.ReactNode => {
     if (status === 'completed') {
         return <Badge status="success" text={t('backlog.status.done')} />;
     }
@@ -301,7 +300,7 @@ export const StoryBacklog: React.FC = () => {
                                                 >
                                                     {`${index + 1}. ${story.title}`}
                                                 </Typography.Text>
-                                                <StoryStatusBadge status={story.status} />
+                                                {renderStoryStatus(story.status, t)}
                                                 {hasEstimate && (
                                                     <Tag>
                                                         {t('backlog.score', {

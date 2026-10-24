@@ -7,7 +7,7 @@ import {
     ThunderboltOutlined,
     UndoOutlined,
 } from '@ant-design/icons';
-import { TimerState } from '@planitpoker/shared';
+import { Story, TimerState } from '@planitpoker/shared';
 import {
     Alert,
     Badge,
@@ -46,6 +46,27 @@ interface VoteActionsArgs {
     votesRevealed: boolean;
 }
 
+interface TimerControlsArgs {
+    isAdmin: boolean;
+    isRunning: boolean;
+    onPause: () => void;
+    onReset: () => void;
+    onStart: (duration: number) => void;
+    t: Translate;
+    timer: null | TimerState;
+}
+
+interface VotingProgressArgs {
+    activeVoterCount: number;
+    isAdmin: boolean;
+    onResetVotes: () => void;
+    onRevealVotes: () => void;
+    progress: number;
+    t: Translate;
+    votedCount: number;
+    votesRevealed: boolean;
+}
+
 /** `true` while the countdown is in its final seconds. */
 const isTimerEnding = (timer: null | TimerState | undefined): boolean =>
     Boolean(timer && timer.remaining > 0 && timer.remaining <= TIMER_ENDING_THRESHOLD);
@@ -58,6 +79,77 @@ const formatTimerDisplay = (timer: null | TimerState | undefined, offLabel: stri
     const minutes = Math.floor(timer.remaining / 60);
     const seconds = String(timer.remaining % 60).padStart(2, '0');
     return `${minutes}:${seconds}`;
+};
+
+/** Builds the countdown presets offered by the timer menu. */
+const buildTimerPresets = (t: Translate): MenuProps['items'] =>
+    TIMER_PRESET_SECONDS.map((seconds) => ({
+        key: String(seconds),
+        label: t(`estimation.preset.${seconds}` as const),
+    }));
+
+/** Renders the countdown badge, marking the final seconds as running out. */
+const renderTimerTag = (timer: null | TimerState, t: Translate): React.ReactNode => {
+    const display = formatTimerDisplay(timer, t('estimation.timerOff'));
+    const isRunning = timer?.isRunning === true;
+
+    if (!isTimerEnding(timer) && !isRunning) {
+        return <Tag icon={<ClockCircleOutlined />}>{display}</Tag>;
+    }
+
+    return (
+        <Tag icon={<ClockCircleOutlined />}>
+            <Badge status={isTimerEnding(timer) ? 'error' : 'processing'} text={display} />
+        </Tag>
+    );
+};
+
+/** Renders the host's countdown controls: start (with presets), pause and reset. */
+const renderTimerControls = ({
+    isAdmin,
+    isRunning,
+    onPause,
+    onReset,
+    onStart,
+    t,
+    timer,
+}: TimerControlsArgs): React.ReactNode => {
+    if (!isAdmin) {
+        return null;
+    }
+
+    if (!timer) {
+        return (
+            <Dropdown
+                menu={{
+                    items: buildTimerPresets(t),
+                    onClick: ({ key }) => onStart(Number(key)),
+                }}
+                trigger={['click']}
+            >
+                <Button aria-label={t('estimation.start')} icon={<PlayCircleOutlined />} />
+            </Dropdown>
+        );
+    }
+
+    return (
+        <Space size={4}>
+            <Tooltip title={isRunning ? t('estimation.pause') : t('estimation.start')}>
+                <Button
+                    aria-label={t('estimation.toggle')}
+                    icon={isRunning ? <PauseOutlined /> : <PlayCircleOutlined />}
+                    onClick={isRunning ? onPause : () => onStart(timer.duration)}
+                />
+            </Tooltip>
+            <Tooltip title={t('estimation.resetTimer')}>
+                <Button
+                    aria-label={t('estimation.resetTimer')}
+                    icon={<ReloadOutlined />}
+                    onClick={onReset}
+                />
+            </Tooltip>
+        </Space>
+    );
 };
 
 /** Renders the reveal/reset/waiting affordance for the current voting state. */
@@ -100,11 +192,85 @@ const renderVoteActions = ({
     );
 };
 
+/** Renders the current story and the round it is on. */
+const renderStoryCard = (
+    story: Story | undefined,
+    roundNumber: number,
+    t: Translate
+): React.ReactNode => (
+    <Card
+        extra={story && <Tag>{t('estimation.round', { round: roundNumber })}</Tag>}
+        size="small"
+        title={t('estimation.currentStory')}
+        type="inner"
+    >
+        <Typography.Title level={5} style={{ marginTop: 0 }}>
+            {story?.title ?? t('estimation.noStory')}
+        </Typography.Title>
+        {story?.description && (
+            <Typography.Paragraph type="secondary">{story.description}</Typography.Paragraph>
+        )}
+    </Card>
+);
+
+/** Renders the closing banner, with the shortcut to the summary. */
+const renderEndedBanner = (onOpenSummary: () => void, t: Translate): React.ReactNode => (
+    <Alert
+        action={
+            <Button onClick={onOpenSummary} size="small">
+                {t('estimation.viewSummary')}
+            </Button>
+        }
+        description={t('estimation.ended.desc')}
+        showIcon
+        title={t('estimation.ended.title')}
+        type="success"
+    />
+);
+
+/** Renders the voting progress and the action the current role can take. */
+const renderVotingProgress = ({
+    activeVoterCount,
+    isAdmin,
+    onResetVotes,
+    onRevealVotes,
+    progress,
+    t,
+    votedCount,
+    votesRevealed,
+}: VotingProgressArgs): React.ReactNode => (
+    <Flex gap={8} vertical>
+        <Flex gap={8} justify="space-between" wrap>
+            <Typography.Text>{t('estimation.progress')}</Typography.Text>
+            <Typography.Text type="secondary">
+                {t('estimation.progress.count', {
+                    percent: Math.round(progress),
+                    total: activeVoterCount,
+                    voted: votedCount,
+                })}
+            </Typography.Text>
+        </Flex>
+        <Progress aria-label={t('estimation.progress')} percent={progress} showInfo={false} />
+        <Flex justify="end" wrap>
+            {renderVoteActions({
+                activeVoterCount,
+                isAdmin,
+                onResetVotes,
+                onRevealVotes,
+                t,
+                votedCount,
+                votesRevealed,
+            })}
+        </Flex>
+    </Flex>
+);
+
 /**
  * The centre panel: countdown, current story, deck and the reveal controls.
  *
  * Sections stack rather than overlay, and every action row wraps, so the panel
- * keeps its shape as the timer labels and vote counters grow.
+ * keeps its shape as the timer labels and vote counters grow. Each section is a
+ * render helper so the component itself stays a readable composition.
  */
 export const EstimationPanel: React.FC = () => {
     const { isAdmin, pauseTimer, resetTimer, resetVotes, revealVotes, roomState, startTimer } =
@@ -124,21 +290,15 @@ export const EstimationPanel: React.FC = () => {
         }
     }, [roomState?.endedAt]);
 
-    if (!roomState) return null;
+    if (!roomState) {
+        return null;
+    }
 
     const currentStory = roomState.stories[roomState.currentStoryIndex ?? 0];
     const activeVoters = (roomState.participants ?? []).filter((p) => !p.isSpectator && p.isOnline);
     const votedCount = activeVoters.filter((p) => p.hasVoted).length;
     const votingProgress = activeVoters.length > 0 ? (votedCount / activeVoters.length) * 100 : 0;
-
-    const timer = roomState.timer;
-    const isTimerRunning = timer?.isRunning === true;
-    const roundNumber = (currentStory?.rounds.length ?? 0) + (roomState.votesRevealed ? 0 : 1);
-
-    const timerPresets: MenuProps['items'] = TIMER_PRESET_SECONDS.map((seconds) => ({
-        key: String(seconds),
-        label: t(`estimation.preset.${seconds}` as const),
-    }));
+    const roundNumber = (currentStory?.rounds.length ?? 0) + Number(!roomState.votesRevealed);
 
     return (
         <>
@@ -150,66 +310,16 @@ export const EstimationPanel: React.FC = () => {
                         </Typography.Title>
 
                         <Space size={8} wrap>
-                            <Tag icon={<ClockCircleOutlined />}>
-                                {isTimerEnding(timer) || timer?.isRunning === true ? (
-                                    <Badge
-                                        status={isTimerEnding(timer) ? 'error' : 'processing'}
-                                        text={formatTimerDisplay(timer, t('estimation.timerOff'))}
-                                    />
-                                ) : (
-                                    formatTimerDisplay(timer, t('estimation.timerOff'))
-                                )}
-                            </Tag>
-
-                            {isAdmin &&
-                                (timer ? (
-                                    <Space size={4}>
-                                        <Tooltip
-                                            title={
-                                                isTimerRunning
-                                                    ? t('estimation.pause')
-                                                    : t('estimation.start')
-                                            }
-                                        >
-                                            <Button
-                                                aria-label={t('estimation.toggle')}
-                                                icon={
-                                                    isTimerRunning ? (
-                                                        <PauseOutlined />
-                                                    ) : (
-                                                        <PlayCircleOutlined />
-                                                    )
-                                                }
-                                                onClick={
-                                                    isTimerRunning
-                                                        ? pauseTimer
-                                                        : () => startTimer(timer.duration)
-                                                }
-                                            />
-                                        </Tooltip>
-                                        <Tooltip title={t('estimation.resetTimer')}>
-                                            <Button
-                                                aria-label={t('estimation.resetTimer')}
-                                                icon={<ReloadOutlined />}
-                                                onClick={resetTimer}
-                                            />
-                                        </Tooltip>
-                                    </Space>
-                                ) : (
-                                    <Dropdown
-                                        menu={{
-                                            items: timerPresets,
-                                            onClick: ({ key }) => startTimer(Number(key)),
-                                        }}
-                                        trigger={['click']}
-                                    >
-                                        <Button
-                                            aria-label={t('estimation.start')}
-                                            icon={<PlayCircleOutlined />}
-                                        />
-                                    </Dropdown>
-                                ))}
-
+                            {renderTimerTag(roomState.timer, t)}
+                            {renderTimerControls({
+                                isAdmin,
+                                isRunning: roomState.timer?.isRunning === true,
+                                onPause: pauseTimer,
+                                onReset: resetTimer,
+                                onStart: startTimer,
+                                t,
+                                timer: roomState.timer,
+                            })}
                             {roomState.autoReveal && (
                                 <Tooltip title={t('estimation.autoReveal.hint')}>
                                     <Tag icon={<ThunderboltOutlined />}>
@@ -220,70 +330,22 @@ export const EstimationPanel: React.FC = () => {
                         </Space>
                     </Flex>
 
-                    {roomState.isEnded && (
-                        <Alert
-                            action={
-                                <Button onClick={() => setIsSummaryOpen(true)} size="small">
-                                    {t('estimation.viewSummary')}
-                                </Button>
-                            }
-                            description={t('estimation.ended.desc')}
-                            showIcon
-                            title={t('estimation.ended.title')}
-                            type="success"
-                        />
-                    )}
+                    {roomState.isEnded && renderEndedBanner(() => setIsSummaryOpen(true), t)}
 
-                    <Card
-                        extra={
-                            currentStory ? (
-                                <Tag>{t('estimation.round', { round: roundNumber })}</Tag>
-                            ) : undefined
-                        }
-                        size="small"
-                        title={t('estimation.currentStory')}
-                        type="inner"
-                    >
-                        <Typography.Title level={5} style={{ marginTop: 0 }}>
-                            {currentStory?.title ?? t('estimation.noStory')}
-                        </Typography.Title>
-                        {currentStory?.description && (
-                            <Typography.Paragraph type="secondary">
-                                {currentStory.description}
-                            </Typography.Paragraph>
-                        )}
-                    </Card>
+                    {renderStoryCard(currentStory, roundNumber, t)}
 
                     {roomState.votesRevealed ? <ResultsPanel /> : <CardDeck />}
 
-                    <Flex gap={8} vertical>
-                        <Flex gap={8} justify="space-between" wrap>
-                            <Typography.Text>{t('estimation.progress')}</Typography.Text>
-                            <Typography.Text type="secondary">
-                                {t('estimation.progress.count', {
-                                    percent: Math.round(votingProgress),
-                                    total: activeVoters.length,
-                                    voted: votedCount,
-                                })}
-                            </Typography.Text>
-                        </Flex>
-                        <Progress
-                            aria-label={t('estimation.progress')}
-                            percent={votingProgress}
-                            showInfo={false}
-                        />
-                        <Flex justify="end" wrap>
-                            {renderVoteActions({
-                                activeVoterCount: activeVoters.length,
-                                isAdmin,
-                                onResetVotes: resetVotes,
-                                onRevealVotes: revealVotes,
-                                t,
-                                votedCount,
-                                votesRevealed: roomState.votesRevealed,
-                            })}
-                        </Flex>
-                    </Flex>
+                    {renderVotingProgress({
+                        activeVoterCount: activeVoters.length,
+                        isAdmin,
+                        onResetVotes: resetVotes,
+                        onRevealVotes: revealVotes,
+                        progress: votingProgress,
+                        t,
+                        votedCount,
+                        votesRevealed: roomState.votesRevealed,
+                    })}
                 </Flex>
             </Card>
 

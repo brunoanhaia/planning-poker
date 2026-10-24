@@ -1,9 +1,9 @@
-import { LANGUAGE_STORAGE_KEY, LANGUAGES } from '@planitpoker/shared';
 import i18n from 'i18next';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { INLINE_DICTIONARIES, LOCALE_LOADERS, en } from './dictionary';
 import { normalizeLanguage, readInitialLanguage } from './i18n-provider';
+import { LANGUAGE_STORAGE_KEY, LANGUAGES } from './languages';
 
 describe('language selection', () => {
     afterEach(() => {

@@ -1,10 +1,10 @@
-import { LANGUAGE_STORAGE_KEY } from '@planitpoker/shared';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import i18n from 'i18next';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from './i18n-provider';
+import { LANGUAGE_STORAGE_KEY } from './languages';
 import { useTranslation } from './use-translation';
 
 // The panel specs mock the hook; these tests exercise the provider itself.

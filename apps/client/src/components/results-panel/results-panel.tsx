@@ -74,7 +74,9 @@ export const ResultsPanel: React.FC = () => {
         );
     }
 
-    const suggestedEstimate = hasNumeric ? averageText : (modeVote ?? '-');
+    // `averageText` is rounded for display; the stored estimate must stay the
+    // number the server validates, not the formatted string.
+    const suggestedEstimate = hasNumeric ? Number(averageText) : (modeVote ?? '-');
 
     const promptSaveEstimate = (customEstimate?: number | string) => {
         setPendingEstimate(customEstimate);
@@ -251,7 +253,9 @@ export const ResultsPanel: React.FC = () => {
                                                 </Typography.Text>
                                             </Flex>
                                             <Progress
-                                                aria-label={`Share of votes for ${vote}`}
+                                                aria-label={t('results.share.aria', {
+                                                    vote,
+                                                })}
                                                 percent={percent}
                                                 showInfo={false}
                                                 size="small"
