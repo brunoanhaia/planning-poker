@@ -11,7 +11,7 @@ npm workspaces monorepo:
 - `apps/e2e` — Playwright + Axe-core, package name `@planitpoker/e2e`
 - `packages/shared` — TypeScript types, enums, constants, package name `@planitpoker/shared`
 
-All WebSocket message types and domain models live in `packages/shared/src/index.ts`. Treat it as the source of truth; do not redefine event payloads locally.
+All WebSocket message types and domain models live in `packages/shared/src/index.ts`. Treat it as the source of truth; do not redefine event payloads locally. Voting rounds live on `Story.rounds` as append-only revealed snapshots (capped by `MAX_ROUNDS_PER_STORY`), `RoomState.endedAt` marks the session end, and `ErrorCode` is the contract the client translates — a new code needs an `ERROR_KEYS` entry.
 
 ## Development
 
@@ -110,10 +110,11 @@ The client is styled exclusively with [Ant Design](https://ant.design) 6 compone
 
 ```
 apps/client/src/
-├── app/app.tsx                     # ConfigProvider + AntApp + SocketProvider
+├── app/app.tsx                     # I18nProvider + ConfigProvider + AntApp + SocketProvider
 ├── theme/app-theme.ts              # the only ConfigProvider config in the repo
+├── i18n/                           # dictionary.ts (en + pt-BR), provider, useTranslation
 ├── context/socket-context/         # socket-context.ts, socket-provider.tsx, use-socket.ts
-├── utils/                          # transport-level helpers shared by the context and the components
+├── utils/                          # bulk-import.ts, estimation-stats.ts
 └── components/<kebab-case-name>/   # one folder per component, one component per .tsx
 ```
 
@@ -133,6 +134,8 @@ apps/client/src/
 8. **No deprecated Ant Design APIs.** antd 6.6 deprecates `List` (use `Listy` or flex rows), `Space.direction` (use `orientation`), `Alert.message` (use `title`), `Progress.trailColor` and `Dropdown.dropdownRender`. `List` is deliberately not used: `Listy` is a virtual list and the rosters are 2–20 rows.
 9. **`create_file` may be unavailable**; scaffold new files with a terminal heredoc when needed.
 10. **Icons** come from `@ant-design/icons`. Decorative icons inside an interactive control need `aria-hidden` (or the control needs an explicit `aria-label`) so they stay out of the accessible name.
+11. **No hard-coded copy in components.** Every user-visible string is a key in `apps/client/src/i18n/dictionary.ts`, read through `useTranslation()`; the English dictionary defines the key type, so an untranslated key fails `tsc`. Interpolate with `{placeholders}`, translate deck names with `deckLabelKey` and server failures with `ERROR_KEYS` (`errorKey(code)`), and keep the `message` the server sends in English — it is the log, not the UI.
+12. **Language changes never reconnect the socket.** `SocketProvider` reads the translator through a ref so switching language re-renders copy without tearing down the WebSocket; the choice persists under `planit_language` and drives `ConfigProvider locale`.
 
 ### Verification
 

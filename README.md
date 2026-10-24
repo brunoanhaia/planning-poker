@@ -33,6 +33,21 @@ The client renders entirely with [Ant Design](https://ant.design) 6 components �
 - **Component layout**: one component per folder, kebab-case, under `apps/client/src/components/`. Logic lives in colocated hooks or `.utils.ts` files; only the component itself lives in the `.tsx`.
 - **Accessibility**: `apps/e2e/tests/overlap-axe.spec.ts` scans the lobby, the room and the revealed results on four viewports in both colour schemes, asserting zero axe violations and zero overlapping text or interactive elements.
 
+### Internationalization
+
+The interface ships in English and Brazilian Portuguese.
+
+- **Dictionaries**: `apps/client/src/i18n/dictionary.ts` holds both languages; the English entry defines the key type, so a key that Portuguese forgets fails the build.
+- **Usage**: components read copy through `useTranslation()` (`t('backlog.add')`), interpolate with `{placeholders}`, and never render a literal string. Deck names and server error codes go through explicit maps (`deckLabelKey`, `ERROR_KEYS`) so a new `DeckType` or `ErrorCode` cannot be silently untranslated.
+- **Picker and persistence**: `components/language-switcher/` renders the menu; the choice is stored in `localStorage` (`planit_language`), the browser preference decides the first visit, and Ant Design's own locale (`ConfigProvider`) follows the same value.
+- **Server failures**: the server keeps sending an English `message` for its logs, and the client renders the localized text of the accompanying `ErrorCode`.
+
+### Voting Rounds and Summary
+
+- **Rounds**: each reveal appends a snapshot of the active story (`rounds`, capped at `MAX_ROUNDS_PER_STORY = 10`), holding the card, the voter name and the reveal timestamp; resetting the votes opens the next round instead of erasing the previous one. Only revealed rounds are stored, so this introduces no way to read a hidden card.
+- **Summary**: `components/session-summary/` derives the end-of-session overview from the broadcast state — estimated stories, accepted points, rounds, duration and a CSV export — and opens once when the host ends the session.
+- **Statistics**: `apps/client/src/utils/estimation-stats.ts` computes average, median, population standard deviation, consensus, mode and Tukey outliers from the numeric cards only; symbolic cards still shape the distribution.
+
 ### System Diagram
 
 ```mermaid
@@ -65,7 +80,11 @@ The application supports multiple users connecting to a single room to vote on t
     - Join a room using a unique URL.
     - Select a card to submit an estimate.
     - Toggle personal status between Voter and Spectator.
-    - View the current story backlog.
+    - View the current story backlog, with a per-story breakdown of every revealed round.
+    - **Voting rounds**: re-voting a story keeps the previous rounds instead of erasing them, so the room can compare attempts before accepting a number.
+    - **Result statistics**: average, median, consensus, top vote, voters and population standard deviation, plus the voters whose card falls outside 1.5 interquartile ranges.
+    - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it.
+    - **Interface languages**: English and Brazilian Portuguese, switchable from the application bar and remembered across reloads.
     - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
 
 - **Administrative Features** (Restricted to Admin and Co-host):
