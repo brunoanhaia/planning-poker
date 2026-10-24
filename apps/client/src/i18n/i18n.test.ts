@@ -38,6 +38,33 @@ describe('dictionaries', () => {
         });
     });
 
+    it('puts exactly one JSON catalog per offered language in assets/locales', () => {
+        // Vite resolves the glob, so the assertion needs no Node filesystem types
+        // and runs against the same files the bundler sees.
+        const catalogs = Object.keys(
+            import.meta.glob('../assets/locales/*.json', { eager: true })
+        ).map((path) => path.split('/').pop()!.replace('.json', ''));
+
+        expect(catalogs.sort()).toEqual([...LANGUAGES].sort());
+    });
+
+    it('keeps everything else out of assets/locales', () => {
+        // The folder is excluded from the Sonar scan on the premise that it holds
+        // translation data only; a stray module there would be analysed by nobody.
+        const entries = Object.keys(
+            import.meta.glob('../assets/locales/*', {
+                eager: true,
+                import: 'default',
+                query: '?url',
+            })
+        );
+
+        expect(entries.length).toBeGreaterThan(0);
+        entries.forEach((path) => {
+            expect(path.endsWith('.json'), `${path} is not a catalog`).toBe(true);
+        });
+    });
+
     it('has a locale module per lazy language, with the same keys as English', async () => {
         const english = Object.keys(en).sort();
 

@@ -49,7 +49,7 @@ The interface ships in English, Brazilian Portuguese and Spanish, on top of `i18
 2. Add the code to `Language`/`LANGUAGES` in `packages/shared/src/index.ts` and register the loader in `i18n/dictionary.ts`; add the Ant Design locale in `app/app.tsx`.
 3. Add its native name under `language.<code>` in every catalog and run the client tests — the key-set, plural and provider specs fail if something is missing.
 
-Nothing else: `assets/locales/` is excluded from the Sonar scan as a whole, so a new catalog needs no analysis change. Keep the folder JSON-only — `apps/server/tests/translationCatalogs.test.ts` fails otherwise.
+Nothing else: `assets/locales/` is excluded from the Sonar scan as a whole, so a new catalog needs no analysis change. Keep the folder JSON-only — the i18n spec fails otherwise.
 
 ### Voting Rounds and Summary
 
