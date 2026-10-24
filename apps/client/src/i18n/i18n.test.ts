@@ -81,8 +81,11 @@ describe('translation', () => {
         expect(i18n.t('results.votes', { count: 3 })).toBe('3 votos');
     });
 
-    it('interpolates the single-brace placeholders the dictionaries use', async () => {
+    it('interpolates with the library default double-brace syntax', async () => {
         await i18n.changeLanguage('en');
         expect(i18n.t('nav.room', { code: 'ABCD1234' })).toBe('Room: ABCD1234');
+        expect(i18n.t('estimation.progress.count', { percent: 50, total: 4, voted: 2 })).toBe(
+            '2 of 4 voted (50%)'
+        );
     });
 });

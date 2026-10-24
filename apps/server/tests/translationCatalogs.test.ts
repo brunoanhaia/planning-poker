@@ -5,33 +5,40 @@ import { describe, expect, it } from 'vitest';
 /** Repository root, from this workspace's test directory (apps/server/tests). */
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
-const CATALOGS_DIR = join(REPO_ROOT, 'apps', 'client', 'src', 'i18n');
+const CATALOGS_DIR = join(REPO_ROOT, 'apps', 'client', 'src', 'i18n', 'locales');
 
 /**
- * SonarQube Cloud excludes the translation catalogs from copy-paste detection.
- *
- * The detector ignores string literals, so every locale — which repeats the
- * English keys by design — looks like a copy of the others, and a new language
- * that is not listed in `.sonarcloud.properties` fails the quality gate with a
- * message unrelated to the code under review. This test keeps the list honest;
- * it lives in the server suite because the client build has no Node types.
+ * `i18n/locales/` is excluded from the Sonar scan as a whole, on the premise
+ * that it holds nothing but translation catalogs. This test keeps the premise
+ * true: a stray module with logic in there would be analysed by nobody.
  */
-describe('translation catalogs', () => {
-    it('lists every locale as a copy-paste exclusion', () => {
-        const properties = readFileSync(join(REPO_ROOT, '.sonarcloud.properties'), 'utf8');
+describe('translation catalogs directory', () => {
+    it('holds nothing but JSON catalogs', () => {
+        const entries = readdirSync(CATALOGS_DIR, { withFileTypes: true });
 
-        expect(properties).toContain('apps/client/src/i18n/dictionary.ts');
+        expect(entries.length).toBeGreaterThan(0);
+        entries.forEach((entry) => {
+            expect(entry.isFile(), `${entry.name} is not a file`).toBe(true);
+            expect(entry.name.endsWith('.json'), `${entry.name} is not a catalog`).toBe(true);
+        });
+    });
 
-        const locales = readdirSync(join(CATALOGS_DIR, 'locales')).filter((file) =>
-            file.endsWith('.ts')
-        );
-        expect(locales.length).toBeGreaterThan(0);
+    it('parses every catalog into a flat map of strings', () => {
+        const catalogs = readdirSync(CATALOGS_DIR).map((file) => ({
+            entries: Object.entries(
+                JSON.parse(readFileSync(join(CATALOGS_DIR, file), 'utf8')) as Record<
+                    string,
+                    unknown
+                >
+            ),
+            file,
+        }));
 
-        locales.forEach((file) => {
-            expect(
-                properties,
-                `add apps/client/src/i18n/locales/${file} to sonar.cpd.exclusions`
-            ).toContain(`apps/client/src/i18n/locales/${file}`);
+        catalogs.forEach(({ entries, file }) => {
+            expect(entries.length, `${file} is empty`).toBeGreaterThan(0);
+            entries.forEach(([key, value]) => {
+                expect(typeof value, `${file}: ${key} is not a string`).toBe('string');
+            });
         });
     });
 });

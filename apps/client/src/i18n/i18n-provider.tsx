@@ -50,14 +50,15 @@ export const readInitialLanguage = (): Language => {
 /**
  * The single i18next instance.
  *
- * Placeholders stay `{name}` rather than i18next's default `{{name}}`, so the
- * dictionary syntax the components already use did not have to change. React
- * escapes every node we render, so HTML escaping is off: the values interpolated
- * are our own dictionary entries and typed parameters, not user HTML.
+ * Interpolation uses the library's own defaults: `{{name}}` placeholders,
+ * plural resolution through `Intl.PluralRules` from a `count` parameter, and
+ * `nesting`/`context` available without extra code. Only HTML escaping is
+ * turned off, because React escapes every node we render and the values
+ * interpolated are our own dictionary entries and typed parameters.
  */
 i18n.use(initReactI18next).init({
     fallbackLng: FALLBACK_LANGUAGE,
-    interpolation: { escapeValue: false, prefix: '{', suffix: '}' },
+    interpolation: { escapeValue: false },
     lng: INLINE_DICTIONARIES[readInitialLanguage()] ? readInitialLanguage() : FALLBACK_LANGUAGE,
     resources: Object.fromEntries(
         Object.entries(INLINE_DICTIONARIES).map(([language, dictionary]) => [
