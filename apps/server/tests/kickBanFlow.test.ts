@@ -326,6 +326,33 @@ describe('Ended sessions', () => {
     });
 });
 
+describe('Revealed rounds', () => {
+    it('refuses a vote after the reveal until the room is reset', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const bob = connect();
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        send(bob, 'VOTE', { vote: 5 });
+        send(host, 'REVEAL_VOTES', {});
+        bob.sent.length = 0;
+
+        send(bob, 'VOTE', { vote: 8 });
+
+        expect(lastMessage(bob, 'ERROR')?.payload.code).toBe('VOTES_REVEALED');
+
+        send(host, 'RESET_VOTES', {});
+        bob.sent.length = 0;
+        send(bob, 'VOTE', { vote: 8 });
+
+        expect(lastMessage(bob, 'ERROR')).toBeUndefined();
+    });
+});
+
 describe('Kick ban, end to end', () => {
     it('refuses the rejoin the kicked client attempts with its own token', () => {
         const { connect } = boot();

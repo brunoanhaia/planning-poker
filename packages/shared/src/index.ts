@@ -336,7 +336,8 @@ export type ErrorCode =
     | 'ROOM_NOT_FOUND'
     | 'SESSION_ENDED'
     | 'STORY_LIMIT_REACHED'
-    | 'UNKNOWN_ACTION';
+    | 'UNKNOWN_ACTION'
+    | 'VOTES_REVEALED';
 
 export interface ErrorPayload {
     code?: ErrorCode;

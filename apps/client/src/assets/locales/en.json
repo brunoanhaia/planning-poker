@@ -223,5 +223,6 @@
     "summary.unestimated": "Not estimated: {{total}}.",
     "breakdown.title": "Breakdown: {{title}}",
     "breakdown.estimate": "Estimate",
-    "breakdown.rounds": "{{count}} revealed rounds"
+    "breakdown.rounds": "{{count}} revealed rounds",
+    "error.VOTES_REVEALED": "The votes are already revealed. Reset them to vote again."
 }

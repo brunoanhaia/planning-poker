@@ -847,6 +847,16 @@ export class WebSocketHandler {
             );
             return;
         }
+        if (room?.votesRevealed) {
+            // A revealed round is closed: the cards are public and the result is
+            // being discussed, so accepting another vote would rewrite history.
+            this.sendError(
+                ws,
+                'Votes are already revealed for this story. Reset them to vote again.',
+                'VOTES_REVEALED'
+            );
+            return;
+        }
         if (!room?.activeDeck.includes(payload.vote)) {
             this.sendError(ws, 'Vote value is not part of the active deck.', 'INVALID_VOTE');
             return;

@@ -90,6 +90,7 @@ export const ERROR_KEYS: Record<ErrorCode, keyof Dictionary> = {
     SESSION_ENDED: 'error.SESSION_ENDED',
     STORY_LIMIT_REACHED: 'error.STORY_LIMIT_REACHED',
     UNKNOWN_ACTION: 'error.UNKNOWN_ACTION',
+    VOTES_REVEALED: 'error.VOTES_REVEALED',
 };
 
 /**
