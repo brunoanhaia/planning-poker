@@ -46,7 +46,7 @@ The interface ships in English, Brazilian Portuguese and Spanish, on top of `i18
 #### Adding a language
 
 1. Copy `assets/locales/en.json` to `assets/locales/<code>.json` and translate the values, keeping the keys and the `{{placeholders}}` — the compiler lists every missing key, and add `_few`/`_many` forms only if the language needs them.
-2. Add the code to `Language`/`LANGUAGES` in `packages/shared/src/index.ts` and register the loader in `i18n/dictionary.ts`; add the Ant Design locale in `app/app.tsx`.
+2. Add the code to `Language`/`LANGUAGES` in `apps/client/src/i18n/languages.ts` and register the loader in `i18n/dictionary.ts`; add the Ant Design locale in `app/app.tsx`.
 3. Add its native name under `language.<code>` in every catalog and run the client tests — the key-set, plural and provider specs fail if something is missing.
 
 Nothing else: `assets/locales/` is excluded from the Sonar scan as a whole, so a new catalog needs no analysis change. Keep the folder JSON-only — the i18n spec fails otherwise.
@@ -93,7 +93,7 @@ The application supports multiple users connecting to a single room to vote on t
     - **Voting rounds**: re-voting a story keeps the previous rounds instead of erasing them, so the room can compare attempts before accepting a number.
     - **Result statistics**: average, median, consensus, top vote, voters and population standard deviation, plus the voters whose card falls outside 1.5 interquartile ranges.
     - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it.
-    - **Interface languages**: English and Brazilian Portuguese, switchable from the application bar and remembered across reloads.
+    - **Interface languages**: English, Brazilian Portuguese and Spanish, switchable from the application bar and remembered across reloads.
     - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
 
 - **Administrative Features** (Restricted to Admin and Co-host):

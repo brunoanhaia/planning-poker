@@ -223,6 +223,37 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(rm.getRoom(roomId)!.stories[0].rounds).toHaveLength(1);
     });
 
+    it.each([false, true])('rejects votes after reveal (auto-reveal: %s)', (autoReveal) => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        if (autoReveal) {
+            rm.toggleAutoReveal(roomId, hostId);
+        }
+        expect(rm.submitVote(roomId, hostId, 3)).not.toBeNull();
+        if (!autoReveal) {
+            expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
+            rm.revealVotes(roomId, hostId);
+        }
+        const revealedRoom = structuredClone(rm.getRoom(roomId)!);
+
+        expect(rm.submitVote(roomId, hostId, 8)).toBeNull();
+        expect(rm.getRoom(roomId)).toEqual(revealedRoom);
+
+        rm.resetVotes(roomId, hostId);
+        expect(rm.submitVote(roomId, hostId, 8)).not.toBeNull();
+        expect(rm.getRoom(roomId)!.participants[0].vote).toBe(8);
+    });
+
+    it('rejects a first vote submitted after reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+        const revealedRoom = structuredClone(rm.getRoom(roomId)!);
+
+        expect(rm.submitVote(roomId, bobId, 8)).toBeNull();
+        expect(rm.getRoom(roomId)).toEqual(revealedRoom);
+    });
+
     it('opens a new round on reset instead of erasing the previous result', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 

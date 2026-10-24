@@ -40,8 +40,14 @@ export const readInitialLanguage = (): Language => {
     if (typeof window === 'undefined') {
         return FALLBACK_LANGUAGE;
     }
+    let storedLanguage: null | string = null;
+    try {
+        storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    } catch {
+        // Storage can be unavailable; continue with the browser preference.
+    }
     return (
-        normalizeLanguage(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)) ??
+        normalizeLanguage(storedLanguage) ??
         normalizeLanguage(window.navigator.language) ??
         FALLBACK_LANGUAGE
     );
@@ -110,6 +116,8 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         INLINE_DICTIONARIES[wantedLanguage] ? wantedLanguage : FALLBACK_LANGUAGE
     );
 
+    const requestedLanguageRef = useRef(wantedLanguage);
+
     // A language that is not inlined yet is fetched after the first paint; the
     // fallback rendered meanwhile is English, never a raw key. The guard keeps
     // this to one run: a later language change is the user's choice and must not
@@ -125,7 +133,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         let isMounted = true;
         void loadDictionary(wantedLanguage).then((loaded) => {
-            if (!isMounted || !loaded) {
+            if (!isMounted || !loaded || requestedLanguageRef.current !== wantedLanguage) {
                 return;
             }
             void i18n.changeLanguage(wantedLanguage);
@@ -141,10 +149,14 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [language, wantedLanguage]);
 
     const changeLanguage = useCallback(async (next: Language) => {
-        if (!(await loadDictionary(next))) {
+        requestedLanguageRef.current = next;
+        if (!(await loadDictionary(next)) || requestedLanguageRef.current !== next) {
             return;
         }
         await i18n.changeLanguage(next);
+        if (requestedLanguageRef.current !== next) {
+            return;
+        }
         setLanguage(next);
         storeLanguage(next);
     }, []);

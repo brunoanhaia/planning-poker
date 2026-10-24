@@ -458,7 +458,7 @@ export class RoomManager {
      */
     public submitVote(roomId: string, userId: string, vote: CardValue): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room) {
+        if (!room || room.votesRevealed) {
             return null;
         }
 

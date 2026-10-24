@@ -1,5 +1,5 @@
 import i18n from 'i18next';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { INLINE_DICTIONARIES, LOCALE_LOADERS, en } from './dictionary';
 import { normalizeLanguage, readInitialLanguage } from './i18n-provider';
@@ -7,6 +7,7 @@ import { LANGUAGE_STORAGE_KEY, LANGUAGES } from './languages';
 
 describe('language selection', () => {
     afterEach(() => {
+        vi.restoreAllMocks();
         window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
     });
 
@@ -22,6 +23,25 @@ describe('language selection', () => {
         expect(normalizeLanguage('fr-FR')).toBeNull();
         expect(normalizeLanguage('')).toBeNull();
         expect(normalizeLanguage(null)).toBeNull();
+    });
+
+    it.each([
+        ['pt-PT', 'pt-BR'],
+        ['fr-FR', 'en'],
+    ])('falls back from blocked storage and browser %s to %s', (browser, expected) => {
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new DOMException('Storage access denied', 'SecurityError');
+        });
+        vi.spyOn(window.navigator, 'language', 'get').mockReturnValue(browser);
+
+        expect(readInitialLanguage()).toBe(expected);
+    });
+
+    it('normalizes a stored regional language before considering the browser', () => {
+        window.localStorage.setItem(LANGUAGE_STORAGE_KEY, 'pt-PT');
+        vi.spyOn(window.navigator, 'language', 'get').mockReturnValue('en');
+
+        expect(readInitialLanguage()).toBe('pt-BR');
     });
 
     it('prefers the stored choice over the browser', () => {

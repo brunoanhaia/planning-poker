@@ -112,7 +112,7 @@ export const StoryBacklog: React.FC = () => {
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [bulkText, setBulkText] = useState('');
     const [pendingStoryIndex, setPendingStoryIndex] = useState<null | number>(null);
-    const [breakdownStory, setBreakdownStory] = useState<null | Story>(null);
+    const [breakdownStoryId, setBreakdownStoryId] = useState<null | string>(null);
 
     if (!roomState) {
         return null;
@@ -328,7 +328,7 @@ export const StoryBacklog: React.FC = () => {
                                                 <Button
                                                     aria-label={t('backlog.breakdown')}
                                                     icon={<ProfileOutlined />}
-                                                    onClick={() => setBreakdownStory(story)}
+                                                    onClick={() => setBreakdownStoryId(story.id)}
                                                     size="small"
                                                     type="text"
                                                 />
@@ -500,7 +500,10 @@ export const StoryBacklog: React.FC = () => {
                 <Typography.Paragraph>{t('backlog.change.body')}</Typography.Paragraph>
             </Modal>
 
-            <StoryBreakdownModal onClose={() => setBreakdownStory(null)} story={breakdownStory} />
+            <StoryBreakdownModal
+                onClose={() => setBreakdownStoryId(null)}
+                story={roomState.stories.find((story) => story.id === breakdownStoryId) ?? null}
+            />
         </>
     );
 };
