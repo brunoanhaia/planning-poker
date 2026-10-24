@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+
 import { LANGUAGE_STORAGE_KEY, LANGUAGES } from '@planitpoker/shared';
 import i18n from 'i18next';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -66,6 +68,21 @@ describe('dictionaries', () => {
                 en[`${base}_other` as keyof typeof en],
                 `${base} has no _other form`
             ).toBeDefined();
+        });
+    });
+
+    it('keeps every catalog out of Sonar copy-paste detection', () => {
+        // The tokenizer ignores string literals, so parallel catalogs always look
+        // duplicated; forgetting to list a new locale would fail the quality gate
+        // for a reason unrelated to the code under review.
+        const properties = readFileSync('../../.sonarcloud.properties', 'utf8');
+
+        expect(properties).toContain('apps/client/src/i18n/dictionary.ts');
+        readdirSync('src/i18n/locales').forEach((file) => {
+            expect(
+                properties,
+                `add apps/client/src/i18n/locales/${file} to sonar.cpd.exclusions`
+            ).toContain(`apps/client/src/i18n/locales/${file}`);
         });
     });
 });
