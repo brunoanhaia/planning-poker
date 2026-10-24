@@ -1,7 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
-
 import { LANGUAGE_STORAGE_KEY, LANGUAGES } from '@planitpoker/shared';
 import i18n from 'i18next';
+import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { INLINE_DICTIONARIES, LOCALE_LOADERS, en } from './dictionary';
