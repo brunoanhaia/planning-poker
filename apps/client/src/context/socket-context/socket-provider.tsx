@@ -2,6 +2,7 @@ import { DeckType, ErrorCode, ErrorPayload, RoomState, WSMessageType } from '@pl
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ERROR_KEYS, TranslationKey } from '../../i18n/dictionary';
+import { Translate } from '../../i18n/i18n-context';
 import { useTranslation } from '../../i18n/use-translation';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
 import { SocketContext, SocketContextValue } from './socket-context';
@@ -26,6 +27,22 @@ interface ErrorNotice {
     /** English message the server sent, used when the code is unknown here. */
     message?: string;
 }
+
+/** Renders a notice in the active language, or `null` when there is none. */
+const translateNotice = (notice: ErrorNotice | null, t: Translate): string | null => {
+    if (!notice) {
+        return null;
+    }
+    const key = notice.code
+        ? (ERROR_KEYS as Partial<Record<string, TranslationKey>>)[notice.code]
+        : notice.key;
+    if (key) {
+        return t(key);
+    }
+    // A code this build does not know: the server's own message is more useful
+    // than the generic one, so it wins over the fallback.
+    return notice.message ?? t('error.generic');
+};
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { t } = useTranslation();
@@ -315,14 +332,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const contextValue = useMemo<SocketContextValue>(() => {
         const host = roomState?.hostId === currentUserId;
         const currentParticipant = roomState?.participants.find((p) => p.id === currentUserId);
-        const errorKeyForNotice = errorNotice?.code
-            ? (ERROR_KEYS as Partial<Record<string, TranslationKey>>)[errorNotice.code]
-            : errorNotice?.key;
-        const error = errorNotice
-            ? errorKeyForNotice
-                ? t(errorKeyForNotice)
-                : (errorNotice.message ?? t('error.generic'))
-            : null;
+        const error = translateNotice(errorNotice, t);
         const kickedMessage = isKicked ? t('notice.kicked') : null;
 
         return {
