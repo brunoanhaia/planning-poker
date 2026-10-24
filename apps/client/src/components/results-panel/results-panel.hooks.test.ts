@@ -25,6 +25,7 @@ const buildRoom = (participants: Participant[]): RoomState => ({
     createdAt: Date.now(),
     currentStoryIndex: 0,
     deckType: 'fibonacci',
+    endedAt: null,
     hostId: participants[0]?.id ?? 'user_1',
     id: 'ROOM01',
     isEnded: false,
@@ -43,11 +44,12 @@ describe('useEstimationStats', () => {
         );
 
         expect(result.current.modeVote).toBe('5');
-        expect(result.current.average).toBe('5.0');
+        expect(result.current.averageText).toBe('5.0');
+        expect(result.current.medianText).toBe('5.0');
         expect(result.current.totalVotes).toBe(1);
     });
 
-    it('picks the most frequent vote as the mode', () => {
+    it('picks the most frequent vote as the mode and keeps the median between cards', () => {
         const { result } = renderHook(() =>
             useEstimationStats(
                 buildRoom([
@@ -59,42 +61,44 @@ describe('useEstimationStats', () => {
         );
 
         expect(result.current.modeVote).toBe('5');
+        expect(result.current.medianText).toBe('5.0');
+        expect(result.current.deviationText).toBe('1.41');
         expect(result.current.consensusPercentage).toBe(67);
-        expect(result.current.isFullConsensus).toBe(false);
     });
 
-    it('reports unanimity only when more than one voter agrees', () => {
-        const single = renderHook(() => useEstimationStats(buildRoom([buildVoter('user_1', 8)])));
-        expect(single.result.current.isFullConsensus).toBe(false);
-
-        const pair = renderHook(() =>
-            useEstimationStats(buildRoom([buildVoter('user_1', 8), buildVoter('user_2', 8)]))
-        );
-        expect(pair.result.current.isFullConsensus).toBe(true);
-        expect(pair.result.current.consensusPercentage).toBe(100);
-    });
-
-    it('ignores spectators and handles a deck with no numeric votes', () => {
+    it('ignores spectators and empty cards', () => {
         const spectator: Participant = {
-            ...buildVoter('user_2', null),
+            ...buildVoter('user_2', 8),
             isSpectator: true,
         };
         const { result } = renderHook(() =>
-            useEstimationStats(buildRoom([buildVoter('user_1', 'XL'), spectator]))
+            useEstimationStats(buildRoom([buildVoter('user_1', 3), spectator]))
         );
 
         expect(result.current.totalVotes).toBe(1);
-        expect(result.current.hasNumeric).toBe(false);
-        expect(result.current.average).toBe('N/A');
-        expect(result.current.modeVote).toBe('XL');
+        expect(result.current.votedParticipants).toHaveLength(1);
     });
 
-    it('falls back to a placeholder when nobody voted', () => {
-        const { result } = renderHook(() => useEstimationStats(buildRoom([])));
+    it('reports unanimity only when every voter chose the same card', () => {
+        const consensus = renderHook(() =>
+            useEstimationStats(buildRoom([buildVoter('user_1', 5), buildVoter('user_2', 5)]))
+        );
+        const split = renderHook(() =>
+            useEstimationStats(buildRoom([buildVoter('user_1', 5), buildVoter('user_2', 8)]))
+        );
 
-        expect(result.current.modeVote).toBe('-');
-        expect(result.current.average).toBe('N/A');
-        expect(result.current.consensusPercentage).toBe(0);
-        expect(result.current.totalVotes).toBe(0);
+        expect(consensus.result.current.isFullConsensus).toBe(true);
+        expect(split.result.current.isFullConsensus).toBe(false);
+    });
+
+    it('reports symbolic-only rounds as having no numeric figure', () => {
+        const { result } = renderHook(() =>
+            useEstimationStats(buildRoom([buildVoter('user_1', '?'), buildVoter('user_2', '☕')]))
+        );
+
+        expect(result.current.hasNumeric).toBe(false);
+        expect(result.current.averageText).toBe('N/A');
+        expect(result.current.medianText).toBe('N/A');
+        expect(result.current.totalVotes).toBe(2);
     });
 });

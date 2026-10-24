@@ -3,6 +3,7 @@ import { Alert, Card, Col, Flex, Row, Space, Tabs, Typography } from 'antd';
 import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { useTranslation } from '../../i18n/use-translation';
 import { CreateSessionForm } from '../create-session-form/create-session-form';
 import { JoinSessionForm } from '../join-session-form/join-session-form';
 import { ParticipantProfile } from '../participant-profile/participant-profile';
@@ -29,6 +30,7 @@ const readRoomCodeFromHash = (): string => {
  */
 export const Home: React.FC = () => {
     const { createRoom, joinRoom, error, clearError } = useSocket();
+    const { t } = useTranslation();
 
     const roomCodeFromHash = readRoomCodeFromHash();
     const [activeTab, setActiveTab] = useState(roomCodeFromHash ? 'join' : 'create');
@@ -71,10 +73,9 @@ export const Home: React.FC = () => {
             <Col xs={24} md={14} lg={10}>
                 <Space orientation="vertical" size="large" style={{ width: '100%' }}>
                     <Flex gap={8} vertical>
-                        <Typography.Title level={1}>Planit Poker Real-Time</Typography.Title>
+                        <Typography.Title level={1}>{t('app.title')}</Typography.Title>
                         <Typography.Paragraph type="secondary">
-                            Agile estimation made fun, fast, and effortless for remote software
-                            teams.
+                            {t('app.subtitle')}
                         </Typography.Paragraph>
                     </Flex>
 
@@ -82,7 +83,7 @@ export const Home: React.FC = () => {
 
                     <Card>
                         <Flex gap={16} vertical>
-                            <Typography.Title level={5}>1. Your Profile</Typography.Title>
+                            <Typography.Title level={5}>{t('home.profile')}</Typography.Title>
 
                             <ParticipantProfile
                                 avatar={avatar}
@@ -104,7 +105,7 @@ export const Home: React.FC = () => {
                                             />
                                         ),
                                         key: 'create',
-                                        label: 'Create Session',
+                                        label: t('home.tab.create'),
                                     },
                                     {
                                         children: (
@@ -114,7 +115,7 @@ export const Home: React.FC = () => {
                                             />
                                         ),
                                         key: 'join',
-                                        label: 'Join Session',
+                                        label: t('home.tab.join'),
                                     },
                                 ]}
                                 onChange={setActiveTab}

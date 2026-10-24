@@ -13,11 +13,13 @@ import {
     Space,
     Statistic,
     Tag,
+    Tooltip,
     Typography,
 } from 'antd';
 import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { useTranslation } from '../../i18n/use-translation';
 import { DeckChipPicker } from '../deck-chip-picker/deck-chip-picker';
 import { useEstimationStats } from './results-panel.hooks';
 
@@ -30,12 +32,13 @@ const toFinalEstimate = (value: number | string): number | string => {
 /**
  * Revealed votes for the active story, with the actions the host can take next.
  *
- * The statistic grid uses real grid columns so the four figures never overlap
- * when the panel narrows.
+ * The statistic grid uses real grid columns so the figures never overlap when
+ * the panel narrows.
  */
 export const ResultsPanel: React.FC = () => {
     const { isAdmin, roomState, setCurrentStory, updateStoryEstimate } = useSocket();
     const { message } = AntApp.useApp();
+    const { t } = useTranslation();
 
     const [isManualEditOpen, setIsManualEditOpen] = useState(false);
     const [manualScore, setManualScore] = useState('');
@@ -43,17 +46,21 @@ export const ResultsPanel: React.FC = () => {
     const [pendingEstimate, setPendingEstimate] = useState<number | string | undefined>(undefined);
 
     const {
-        average,
+        averageText,
         consensusPercentage,
+        deviationText,
         hasNumeric,
         isFullConsensus,
+        medianText,
         modeVote,
+        outliers,
         totalVotes,
         voteCounts,
         votedParticipants,
     } = useEstimationStats(roomState);
 
     const currentStory = roomState?.stories[roomState.currentStoryIndex ?? 0];
+    const roundNumber = currentStory?.rounds.length ?? 0;
 
     if (!roomState?.votesRevealed) {
         return null;
@@ -62,14 +69,12 @@ export const ResultsPanel: React.FC = () => {
     if (votedParticipants.length === 0) {
         return (
             <Card>
-                <Typography.Text type="secondary">
-                    No votes were cast for this story yet.
-                </Typography.Text>
+                <Typography.Text type="secondary">{t('results.noVotes')}</Typography.Text>
             </Card>
         );
     }
 
-    const suggestedEstimate = hasNumeric ? Number(average) : modeVote;
+    const suggestedEstimate = hasNumeric ? averageText : (modeVote ?? '-');
 
     const promptSaveEstimate = (customEstimate?: number | string) => {
         setPendingEstimate(customEstimate);
@@ -92,7 +97,7 @@ export const ResultsPanel: React.FC = () => {
         if (nextIndex < roomState.stories.length) {
             setCurrentStory(nextIndex);
         } else {
-            void message.success('All stories in the backlog have been estimated!');
+            void message.success(t('results.allEstimated'));
         }
 
         setIsConfirmOpen(false);
@@ -111,9 +116,16 @@ export const ResultsPanel: React.FC = () => {
             <Card
                 className="results-panel"
                 extra={
-                    isFullConsensus ? <Badge status="success" text="100% Consensus" /> : undefined
+                    <Flex align="center" gap={8} wrap>
+                        {roundNumber > 0 && (
+                            <Tag>{t('estimation.round', { round: roundNumber })}</Tag>
+                        )}
+                        {isFullConsensus && (
+                            <Badge status="success" text={t('results.consensus.full')} />
+                        )}
+                    </Flex>
                 }
-                title="Estimation Results"
+                title={t('results.title')}
             >
                 <Flex gap={16} vertical>
                     {isAdmin && (
@@ -125,14 +137,19 @@ export const ResultsPanel: React.FC = () => {
                                     setIsManualEditOpen(true);
                                 }}
                             >
-                                Custom Score
+                                {t('results.customScore')}
                             </Button>
                             <Button
                                 icon={<SaveOutlined />}
                                 onClick={() => promptSaveEstimate()}
                                 type="primary"
                             >
-                                {`Accept ${hasNumeric ? 'Avg' : 'Mode'} (${suggestedEstimate})`}
+                                {t('results.accept', {
+                                    strategy: hasNumeric
+                                        ? t('results.accept.average')
+                                        : t('results.accept.mode'),
+                                    value: suggestedEstimate,
+                                })}
                             </Button>
                         </Flex>
                     )}
@@ -143,27 +160,75 @@ export const ResultsPanel: React.FC = () => {
                      * groups thousands, which is wrong for poker estimates.
                      */}
                     <Row gutter={[16, 16]}>
-                        <Col xs={12} md={6}>
-                            <Statistic formatter={String} title="Average" value={average} />
+                        <Col xs={12} md={8} xl={4}>
+                            <Statistic
+                                formatter={String}
+                                title={t('results.average')}
+                                value={averageText}
+                            />
                         </Col>
-                        <Col xs={12} md={6}>
+                        <Col xs={12} md={8} xl={4}>
+                            <Statistic
+                                formatter={String}
+                                title={t('results.median')}
+                                value={medianText}
+                            />
+                        </Col>
+                        <Col xs={12} md={8} xl={4}>
+                            <Statistic
+                                formatter={String}
+                                title={t('results.stdev')}
+                                value={deviationText}
+                            />
+                        </Col>
+                        <Col xs={12} md={8} xl={4}>
                             <Statistic
                                 formatter={String}
                                 suffix="%"
-                                title="Consensus"
+                                title={t('results.consensus')}
                                 value={consensusPercentage}
                             />
                         </Col>
-                        <Col xs={12} md={6}>
-                            <Statistic formatter={String} title="Top Vote" value={modeVote} />
+                        <Col xs={12} md={8} xl={4}>
+                            <Statistic
+                                formatter={String}
+                                title={t('results.topVote')}
+                                value={modeVote ?? '-'}
+                            />
                         </Col>
-                        <Col xs={12} md={6}>
-                            <Statistic formatter={String} title="Voters" value={totalVotes} />
+                        <Col xs={12} md={8} xl={4}>
+                            <Statistic
+                                formatter={String}
+                                title={t('results.voters')}
+                                value={totalVotes}
+                            />
                         </Col>
                     </Row>
 
+                    <Flex gap={8} vertical>
+                        <Flex align="center" gap={8} wrap>
+                            <Typography.Text strong>{t('results.outliers')}</Typography.Text>
+                            <Tooltip title={t('results.outliers.hint')}>
+                                <Typography.Text type="secondary">(1.5 × IQR)</Typography.Text>
+                            </Tooltip>
+                        </Flex>
+                        {outliers.length === 0 ? (
+                            <Typography.Text type="secondary">
+                                {t('results.outliers.none')}
+                            </Typography.Text>
+                        ) : (
+                            <Flex gap={4} wrap>
+                                {outliers.map((outlier) => (
+                                    <Tag key={`${outlier.name}-${outlier.vote}`}>
+                                        {`${outlier.name}: ${outlier.vote}`}
+                                    </Tag>
+                                ))}
+                            </Flex>
+                        )}
+                    </Flex>
+
                     <Typography.Title level={5} style={{ margin: 0 }}>
-                        Vote Distribution Breakdown
+                        {t('results.distribution')}
                     </Typography.Title>
 
                     <Flex gap={8} vertical>
@@ -179,7 +244,9 @@ export const ResultsPanel: React.FC = () => {
                                         <Flex gap={8} vertical>
                                             <Flex gap={8} justify="space-between" wrap>
                                                 <Typography.Text>
-                                                    {`${count} ${count === 1 ? 'vote' : 'votes'}`}
+                                                    {count === 1
+                                                        ? t('results.votes.one', { count })
+                                                        : t('results.votes', { count })}
                                                 </Typography.Text>
                                                 <Typography.Text type="secondary">
                                                     {`${percent}%`}
@@ -204,35 +271,37 @@ export const ResultsPanel: React.FC = () => {
                 footer={
                     <Flex gap={8} justify="space-between" wrap>
                         <Button danger onClick={resetManualScore}>
-                            Reset Score
+                            {t('results.resetScore')}
                         </Button>
                         <Space>
-                            <Button onClick={() => setIsManualEditOpen(false)}>Cancel</Button>
+                            <Button onClick={() => setIsManualEditOpen(false)}>
+                                {t('common.cancel')}
+                            </Button>
                             <Button
                                 disabled={!manualScore.trim()}
                                 onClick={() => promptSaveEstimate(manualScore.trim())}
                                 type="primary"
                             >
-                                Save &amp; Next
+                                {t('results.saveNext')}
                             </Button>
                         </Space>
                     </Flex>
                 }
                 onCancel={() => setIsManualEditOpen(false)}
                 open={isManualEditOpen}
-                title="Set Custom Story Score"
+                title={t('results.custom.title')}
             >
                 <Flex gap={12} vertical>
                     <Typography.Text type="secondary">
-                        {`Enter a custom estimate for "${currentStory?.title ?? ''}" or pick one from the room deck.`}
+                        {t('results.custom.body', { title: currentStory?.title ?? '' })}
                     </Typography.Text>
 
                     <div>
-                        <label htmlFor="results-custom-score">Estimate / Story Points</label>
+                        <label htmlFor="results-custom-score">{t('results.custom.label')}</label>
                         <Input
                             id="results-custom-score"
                             onChange={(event) => setManualScore(event.target.value)}
-                            placeholder="e.g. 3, 5, 8, M"
+                            placeholder={t('results.custom.placeholder')}
                             value={manualScore}
                         />
                     </div>
@@ -246,16 +315,13 @@ export const ResultsPanel: React.FC = () => {
             </Modal>
 
             <Modal
-                okText="Save & Advance"
+                okText={t('results.confirm.ok')}
                 onCancel={() => setIsConfirmOpen(false)}
                 onOk={confirmSaveEstimate}
                 open={isConfirmOpen}
-                title="Confirm Story Change"
+                title={t('results.confirm.title')}
             >
-                <Typography.Paragraph>
-                    Are you sure you want to save this estimate and advance to the next story? This
-                    will affect all participants and reset the timer.
-                </Typography.Paragraph>
+                <Typography.Paragraph>{t('results.confirm.body')}</Typography.Paragraph>
             </Modal>
         </>
     );

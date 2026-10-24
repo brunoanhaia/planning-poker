@@ -13,6 +13,7 @@ const mockRevealedRoomState: RoomState = {
     createdAt: Date.now(),
     currentStoryIndex: 0,
     deckType: 'fibonacci',
+    endedAt: null,
     hostId: 'user_1',
     id: 'ROOM01',
     isEnded: false,
@@ -46,6 +47,7 @@ const mockRevealedRoomState: RoomState = {
     stories: [
         {
             id: 'story_1',
+            rounds: [],
             status: 'estimating',
             title: 'Setup Database Migration',
         },
@@ -65,7 +67,8 @@ describe('ResultsPanel', () => {
 
         expect(screen.getByText('Estimation Results')).toBeInTheDocument();
         expect(screen.getByText(/100% Consensus/i)).toBeInTheDocument();
-        expect(screen.getByText('5.0')).toBeInTheDocument();
+        // Unanimous votes put the average and the median on the same figure.
+        expect(screen.getAllByText('5.0')).toHaveLength(2);
         expect(screen.getByRole('button', { name: /Accept Avg/i })).toBeInTheDocument();
     });
 

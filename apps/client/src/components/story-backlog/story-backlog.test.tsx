@@ -12,6 +12,7 @@ import { StoryBacklog } from './story-backlog';
 const roomWithStories = (storyCount: number): RoomState => {
     const stories: Story[] = Array.from({ length: storyCount }, (_, index) => ({
         id: `story_${index}`,
+        rounds: [],
         status: 'pending',
         title: `Story ${index}`,
     }));
@@ -22,6 +23,7 @@ const roomWithStories = (storyCount: number): RoomState => {
         createdAt: Date.now(),
         currentStoryIndex: 0,
         deckType: 'fibonacci',
+        endedAt: null,
         hostId: 'user_1',
         id: 'ROOM01',
         isEnded: false,

@@ -26,7 +26,9 @@ import {
 import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { useTranslation } from '../../i18n/use-translation';
 import { ColorMode } from '../../theme/app-theme';
+import { LanguageSwitcher } from '../language-switcher/language-switcher';
 
 /** Horizontal rhythm between the header content, in pixels. */
 const HEADER_PADDING_INLINE = 16;
@@ -66,6 +68,7 @@ export interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onToggleColorMode }) => {
     const { currentUserId, isAdmin, leaveRoom, roomState, toggleSpectator, updateRoomTitle } =
         useSocket();
+    const { t } = useTranslation();
     const { message } = AntApp.useApp();
     const { token } = theme.useToken();
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -80,16 +83,16 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
         // An insecure context or a browser without the Clipboard API throws on the
         // property access itself, which would bypass the rejection handler below.
         if (!navigator.clipboard) {
-            void message.error('Could not copy the invite link. Copy it from the address bar.');
+            void message.error(t('nav.copy.error'));
             return;
         }
         navigator.clipboard
             .writeText(buildInviteLink(roomState.id))
             .then(() => {
-                void message.success('Invite link copied to clipboard! Share it with your team.');
+                void message.success(t('nav.copy.success'));
             })
             .catch(() => {
-                void message.error('Could not copy the invite link. Copy it from the address bar.');
+                void message.error(t('nav.copy.error'));
             });
     };
 
@@ -128,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                 <Space align="center" size={8}>
                     <Avatar size={36}>🃏</Avatar>
                     <Flex vertical>
-                        <Typography.Text strong>Planit Poker</Typography.Text>
+                        <Typography.Text strong>{t('app.brand')}</Typography.Text>
                         {roomState && (
                             <Space align="center" size={4}>
                                 <Typography.Text
@@ -139,9 +142,9 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                     {roomState.title}
                                 </Typography.Text>
                                 {isAdmin && (
-                                    <Tooltip title="Rename room">
+                                    <Tooltip title={t('nav.rename')}>
                                         <Button
-                                            aria-label="Rename room"
+                                            aria-label={t('nav.rename')}
                                             icon={<EditOutlined />}
                                             onClick={openRename}
                                             size="small"
@@ -156,15 +159,15 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
 
                 {roomState && (
                     <Flex align="center" gap={8} wrap>
-                        {isAdmin && <Tag>👑 Admin</Tag>}
+                        {isAdmin && <Tag>{`👑 ${t('nav.admin')}`}</Tag>}
 
                         {roomState.isLocked && (
-                            <Tooltip title="Room is locked by admin (no new members can join)">
-                                <Tag icon={<LockOutlined />}>Locked</Tag>
+                            <Tooltip title={t('nav.locked.hint')}>
+                                <Tag icon={<LockOutlined />}>{t('nav.locked')}</Tag>
                             </Tooltip>
                         )}
 
-                        <Tooltip title="Click to copy invite link">
+                        <Tooltip title={t('nav.copy.hint')}>
                             <Tag
                                 icon={<CopyOutlined />}
                                 onClick={handleCopyLink}
@@ -179,16 +182,14 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                     handleCopyLink();
                                 }}
                             >
-                                Room: {roomState.id}
+                                {t('nav.room', { code: roomState.id })}
                             </Tag>
                         </Tooltip>
 
                         {currentUser && (
                             <Tooltip
                                 title={
-                                    currentUser.isSpectator
-                                        ? 'Spectating — your card is not counted'
-                                        : 'Voting — your card is counted'
+                                    currentUser.isSpectator ? t('nav.spectating') : t('nav.voting')
                                 }
                             >
                                 <Space size={4}>
@@ -198,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                         <EyeOutlined />
                                     )}
                                     <Switch
-                                        aria-label="Spectator mode"
+                                        aria-label={t('nav.spectator')}
                                         checked={currentUser.isSpectator}
                                         onChange={toggleSpectator}
                                         size="small"
@@ -208,9 +209,9 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                         )}
 
                         {isAdmin && (
-                            <Tooltip title="Room Settings (Admin)">
+                            <Tooltip title={t('nav.settings')}>
                                 <Button
-                                    aria-label="Room settings"
+                                    aria-label={t('nav.settings')}
                                     icon={<SettingOutlined />}
                                     onClick={onOpenSettings}
                                     type="text"
@@ -218,9 +219,9 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             </Tooltip>
                         )}
 
-                        <Tooltip title="Leave Room">
+                        <Tooltip title={t('nav.leave')}>
                             <Button
-                                aria-label="Leave room"
+                                aria-label={t('nav.leave')}
                                 danger
                                 icon={<LogoutOutlined />}
                                 onClick={leaveRoom}
@@ -230,26 +231,28 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                     </Flex>
                 )}
 
-                <Tooltip
-                    title={colorMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                >
-                    <Button
-                        aria-label="Toggle dark mode"
-                        icon={colorMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-                        onClick={onToggleColorMode}
-                        type="text"
-                    />
-                </Tooltip>
+                <Flex align="center" gap={4} wrap>
+                    <LanguageSwitcher />
+
+                    <Tooltip title={colorMode === 'dark' ? t('nav.light') : t('nav.dark')}>
+                        <Button
+                            aria-label={colorMode === 'dark' ? t('nav.light') : t('nav.dark')}
+                            icon={colorMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+                            onClick={onToggleColorMode}
+                            type="text"
+                        />
+                    </Tooltip>
+                </Flex>
             </Flex>
 
             <Modal
-                okText="Save"
+                okText={t('common.save')}
                 onCancel={closeRename}
                 onOk={saveRename}
                 open={isEditingTitle}
-                title="Rename Room"
+                title={t('nav.rename.title')}
             >
-                <label htmlFor="room-title-input">Room / Sprint Title</label>
+                <label htmlFor="room-title-input">{t('nav.roomTitle')}</label>
                 <Input
                     autoFocus
                     id="room-title-input"

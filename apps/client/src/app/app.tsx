@@ -1,16 +1,40 @@
 import { App as AntApp, ConfigProvider } from 'antd';
 import enUS from 'antd/locale/en_US';
+import ptBR from 'antd/locale/pt_BR';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { MainContent } from '../components/main-content/main-content';
 import { SocketProvider } from '../context/socket-context/socket-provider';
+import { I18nProvider, useTranslation } from '../i18n';
 import { ColorMode, getAppTheme, readStoredColorMode, storeColorMode } from '../theme/app-theme';
+
+/** Ant Design locale packages, one per interface language. */
+const ANT_LOCALES = { en: enUS, 'pt-BR': ptBR } as const;
+
+/**
+ * The translated shell: Ant Design is configured in the active language, so its
+ * own strings (pagination, empty states, date pickers) follow the interface.
+ */
+const ThemedShell: React.FC<{ children: React.ReactNode; colorMode: ColorMode }> = ({
+    children,
+    colorMode,
+}) => {
+    const { language } = useTranslation();
+    const appTheme = useMemo(() => getAppTheme(colorMode), [colorMode]);
+
+    return (
+        <ConfigProvider locale={ANT_LOCALES[language]} theme={appTheme}>
+            <AntApp>{children}</AntApp>
+        </ConfigProvider>
+    );
+};
 
 /**
  * The application root.
  *
- * Owns the two global concerns — the Ant Design design-token scheme and the
- * live socket session — so every screen below receives a themed, connected tree.
+ * Owns the design-token scheme and hands the language to the provider, which
+ * persists it; the socket session sits inside both so any error it reports is
+ * already translated.
  */
 export const App: React.FC = () => {
     const [colorMode, setColorMode] = useState<ColorMode>(readStoredColorMode);
@@ -25,16 +49,14 @@ export const App: React.FC = () => {
         setColorMode((previous) => (previous === 'dark' ? 'light' : 'dark'));
     };
 
-    const appTheme = useMemo(() => getAppTheme(colorMode), [colorMode]);
-
     return (
-        <ConfigProvider locale={enUS} theme={appTheme}>
-            <AntApp>
+        <I18nProvider>
+            <ThemedShell colorMode={colorMode}>
                 <SocketProvider>
                     <MainContent colorMode={colorMode} onToggleColorMode={toggleColorMode} />
                 </SocketProvider>
-            </AntApp>
-        </ConfigProvider>
+            </ThemedShell>
+        </I18nProvider>
     );
 };
 

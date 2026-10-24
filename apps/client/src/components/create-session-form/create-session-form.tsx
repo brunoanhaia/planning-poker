@@ -1,6 +1,5 @@
 import {
     DECK_TYPES,
-    DECK_TYPE_LABELS,
     DeckType,
     MAX_CUSTOM_DECK_SIZE,
     MAX_NAME_LENGTH,
@@ -11,10 +10,13 @@ import {
 import { Button, Flex, Input, Select, Typography } from 'antd';
 import React, { useState } from 'react';
 
+import { deckLabelKey } from '../../i18n/dictionary';
+import { useTranslation } from '../../i18n/use-translation';
+
 /** Renders the card list preview for the selected deck. */
-const renderDeckPreview = (deckType: DeckType): string => {
+const renderDeckPreview = (deckType: DeckType, customLabel: string): string => {
     if (deckType === 'custom') {
-        return 'Custom deck';
+        return customLabel;
     }
     return PRESET_DECKS[deckType].join(', ');
 };
@@ -30,6 +32,7 @@ export interface CreateSessionFormProps {
  * Step 2 of the "create a room" flow: the optional session title and the deck.
  */
 export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, onSubmit }) => {
+    const { t } = useTranslation();
     const [roomTitle, setRoomTitle] = useState('');
     const [deckType, setDeckType] = useState<DeckType>('fibonacci');
     const [customDeck, setCustomDeck] = useState('');
@@ -49,7 +52,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
             .map((entry) => (Number.isNaN(Number(entry)) ? entry : Number(entry)));
         if (cards.length < MIN_CUSTOM_DECK_SIZE || cards.length > MAX_CUSTOM_DECK_SIZE) {
             setCustomDeckError(
-                `Enter between ${MIN_CUSTOM_DECK_SIZE} and ${MAX_CUSTOM_DECK_SIZE} cards.`
+                t('create.error.count', { max: MAX_CUSTOM_DECK_SIZE, min: MIN_CUSTOM_DECK_SIZE })
             );
             return;
         }
@@ -58,11 +61,11 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                 typeof card === 'number' ? !Number.isFinite(card) : card.length > MAX_NAME_LENGTH
             )
         ) {
-            setCustomDeckError(`Use finite numbers or labels up to ${MAX_NAME_LENGTH} characters.`);
+            setCustomDeckError(t('create.error.label', { max: MAX_NAME_LENGTH }));
             return;
         }
         if (new Set(cards.map(String)).size !== cards.length) {
-            setCustomDeckError('Custom cards must be unique.');
+            setCustomDeckError(t('create.error.duplicate'));
             return;
         }
         setCustomDeckError('');
@@ -73,38 +76,38 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
         <form onSubmit={handleSubmit}>
             <Flex gap={12} vertical>
                 <div>
-                    <label htmlFor="create-session-title">Session / Project Title (Optional)</label>
+                    <label htmlFor="create-session-title">{t('create.title')}</label>
                     <Input
                         id="create-session-title"
                         maxLength={MAX_TITLE_LENGTH}
                         onChange={(event) => setRoomTitle(event.target.value)}
-                        placeholder="e.g. Sprint 42 Estimation"
+                        placeholder={t('create.title.placeholder')}
                         value={roomTitle}
                     />
                 </div>
 
                 <div>
-                    <label htmlFor="create-session-deck">Estimation Deck Type</label>
+                    <label htmlFor="create-session-deck">{t('create.deck')}</label>
                     <Select<DeckType>
                         id="create-session-deck"
                         onChange={setDeckType}
                         options={DECK_TYPES.map((option) => ({
-                            label: DECK_TYPE_LABELS[option],
+                            label: t(deckLabelKey(option)),
                             value: option,
                         }))}
                         style={{ width: '100%' }}
                         value={deckType}
                     />
                     <Typography.Paragraph type="secondary">
-                        Deck cards preview: {renderDeckPreview(deckType)}
+                        {t('create.deck.preview', {
+                            cards: renderDeckPreview(deckType, t('create.deck.custom')),
+                        })}
                     </Typography.Paragraph>
                 </div>
 
                 {deckType === 'custom' && (
                     <div>
-                        <label htmlFor="create-session-custom-deck">
-                            Comma-Separated Custom Cards
-                        </label>
+                        <label htmlFor="create-session-custom-deck">{t('create.customDeck')}</label>
                         <Input
                             aria-describedby={
                                 customDeckError ? 'create-session-custom-deck-error' : undefined
@@ -115,7 +118,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                                 setCustomDeck(event.target.value);
                                 setCustomDeckError('');
                             }}
-                            placeholder="e.g. 0, 1, 2, 3, 5, 8, ?, ☕"
+                            placeholder={t('create.customDeck.placeholder')}
                             value={customDeck}
                         />
                         {customDeckError && (
@@ -131,7 +134,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                 )}
 
                 <Button block disabled={disabled} htmlType="submit" size="large" type="primary">
-                    Start Session &amp; Generate Room Code
+                    {t('create.submit')}
                 </Button>
             </Flex>
         </form>

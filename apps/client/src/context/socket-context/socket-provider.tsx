@@ -1,6 +1,8 @@
-import { DeckType, RoomState, WSMessageType } from '@planitpoker/shared';
+import { DeckType, ErrorPayload, RoomState, WSMessageType } from '@planitpoker/shared';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { errorKey } from '../../i18n/dictionary';
+import { useTranslation } from '../../i18n/use-translation';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
 import { SocketContext, SocketContextValue } from './socket-context';
 
@@ -11,6 +13,7 @@ const RECONNECT_DELAY_MS = 2000;
 const SESSION_TOKEN_STORAGE_KEY = 'planit_session_token';
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { t } = useTranslation();
     const [roomState, setRoomState] = useState<null | RoomState>(null);
     const [currentUserId, setCurrentUserId] = useState<null | string>(null);
     const [isConnected, setIsConnected] = useState(false);
@@ -18,6 +21,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [kickedMessage, setKickedMessage] = useState<null | string>(null);
     const socketRef = useRef<null | WebSocket>(null);
     const sessionTokenRef = useRef<null | string>(null);
+    // The socket handlers are installed once, so they reach the current
+    // translator through a ref instead of reconnecting on every language change.
+    const translateRef = useRef(t);
+    useEffect(() => {
+        translateRef.current = t;
+    }, [t]);
 
     useEffect(() => {
         sessionTokenRef.current = sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
@@ -72,11 +81,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         setRoomState(null);
                         sessionTokenRef.current = null;
                         sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-                        setKickedMessage(
-                            payload.message || 'You have been removed from the session.'
-                        );
+                        setKickedMessage(translateRef.current('notice.kicked'));
                     } else if (type === 'ERROR') {
-                        setError(payload.message || 'An error occurred');
+                        const errorPayload = payload as ErrorPayload;
+                        setError(
+                            errorPayload.code
+                                ? translateRef.current(errorKey(errorPayload.code))
+                                : errorPayload.message || translateRef.current('error.generic')
+                        );
                     }
                 } catch (err) {
                     console.error('Failed to parse WS payload:', err);
@@ -122,7 +134,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ payload, type }));
         } else {
-            setError('Connection to server lost. Retrying...');
+            setError(translateRef.current('error.offline'));
         }
     }, []);
 

@@ -22,19 +22,17 @@ import {
     Tooltip,
     Typography,
 } from 'antd';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { Translate } from '../../i18n/i18n-context';
+import { useTranslation } from '../../i18n/use-translation';
 import { CardDeck } from '../card-deck/card-deck';
 import { ResultsPanel } from '../results-panel/results-panel';
+import { SessionSummary } from '../session-summary/session-summary';
 
 /** Countdown presets offered to the host, in seconds. */
-const TIMER_PRESETS: MenuProps['items'] = [
-    { key: '30', label: '30 Seconds' },
-    { key: '60', label: '1 Minute' },
-    { key: '120', label: '2 Minutes' },
-    { key: '300', label: '5 Minutes' },
-];
+const TIMER_PRESET_SECONDS = [30, 60, 120, 300] as const;
 
 /** Remaining seconds below which the timer is flagged as about to expire. */
 const TIMER_ENDING_THRESHOLD = 10;
@@ -53,9 +51,9 @@ const isTimerEnding = (timer: null | TimerState | undefined): boolean =>
     Boolean(timer && timer.remaining > 0 && timer.remaining <= TIMER_ENDING_THRESHOLD);
 
 /** Formats the remaining time, or a placeholder when the timer is off. */
-const formatTimerDisplay = (timer: null | TimerState | undefined): string => {
+const formatTimerDisplay = (timer: null | TimerState | undefined, offLabel: string): string => {
     if (!timer) {
-        return 'Timer: Off';
+        return offLabel;
     }
     const minutes = Math.floor(timer.remaining / 60);
     const seconds = String(timer.remaining % 60).padStart(2, '0');
@@ -70,14 +68,14 @@ const renderVoteActions = ({
     onRevealVotes,
     votedCount,
     votesRevealed,
-}: VoteActionsArgs): React.ReactNode => {
+    t,
+}: VoteActionsArgs & { t: Translate }): React.ReactNode => {
     if (!votesRevealed) {
         if (!isAdmin) {
-            return <Tag>Waiting for Host to reveal</Tag>;
+            return <Tag>{t('estimation.waiting')}</Tag>;
         }
 
-        const allVotedSuffix =
-            activeVoterCount > 0 && votedCount === activeVoterCount ? ' (All voted!)' : '';
+        const allVoted = activeVoterCount > 0 && votedCount === activeVoterCount;
 
         return (
             <Button
@@ -86,7 +84,7 @@ const renderVoteActions = ({
                 onClick={onRevealVotes}
                 type="primary"
             >
-                {`Reveal Votes${allVotedSuffix}`}
+                {allVoted ? t('estimation.reveal.all') : t('estimation.reveal')}
             </Button>
         );
     }
@@ -97,7 +95,7 @@ const renderVoteActions = ({
 
     return (
         <Button icon={<UndoOutlined />} onClick={onResetVotes}>
-            Reset Votes (Admin)
+            {t('estimation.resetVotes')}
         </Button>
     );
 };
@@ -111,6 +109,20 @@ const renderVoteActions = ({
 export const EstimationPanel: React.FC = () => {
     const { isAdmin, pauseTimer, resetTimer, resetVotes, revealVotes, roomState, startTimer } =
         useSocket();
+    const { t } = useTranslation();
+
+    const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+    const lastOpenedEndRef = useRef<null | number>(null);
+
+    // The summary opens once per session end: a second render of the same ended
+    // room must not reopen a dialog the facilitator has already dismissed.
+    useEffect(() => {
+        const endedAt = roomState?.endedAt ?? null;
+        if (endedAt !== null && lastOpenedEndRef.current !== endedAt) {
+            lastOpenedEndRef.current = endedAt;
+            setIsSummaryOpen(true);
+        }
+    }, [roomState?.endedAt]);
 
     if (!roomState) return null;
 
@@ -121,124 +133,161 @@ export const EstimationPanel: React.FC = () => {
 
     const timer = roomState.timer;
     const isTimerRunning = timer?.isRunning === true;
+    const roundNumber = (currentStory?.rounds.length ?? 0) + (roomState.votesRevealed ? 0 : 1);
+
+    const timerPresets: MenuProps['items'] = TIMER_PRESET_SECONDS.map((seconds) => ({
+        key: String(seconds),
+        label: t(`estimation.preset.${seconds}` as const),
+    }));
 
     return (
-        <Card style={{ height: '100%' }}>
-            <Flex gap={16} vertical>
-                <Flex align="center" gap={8} justify="space-between" wrap>
-                    <Typography.Title level={4} style={{ margin: 0 }}>
-                        Estimation
-                    </Typography.Title>
+        <>
+            <Card style={{ height: '100%' }}>
+                <Flex gap={16} vertical>
+                    <Flex align="center" gap={8} justify="space-between" wrap>
+                        <Typography.Title level={4} style={{ margin: 0 }}>
+                            {t('estimation.title')}
+                        </Typography.Title>
 
-                    <Space size={8} wrap>
-                        <Tag icon={<ClockCircleOutlined />}>
-                            {isTimerEnding(timer) || timer?.isRunning === true ? (
-                                <Badge
-                                    status={isTimerEnding(timer) ? 'error' : 'processing'}
-                                    text={formatTimerDisplay(timer)}
-                                />
-                            ) : (
-                                formatTimerDisplay(timer)
-                            )}
-                        </Tag>
-
-                        {isAdmin &&
-                            (timer ? (
-                                <Space size={4}>
-                                    <Tooltip title={isTimerRunning ? 'Pause Timer' : 'Start Timer'}>
-                                        <Button
-                                            aria-label="Toggle timer"
-                                            icon={
-                                                isTimerRunning ? (
-                                                    <PauseOutlined />
-                                                ) : (
-                                                    <PlayCircleOutlined />
-                                                )
-                                            }
-                                            onClick={
-                                                isTimerRunning
-                                                    ? pauseTimer
-                                                    : () => startTimer(timer.duration)
-                                            }
-                                        />
-                                    </Tooltip>
-                                    <Tooltip title="Reset Timer">
-                                        <Button
-                                            aria-label="Reset timer"
-                                            icon={<ReloadOutlined />}
-                                            onClick={resetTimer}
-                                        />
-                                    </Tooltip>
-                                </Space>
-                            ) : (
-                                <Dropdown
-                                    menu={{
-                                        items: TIMER_PRESETS,
-                                        onClick: ({ key }) => startTimer(Number(key)),
-                                    }}
-                                    trigger={['click']}
-                                >
-                                    <Button
-                                        aria-label="Start timer"
-                                        icon={<PlayCircleOutlined />}
+                        <Space size={8} wrap>
+                            <Tag icon={<ClockCircleOutlined />}>
+                                {isTimerEnding(timer) || timer?.isRunning === true ? (
+                                    <Badge
+                                        status={isTimerEnding(timer) ? 'error' : 'processing'}
+                                        text={formatTimerDisplay(timer, t('estimation.timerOff'))}
                                     />
-                                </Dropdown>
-                            ))}
+                                ) : (
+                                    formatTimerDisplay(timer, t('estimation.timerOff'))
+                                )}
+                            </Tag>
 
-                        {roomState.autoReveal && (
-                            <Tooltip title="Auto-Reveal is active">
-                                <Tag icon={<ThunderboltOutlined />}>Auto-Reveal</Tag>
-                            </Tooltip>
-                        )}
-                    </Space>
-                </Flex>
+                            {isAdmin &&
+                                (timer ? (
+                                    <Space size={4}>
+                                        <Tooltip
+                                            title={
+                                                isTimerRunning
+                                                    ? t('estimation.pause')
+                                                    : t('estimation.start')
+                                            }
+                                        >
+                                            <Button
+                                                aria-label={t('estimation.toggle')}
+                                                icon={
+                                                    isTimerRunning ? (
+                                                        <PauseOutlined />
+                                                    ) : (
+                                                        <PlayCircleOutlined />
+                                                    )
+                                                }
+                                                onClick={
+                                                    isTimerRunning
+                                                        ? pauseTimer
+                                                        : () => startTimer(timer.duration)
+                                                }
+                                            />
+                                        </Tooltip>
+                                        <Tooltip title={t('estimation.resetTimer')}>
+                                            <Button
+                                                aria-label={t('estimation.resetTimer')}
+                                                icon={<ReloadOutlined />}
+                                                onClick={resetTimer}
+                                            />
+                                        </Tooltip>
+                                    </Space>
+                                ) : (
+                                    <Dropdown
+                                        menu={{
+                                            items: timerPresets,
+                                            onClick: ({ key }) => startTimer(Number(key)),
+                                        }}
+                                        trigger={['click']}
+                                    >
+                                        <Button
+                                            aria-label={t('estimation.start')}
+                                            icon={<PlayCircleOutlined />}
+                                        />
+                                    </Dropdown>
+                                ))}
 
-                {roomState.isEnded && (
-                    <Alert
-                        description="All story estimates have been finalized. You can export the summary from the Backlog."
-                        showIcon
-                        title="Sprint Planning Estimation Session Ended!"
-                        type="success"
-                    />
-                )}
+                            {roomState.autoReveal && (
+                                <Tooltip title={t('estimation.autoReveal.hint')}>
+                                    <Tag icon={<ThunderboltOutlined />}>
+                                        {t('estimation.autoReveal')}
+                                    </Tag>
+                                </Tooltip>
+                            )}
+                        </Space>
+                    </Flex>
 
-                <Card size="small" title="Current Story" type="inner">
-                    <Typography.Title level={5} style={{ marginTop: 0 }}>
-                        {currentStory?.title ?? 'No active story selected'}
-                    </Typography.Title>
-                    {currentStory?.description && (
-                        <Typography.Paragraph type="secondary">
-                            {currentStory.description}
-                        </Typography.Paragraph>
+                    {roomState.isEnded && (
+                        <Alert
+                            action={
+                                <Button onClick={() => setIsSummaryOpen(true)} size="small">
+                                    {t('estimation.viewSummary')}
+                                </Button>
+                            }
+                            description={t('estimation.ended.desc')}
+                            showIcon
+                            title={t('estimation.ended.title')}
+                            type="success"
+                        />
                     )}
-                </Card>
 
-                {roomState.votesRevealed ? <ResultsPanel /> : <CardDeck />}
+                    <Card
+                        extra={
+                            currentStory ? (
+                                <Tag>{t('estimation.round', { round: roundNumber })}</Tag>
+                            ) : undefined
+                        }
+                        size="small"
+                        title={t('estimation.currentStory')}
+                        type="inner"
+                    >
+                        <Typography.Title level={5} style={{ marginTop: 0 }}>
+                            {currentStory?.title ?? t('estimation.noStory')}
+                        </Typography.Title>
+                        {currentStory?.description && (
+                            <Typography.Paragraph type="secondary">
+                                {currentStory.description}
+                            </Typography.Paragraph>
+                        )}
+                    </Card>
 
-                <Flex gap={8} vertical>
-                    <Flex gap={8} justify="space-between" wrap>
-                        <Typography.Text>Voting Progress</Typography.Text>
-                        <Typography.Text type="secondary">
-                            {`${votedCount} of ${activeVoters.length} voted (${Math.round(votingProgress)}%)`}
-                        </Typography.Text>
-                    </Flex>
-                    <Progress
-                        aria-label="Voting progress"
-                        percent={votingProgress}
-                        showInfo={false}
-                    />
-                    <Flex justify="end" wrap>
-                        {renderVoteActions({
-                            activeVoterCount: activeVoters.length,
-                            isAdmin,
-                            onResetVotes: resetVotes,
-                            onRevealVotes: revealVotes,
-                            votedCount,
-                            votesRevealed: roomState.votesRevealed,
-                        })}
+                    {roomState.votesRevealed ? <ResultsPanel /> : <CardDeck />}
+
+                    <Flex gap={8} vertical>
+                        <Flex gap={8} justify="space-between" wrap>
+                            <Typography.Text>{t('estimation.progress')}</Typography.Text>
+                            <Typography.Text type="secondary">
+                                {t('estimation.progress.count', {
+                                    percent: Math.round(votingProgress),
+                                    total: activeVoters.length,
+                                    voted: votedCount,
+                                })}
+                            </Typography.Text>
+                        </Flex>
+                        <Progress
+                            aria-label={t('estimation.progress')}
+                            percent={votingProgress}
+                            showInfo={false}
+                        />
+                        <Flex justify="end" wrap>
+                            {renderVoteActions({
+                                activeVoterCount: activeVoters.length,
+                                isAdmin,
+                                onResetVotes: resetVotes,
+                                onRevealVotes: revealVotes,
+                                t,
+                                votedCount,
+                                votesRevealed: roomState.votesRevealed,
+                            })}
+                        </Flex>
                     </Flex>
                 </Flex>
-            </Flex>
-        </Card>
+            </Card>
+
+            <SessionSummary onClose={() => setIsSummaryOpen(false)} open={isSummaryOpen} />
+        </>
     );
 };
