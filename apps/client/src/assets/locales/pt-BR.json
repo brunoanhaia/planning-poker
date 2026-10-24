@@ -183,6 +183,7 @@
     "results.noVotes": "Nenhum voto foi dado para esta história ainda.",
     "results.outliers": "Outliers",
     "results.outliers.hint": "Fora de 1,5 × IIQ",
+    "results.outliers.range": "(1,5 × IIQ)",
     "results.outliers.none": "Sem outliers",
     "results.resetScore": "Redefinir Pontuação",
     "results.saveNext": "Salvar e Próxima",
@@ -222,7 +223,5 @@
     "summary.title": "Sumário da Sessão",
     "summary.unestimated": "Não estimadas: {{total}}.",
     "breakdown.title": "Detalhamento: {{title}}",
-    "breakdown.estimate": "Estimativa",
-    "breakdown.rounds": "{{count}} rodadas reveladas",
     "error.VOTES_REVEALED": "Os votos já foram revelados. Reinicie-os para votar de novo."
 }

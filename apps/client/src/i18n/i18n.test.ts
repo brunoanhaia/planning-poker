@@ -115,6 +115,20 @@ describe('dictionaries', () => {
             ).toBeDefined();
         });
     });
+
+    it('gives every key that interpolates a count a plural suffix', () => {
+        // Without a suffix, i18next cannot pick a form and `{{count}}` renders the
+        // base string: "1 revealed rounds".
+        const offenders = Object.entries(en)
+            .filter(
+                ([key, value]) =>
+                    String(value).includes('{{count}}') &&
+                    !/_(?:zero|one|two|few|many|other)$/.test(key)
+            )
+            .map(([key]) => key);
+
+        expect(offenders).toEqual([]);
+    });
 });
 
 describe('translation', () => {

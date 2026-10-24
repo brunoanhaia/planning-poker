@@ -1,5 +1,5 @@
 import { MAX_ROUNDS_PER_STORY } from '@planitpoker/shared';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
 
@@ -289,6 +289,18 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
         expect(rm.getRoom(roomId)!.isEnded).toBe(true);
         expect(rm.getRoom(roomId)!.endedAt).toBeTypeOf('number');
+    });
+
+    it('keeps the original end timestamp when the session is ended twice', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+
+        rm.endSession(roomId, hostId);
+        clock.mockReturnValue(9_000);
+        rm.endSession(roomId, hostId);
+
+        expect(rm.getRoom(roomId)!.endedAt).toBe(1_000);
+        clock.mockRestore();
     });
 
     it('records the round when auto-reveal flips the flag inside the last vote', () => {

@@ -211,7 +211,9 @@ export const ResultsPanel: React.FC = () => {
                         <Flex align="center" gap={8} wrap>
                             <Typography.Text strong>{t('results.outliers')}</Typography.Text>
                             <Tooltip title={t('results.outliers.hint')}>
-                                <Typography.Text type="secondary">(1.5 × IQR)</Typography.Text>
+                                <Typography.Text type="secondary">
+                                    {t('results.outliers.range')}
+                                </Typography.Text>
                             </Tooltip>
                         </Flex>
                         {outliers.length === 0 ? (

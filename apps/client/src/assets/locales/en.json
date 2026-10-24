@@ -183,6 +183,7 @@
     "results.noVotes": "No votes were cast for this story yet.",
     "results.outliers": "Outliers",
     "results.outliers.hint": "Outside 1.5 × IQR",
+    "results.outliers.range": "(1.5 × IQR)",
     "results.outliers.none": "No outliers",
     "results.resetScore": "Reset Score",
     "results.saveNext": "Save & Next",
@@ -222,7 +223,5 @@
     "summary.title": "Session Summary",
     "summary.unestimated": "Not estimated: {{total}}.",
     "breakdown.title": "Breakdown: {{title}}",
-    "breakdown.estimate": "Estimate",
-    "breakdown.rounds": "{{count}} revealed rounds",
     "error.VOTES_REVEALED": "The votes are already revealed. Reset them to vote again."
 }

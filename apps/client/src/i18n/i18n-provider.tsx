@@ -85,9 +85,15 @@ const loadDictionary = async (language: Language): Promise<boolean> => {
     if (!loader) {
         return false;
     }
-    const module = await loader();
-    i18n.addResourceBundle(language, NAMESPACE, module.default as Dictionary, true, true);
-    return true;
+    try {
+        const module = await loader();
+        i18n.addResourceBundle(language, NAMESPACE, module.default as Dictionary, true, true);
+        return true;
+    } catch {
+        // A rotated chunk hash or a dropped connection rejects here. The caller
+        // keeps the current language, which is better than an unhandled rejection.
+        return false;
+    }
 };
 
 /** Stores the choice, ignoring a browser that refuses the write. */

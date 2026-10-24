@@ -183,6 +183,7 @@
     "results.noVotes": "Todavía no se ha votado esta historia.",
     "results.outliers": "Valores atípicos",
     "results.outliers.hint": "Fuera de 1,5 × RIC",
+    "results.outliers.range": "(1,5 × RIC)",
     "results.outliers.none": "Sin valores atípicos",
     "results.resetScore": "Restablecer Puntuación",
     "results.saveNext": "Guardar y Siguiente",
@@ -222,7 +223,5 @@
     "summary.title": "Resumen de la Sesión",
     "summary.unestimated": "Sin estimar: {{total}}.",
     "breakdown.title": "Desglose: {{title}}",
-    "breakdown.estimate": "Estimación",
-    "breakdown.rounds": "{{count}} rondas reveladas",
     "error.VOTES_REVEALED": "Los votos ya están revelados. Reinícialos para votar de nuevo."
 }

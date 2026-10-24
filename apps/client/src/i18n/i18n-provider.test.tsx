@@ -119,4 +119,22 @@ describe('I18nProvider', () => {
         expect(screen.getByTestId('language')).toHaveTextContent('en');
         expect(screen.getByTestId('label')).toHaveTextContent('Add Story');
     });
+
+    it('keeps the current language when the dictionary chunk fails to load', async () => {
+        const loader = vi
+            .spyOn(LOCALE_LOADERS, 'es')
+            .mockRejectedValue(new Error('chunk rotated by a deploy'));
+
+        render(
+            <I18nProvider>
+                <Consumer />
+            </I18nProvider>
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Spanish' }));
+
+        await waitFor(() => expect(loader).toHaveBeenCalled());
+        expect(screen.getByTestId('language')).toHaveTextContent('en');
+        expect(screen.getByTestId('label')).toHaveTextContent('Add Story');
+        expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).not.toBe('es');
+    });
 });

@@ -810,8 +810,13 @@ export class RoomManager {
             return null;
         }
 
-        room.isEnded = true;
-        room.endedAt = Date.now();
+        // A second END_SESSION — a retry, or a stale tab — must not move the
+        // timestamp: it is the summary's duration, and the client reopens the
+        // dialog whenever it changes.
+        if (!room.isEnded) {
+            room.isEnded = true;
+            room.endedAt = Date.now();
+        }
         return room;
     }
 
