@@ -265,7 +265,7 @@ export class WebSocketHandler {
                     this.handleMessage(ws, parsed);
                 } catch (err) {
                     console.error('Failed to parse WebSocket message:', err);
-                    this.sendError(ws, 'Invalid JSON message payload format');
+                    this.sendError(ws, 'Invalid JSON message payload format', 'INVALID_MESSAGE');
                 }
             });
 
@@ -393,7 +393,11 @@ export class WebSocketHandler {
      */
     private handleMessage(ws: ExtendedWebSocket, msg: WSMessage): void {
         if (typeof msg !== 'object' || msg === null) {
-            this.sendError(ws, 'Invalid message format. Expected a JSON object.', 'FORBIDDEN');
+            this.sendError(
+                ws,
+                'Invalid message format. Expected a JSON object.',
+                'INVALID_MESSAGE'
+            );
             return;
         }
 
@@ -401,13 +405,17 @@ export class WebSocketHandler {
             ? this.messageHandlers[msg.type]
             : undefined;
         if (!handler) {
-            this.sendError(ws, `Unknown action type: ${String(msg.type)}`, 'FORBIDDEN');
+            this.sendError(ws, `Unknown action type: ${String(msg.type)}`, 'UNKNOWN_ACTION');
             return;
         }
 
         const validation = validatePayload(msg.type, msg.payload);
         if (!validation.success) {
-            this.sendError(ws, validation.error || `Invalid ${msg.type} payload.`, 'FORBIDDEN');
+            this.sendError(
+                ws,
+                validation.error || `Invalid ${msg.type} payload.`,
+                'INVALID_PAYLOAD'
+            );
             return;
         }
 
@@ -584,7 +592,8 @@ export class WebSocketHandler {
             auditLog({ action: 'join.rejected.token-missing', outcome: 'denied' });
             this.sendError(
                 ws,
-                'A valid session token is required to join from a non-browser client.'
+                'A valid session token is required to join from a non-browser client.',
+                'NO_SESSION'
             );
             return true;
         }
@@ -692,7 +701,7 @@ export class WebSocketHandler {
 
         const { participant, roomState } = result;
         if (!participant || !roomState) {
-            this.sendError(ws, 'Unable to join room.');
+            this.sendError(ws, 'Unable to join room.', 'FORBIDDEN');
             return;
         }
 
@@ -839,7 +848,7 @@ export class WebSocketHandler {
             return;
         }
         if (!room?.activeDeck.includes(payload.vote)) {
-            this.sendError(ws, 'Vote value is not part of the active deck.');
+            this.sendError(ws, 'Vote value is not part of the active deck.', 'INVALID_VOTE');
             return;
         }
 
@@ -848,7 +857,7 @@ export class WebSocketHandler {
             this.broadcastRoomState(session.roomId);
             return;
         }
-        this.sendError(ws, 'Your vote was not accepted for the active story.', 'FORBIDDEN');
+        this.sendError(ws, 'Your vote was not accepted for the active story.', 'INVALID_VOTE');
     }
 
     /**
@@ -929,7 +938,7 @@ export class WebSocketHandler {
             payload.targetUserId
         );
         if (!updated) {
-            this.sendError(ws, 'Only administrators can remove participants.');
+            this.sendError(ws, 'Only administrators can remove participants.', 'FORBIDDEN');
             return;
         }
 

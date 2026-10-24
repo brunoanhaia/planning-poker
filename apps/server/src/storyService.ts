@@ -45,6 +45,7 @@ export const addStoryToRoom = (
     const newStory: Story = {
         description: description?.trim().slice(0, MAX_DESCRIPTION_LENGTH),
         id: generateStoryId(),
+        rounds: [],
         status: 'pending',
         title: trimmedTitle,
     };
@@ -81,6 +82,7 @@ export const bulkAddStoriesToRoom = (
             accepted.push({
                 description: item.description?.trim().slice(0, MAX_DESCRIPTION_LENGTH),
                 id: generateStoryId(),
+                rounds: [],
                 status: 'pending',
                 title: trimmedTitle,
             });

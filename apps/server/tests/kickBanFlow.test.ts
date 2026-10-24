@@ -179,7 +179,7 @@ describe('Message dispatch hardening', () => {
         expect(errors).toHaveLength(5);
         errors.forEach((error) => {
             expect(error.payload.message).toContain('Unknown action type:');
-            expect(error.payload.code).toBe('FORBIDDEN');
+            expect(error.payload.code).toBe('UNKNOWN_ACTION');
         });
         expect(messagesOf(host, 'ROOM_STATE')).toHaveLength(0);
     });

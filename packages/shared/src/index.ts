@@ -43,6 +43,24 @@ export const MAX_PARTICIPANTS_PER_ROOM = 100;
 /** Maximum number of stories a single room's backlog may hold. */
 export const MAX_STORIES_PER_ROOM = 200;
 
+/**
+ * Revealed voting rounds a story keeps.
+ *
+ * A team re-votes a handful of times at most, so the ring is small enough that
+ * the whole backlog still fits in one broadcast. The oldest round is dropped
+ * once the cap is reached, which keeps a stuck story from growing the room.
+ */
+export const MAX_ROUNDS_PER_STORY = 10;
+
+/** Interface languages the client ships translations for. */
+export type Language = 'en' | 'pt-BR';
+
+/** Languages offered in the interface, in the order the picker shows them. */
+export const LANGUAGES = ['en', 'pt-BR'] as const satisfies readonly Language[];
+
+/** Local-storage key that persists the chosen interface language. */
+export const LANGUAGE_STORAGE_KEY = 'planit_language';
+
 /** Largest WebSocket frame the server accepts, in bytes. */
 export const WS_MAX_PAYLOAD_BYTES = 32 * 1024;
 
@@ -141,10 +159,33 @@ export interface Participant {
     vote: EstimateValue;
 }
 
+/** One card as it stood when a round was revealed. */
+export interface RoundVote {
+    /** Display name at reveal time, so a later rename cannot rewrite history. */
+    name: string;
+    participantId: string;
+    vote: CardValue;
+}
+
+/**
+ * One revealed voting round of a story.
+ *
+ * Rounds are append-only: a reset opens the next one instead of erasing the
+ * previous result, which is what makes the round-over-round comparison and the
+ * session summary possible.
+ */
+export interface VotingRound {
+    id: string;
+    /** When the cards were revealed, in milliseconds since the epoch. */
+    revealedAt: number;
+    votes: RoundVote[];
+}
+
 export interface Story {
     description?: string;
     finalEstimate?: EstimateValue;
     id: string;
+    rounds: VotingRound[];
     status: StoryStatus;
     title: string;
 }
@@ -163,6 +204,8 @@ export interface RoomState {
     currentStoryIndex: number;
     customDeck?: CardValue[];
     deckType: DeckType;
+    /** When the host closed the session, or `null` while it is still running. */
+    endedAt: null | number;
     hostId: string;
     id: string;
     isEnded: boolean;
@@ -288,7 +331,11 @@ export interface KickedPayload {
 export type ErrorCode =
     | 'BANNED'
     | 'FORBIDDEN'
+    | 'INVALID_DECK'
+    | 'INVALID_MESSAGE'
+    | 'INVALID_PAYLOAD'
     | 'INVALID_STORY_INDEX'
+    | 'INVALID_VOTE'
     | 'NO_SESSION'
     | 'PARTICIPANT_LIMIT_REACHED'
     | 'RATE_LIMITED'
@@ -297,7 +344,8 @@ export type ErrorCode =
     | 'ROOM_LOCKED'
     | 'ROOM_NOT_FOUND'
     | 'SESSION_ENDED'
-    | 'STORY_LIMIT_REACHED';
+    | 'STORY_LIMIT_REACHED'
+    | 'UNKNOWN_ACTION';
 
 export interface ErrorPayload {
     code?: ErrorCode;
