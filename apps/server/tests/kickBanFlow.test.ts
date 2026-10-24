@@ -2,6 +2,8 @@ import { KICK_BAN_DURATION_MS, WS_THROTTLE_MAX_MESSAGES } from '@planitpoker/sha
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocketServer } from 'ws';
 
+import { ConnectionLimiter } from '../src/connectionLimiter.js';
+import { JOIN_FAILURE_LIMIT } from '../src/constants.js';
 import { WebSocketHandler } from '../src/webSocketHandler.js';
 
 /** One message the handler sent to a socket double. */
@@ -111,19 +113,28 @@ const boot = () => {
         }),
     } as unknown as WebSocketServer;
 
-    const handler = new WebSocketHandler(wss);
+    const handler = new WebSocketHandler(wss, {
+        cloudflareEnabled: false,
+        connections: new ConnectionLimiter(64, 1_000, 60_000, 100),
+        trustProxyHops: 0,
+    });
     handlers.push(handler);
 
     /**
      * Opens a connection the way the handler sees it.
      *
-     * @param options - Origin presence and the identity cookie, if any.
+     * @param options - Origin presence, the identity cookie and the peer address.
      */
-    const connect = (options?: { clientId?: string; hasOrigin?: boolean }): SocketDouble => {
+    const connect = (options?: {
+        clientId?: string;
+        hasOrigin?: boolean;
+        remoteAddress?: string;
+    }): SocketDouble => {
         const hasOrigin = options?.hasOrigin ?? true;
         // A browser always carries the identity the server issued it, unless a
         // test explicitly asks for one that has none.
-        const clientId = options?.clientId ?? (hasOrigin ? 'default-client' : undefined);
+        const clientId =
+            options?.clientId ?? (hasOrigin ? '11111111-1111-4111-8111-111111111111' : undefined);
         const socket = new SocketDouble();
         socket.hasOrigin = hasOrigin;
         if (clientId) {
@@ -135,6 +146,7 @@ const boot = () => {
                 ...(hasOrigin ? { origin: 'http://localhost:5173' } : {}),
                 ...(clientId ? { cookie: `pip_client=${clientId}` } : {}),
             },
+            socket: { remoteAddress: options?.remoteAddress ?? '127.0.0.1' },
         });
         return socket;
     };
@@ -152,6 +164,168 @@ afterEach(() => {
     }
 });
 
+describe('Message dispatch hardening', () => {
+    it('answers a type named after an inherited key instead of dispatching it', () => {
+        // A plain object index resolves inherited keys, so these would otherwise
+        // reach the dispatch table and be called as if they were handlers.
+        const { connect } = boot();
+        const host = connect();
+
+        ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'].forEach((type) => {
+            host.emit('message', JSON.stringify({ payload: { x: 1 }, type }));
+        });
+
+        const errors = messagesOf(host, 'ERROR');
+        expect(errors).toHaveLength(5);
+        errors.forEach((error) => {
+            expect(error.payload.message).toContain('Unknown action type:');
+            expect(error.payload.code).toBe('FORBIDDEN');
+        });
+        expect(messagesOf(host, 'ROOM_STATE')).toHaveLength(0);
+    });
+
+    it('answers a message that is not a JSON object', () => {
+        const { connect } = boot();
+        const host = connect();
+
+        host.emit('message', JSON.stringify('just a string'));
+        host.emit('message', '42');
+
+        expect(messagesOf(host, 'ERROR')).toHaveLength(2);
+        expect(lastMessage(host, 'ERROR')?.payload.message).toContain('JSON object');
+    });
+});
+
+describe('Failed room joins', () => {
+    it('spends a budget of distinct wrong codes and then refuses the guesses', () => {
+        const { connect } = boot();
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', {
+                name: `Probe ${attempt}`,
+                roomId: `CODE${attempt}`,
+            });
+        }
+
+        const last = connect();
+        send(last, 'JOIN_ROOM', { name: 'Probe', roomId: 'ONEMORE' });
+
+        expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+    });
+
+    it('audits a code that matched no room', () => {
+        const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+        const { connect } = boot();
+        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'ZZZZZZ' });
+
+        const records = log.mock.calls.map((call) => JSON.parse(String(call[0])));
+        expect(records).toContainEqual(
+            expect.objectContaining({ action: 'join.rejected.room-not-found', outcome: 'denied' })
+        );
+        log.mockRestore();
+    });
+
+    it('counts a code once however often it is retyped', () => {
+        // A shared address is not barred by its own users retyping one code.
+        const { connect } = boot();
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT * 2; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', { name: 'Retyper', roomId: 'ZZZZZZ' });
+        }
+
+        const honest = connect();
+        send(honest, 'JOIN_ROOM', { name: 'Honest', roomId: 'ZZZZZZ' });
+
+        expect(lastMessage(honest, 'ERROR')?.payload.code).toBe('ROOM_NOT_FOUND');
+    });
+
+    it('still admits a code that exists once the budget is spent', () => {
+        // The bar is for guessing, never for joining: a room that exists is
+        // looked up before the budget is consulted.
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', {
+                name: `Probe ${attempt}`,
+                roomId: `CODE${attempt}`,
+            });
+        }
+
+        const participant = connect();
+        send(participant, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        expect(lastMessage(participant, 'ERROR')).toBeUndefined();
+        expect(participantIdOf(participant)).toBeTruthy();
+    });
+
+    it('does not let a successful join buy more misses', () => {
+        // Room creation is open to anybody, so a reset on success would be an
+        // oracle: spend the budget minus one on guesses, join a room of its own,
+        // and start again with a full allowance.
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT - 1; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', {
+                name: `Miss ${attempt}`,
+                roomId: `CODE${attempt}`,
+            });
+        }
+
+        send(connect(), 'JOIN_ROOM', { name: 'Bob', roomId });
+        send(connect(), 'JOIN_ROOM', { name: 'Probe', roomId: 'LASTONE' });
+
+        const last = connect();
+        send(last, 'JOIN_ROOM', { name: 'Probe again', roomId: 'ANOTHER' });
+        expect(lastMessage(last, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+    });
+});
+
+describe('Ended sessions', () => {
+    it('accepts no further votes once the host ended the session', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const bob = connect();
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        send(host, 'END_SESSION', {});
+        bob.sent.length = 0;
+
+        send(bob, 'VOTE', { vote: 5 });
+
+        const error = lastMessage(bob, 'ERROR');
+        expect(error?.payload.code).toBe('SESSION_ENDED');
+    });
+
+    it('takes no new participant once the session has ended', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        send(host, 'END_SESSION', {});
+
+        const latecomer = connect();
+        send(latecomer, 'JOIN_ROOM', { name: 'Late', roomId });
+
+        expect(lastMessage(latecomer, 'ERROR')?.payload.code).toBe('SESSION_ENDED');
+        expect(latecomer.userId).toBeUndefined();
+    });
+});
+
 describe('Kick ban, end to end', () => {
     it('refuses the rejoin the kicked client attempts with its own token', () => {
         const { connect } = boot();
@@ -160,7 +334,7 @@ describe('Kick ban, end to end', () => {
         send(host, 'CREATE_ROOM', { name: 'Alice' });
         const hostToken = tokenOf(host);
         const roomId = roomIdOf(host);
-        expect(roomId).toMatch(/^[A-Z0-9]{6}$/);
+        expect(roomId).toMatch(/^[A-Z0-9]{8}$/);
 
         const bob = connect();
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
@@ -204,7 +378,11 @@ describe('Kick ban, end to end', () => {
 
             // Still barred with the very token that was revoked.
             const barred = connect();
-            send(barred, 'JOIN_ROOM', { name: 'Bob', roomId, sessionToken: bobToken });
+            send(barred, 'JOIN_ROOM', {
+                name: 'Bob',
+                roomId,
+                sessionToken: bobToken,
+            });
             expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
 
             vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
@@ -306,22 +484,27 @@ describe('Message throttle, end to end', () => {
     });
 });
 
+/** Identities a browser would carry, shaped as the server mints them. */
+const HOST_CLIENT_ID = '11111111-1111-4111-8111-111111111111';
+const BOB_CLIENT_ID = '22222222-2222-4222-8222-222222222222';
+const CAROL_CLIENT_ID = '33333333-3333-4333-8333-333333333333';
+
 describe('Kick ban against a browser profile', () => {
     it('still bars a rejoin that presents no token at all', () => {
         const { connect } = boot();
 
-        const host = connect({ clientId: 'host-client' });
+        const host = connect({ clientId: HOST_CLIENT_ID });
         send(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
-        const bob = connect({ clientId: 'bob-client' });
+        const bob = connect({ clientId: BOB_CLIENT_ID });
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
         const bobId = participantIdOf(bob);
 
         send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
         // A fresh tab: no Origin-less escape, no token, same browser.
-        const bobAgain = connect({ clientId: 'bob-client' });
+        const bobAgain = connect({ clientId: BOB_CLIENT_ID });
         send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
 
         expect(lastMessage(bobAgain, 'ERROR')?.payload.code).toBe('BANNED');
@@ -331,17 +514,17 @@ describe('Kick ban against a browser profile', () => {
     it('lets a different browser through', () => {
         const { connect } = boot();
 
-        const host = connect({ clientId: 'host-client' });
+        const host = connect({ clientId: HOST_CLIENT_ID });
         send(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
 
-        const bob = connect({ clientId: 'bob-client' });
+        const bob = connect({ clientId: BOB_CLIENT_ID });
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
         const bobId = participantIdOf(bob);
 
         send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
 
-        const newcomer = connect({ clientId: 'carol-client' });
+        const newcomer = connect({ clientId: CAROL_CLIENT_ID });
         send(newcomer, 'JOIN_ROOM', { name: 'Carol', roomId });
 
         expect(lastMessage(newcomer, 'SESSION')).toBeDefined();
@@ -353,22 +536,22 @@ describe('Kick ban against a browser profile', () => {
         try {
             const { connect } = boot();
 
-            const host = connect({ clientId: 'host-client' });
+            const host = connect({ clientId: HOST_CLIENT_ID });
             send(host, 'CREATE_ROOM', { name: 'Alice' });
             const roomId = roomIdOf(host);
 
-            const bob = connect({ clientId: 'bob-client' });
+            const bob = connect({ clientId: BOB_CLIENT_ID });
             send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
             const bobId = participantIdOf(bob);
 
             send(host, 'KICK_PARTICIPANT', { targetUserId: bobId });
-            const barred = connect({ clientId: 'bob-client' });
+            const barred = connect({ clientId: BOB_CLIENT_ID });
             send(barred, 'JOIN_ROOM', { name: 'Bob', roomId });
             expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('BANNED');
 
             vi.advanceTimersByTime(KICK_BAN_DURATION_MS + 1);
 
-            const bobAgain = connect({ clientId: 'bob-client' });
+            const bobAgain = connect({ clientId: BOB_CLIENT_ID });
             send(bobAgain, 'JOIN_ROOM', { name: 'Bob', roomId });
 
             expect(lastMessage(bobAgain, 'SESSION')).toBeDefined();

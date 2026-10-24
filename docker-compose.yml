@@ -31,6 +31,10 @@ services:
             - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-1}
             # Same-origin (compose) needs no CORS config; keep defaults for direct access / local dev.
             - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:80,http://localhost:5173}
+            # Leave CLOUDFLARE_ENABLED empty on a direct listener; the bundled
+            # Nginx stack reaches the server through its own proxy, so
+            # TRUST_PROXY_HOPS is what applies there.
+            - CLOUDFLARE_ENABLED=${CLOUDFLARE_ENABLED:-}
         healthcheck:
             test:
                 [

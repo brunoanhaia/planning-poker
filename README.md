@@ -11,6 +11,7 @@ The application uses a client-server model communicating over WebSockets for rea
 - **`apps/client`**: The frontend application. Built with React, Vite, and Ant Design. It uses native WebSocket to connect to the backend.
 - **`apps/server`**: The backend server. Built with Node.js, Express, and native WebSocket (`ws`). It manages the state of all active rooms and handles WebSocket connections.
 - **`packages/shared`**: A shared library containing TypeScript interfaces, enums, and constants used by both the client and server.
+- **`docs/security-review.md`**: the penetration test of the HTTP and WebSocket surface, its findings and the abuse controls that answered them.
 
 ### Security Model
 
@@ -18,6 +19,10 @@ The application uses a client-server model communicating over WebSockets for rea
 - **Payload validation**: Every inbound WebSocket message is validated against a `zod` schema (`apps/server/src/validation.ts`) before reaching domain logic. Invalid payloads receive an `ERROR` and are never broadcast.
 - **Input limits**: Names (≤50), room titles (≤120), story titles (≤120), descriptions (≤2000), bulk imports (≤50), custom decks (2–30 unique cards), and timer durations (5–3600 s) are enforced server-side. Limits are shared constants in `packages/shared`.
 - **Safe export**: CSV export neutralizes spreadsheet formula injection and sanitizes the download filename (`apps/client/src/components/story-backlog/story-backlog.utils.ts`).
+- **Room codes**: 8 characters from a 32-character alphabet (~1.1×10¹² candidates), so a code is a secret rather than a guessing game. Ambiguous characters (`0`/`O`, `1`/`I`) are excluded so a code can be read out loud.
+- **Behind Cloudflare**: the server takes the real client from `CF-Connecting-IP`, and only for requests that genuinely arrive from a published Cloudflare address — a forged header from anywhere else is ignored, so a client cannot choose its own identity by sending one. `X-Forwarded-For` is not walked in front of Cloudflare, because the value a client sent before Cloudflare overwrote it is not a claim worth honouring. Set `CLOUDFLARE_ENABLED=true` on the server.
+- **Abuse controls**: every WebSocket connection carries an `error` listener, so a frame the receiver refuses (over the 32 KiB cap) closes that socket instead of the process; one address may hold a bounded number of sockets and a bounded number of failed room joins; message dispatch only honours types the handler owns. The per-address ceilings are sized for a shared address — an office or a carrier-grade NAT is a crowd, not a flood — and a code that matches a room is never refused by the join budget. See `docs/security-review.md`.
+- **Frame safety**: a bulk import is split into batches that each fit in one frame, measured as the exact message they become (`apps/client/src/utils/bulk-import.ts`), because a full import is larger than a frame accepts.
 
 ### Styling
 
@@ -189,6 +194,9 @@ docker compose up --build
   `window.location.host` through the Nginx `/ws` proxy (no CORS setup needed).
 - External backend: `VITE_WS_URL=wss://api.exemplo.com docker compose up --build`
   bakes the URL into the client bundle so the browser dials it directly.
+- Behind TLS: set `CLIENT_ID_COOKIE_SECURE=true` on the server so the
+  browser-identity cookie is only ever sent over HTTPS. Leave it empty on plain
+  HTTP, where a browser would drop the cookie and the kick bar would lapse.
 
 Individual images:
 

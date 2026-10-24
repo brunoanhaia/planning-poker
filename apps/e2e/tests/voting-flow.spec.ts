@@ -23,7 +23,7 @@ test.describe('Voting Flow', () => {
         // Join using the UI
         await voterPage.goto(`/`);
         await voterPage.getByRole('tab', { name: /Join Session/i }).click();
-        await voterPage.getByLabel(/6-Character Room Code/i).fill(roomCode);
+        await voterPage.getByLabel(/8-Character Room Code/i).fill(roomCode);
         await voterPage.getByLabel(/Your Display Name/i).fill('Voter 1');
         await voterPage.getByRole('button', { name: /Join Room Now/i }).click();
 

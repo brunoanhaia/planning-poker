@@ -2,7 +2,7 @@ import { Button, Flex, Input } from 'antd';
 import React, { useState } from 'react';
 
 /** Exact length of a room code, and therefore of the join deep link. */
-const ROOM_CODE_LENGTH = 6;
+const ROOM_CODE_LENGTH = 8;
 
 export interface JoinSessionFormProps {
     /** Pre-fills the field from a `#ABC123` deep link. */
@@ -12,7 +12,7 @@ export interface JoinSessionFormProps {
 }
 
 /**
- * Step 2 of the "join a room" flow: nothing but the six character room code.
+ * Step 2 of the "join a room" flow: nothing but the eight character room code.
  */
 export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({ initialRoomCode, onSubmit }) => {
     const [roomCode, setRoomCode] = useState(initialRoomCode);
