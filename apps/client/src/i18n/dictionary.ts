@@ -1,7 +1,7 @@
 import { DeckType, ErrorCode, Language } from '@planitpoker/shared';
 
-import enJson from './locales/en.json';
-import ptBRJson from './locales/pt-BR.json';
+import enJson from '../assets/locales/en.json';
+import ptBRJson from '../assets/locales/pt-BR.json';
 
 /**
  * Shape every translation must implement, derived from the English catalog.
@@ -34,7 +34,7 @@ export const INLINE_DICTIONARIES: Partial<Record<Language, Dictionary>> = {
  * not grow with the language list.
  */
 export const LOCALE_LOADERS: Partial<Record<Language, () => Promise<{ default: Dictionary }>>> = {
-    es: () => import('./locales/es.json'),
+    es: () => import('../assets/locales/es.json'),
 };
 
 /** Plural categories CLDR defines; a dictionary may use any subset. */

@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest';
 /** Repository root, from this workspace's test directory (apps/server/tests). */
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 
-const CATALOGS_DIR = join(REPO_ROOT, 'apps', 'client', 'src', 'i18n', 'locales');
+const CATALOGS_DIR = join(REPO_ROOT, 'apps', 'client', 'src', 'assets', 'locales');
 
 /**
- * `i18n/locales/` is excluded from the Sonar scan as a whole, on the premise
+ * `assets/locales/` is excluded from the Sonar scan as a whole, on the premise
  * that it holds nothing but translation catalogs. This test keeps the premise
  * true: a stray module with logic in there would be analysed by nobody.
  */

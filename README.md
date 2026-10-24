@@ -37,7 +37,7 @@ The client renders entirely with [Ant Design](https://ant.design) 6 components �
 
 The interface ships in English, Brazilian Portuguese and Spanish, on top of `i18next` + `react-i18next`.
 
-- **Catalogs**: `apps/client/src/i18n/locales/<code>.json` holds one flat key → string map per language, in the format every i18next-aware translator tool reads. `Dictionary` is derived from the English JSON, so a translation missing a key fails `tsc`; the i18n spec rejects one that invents an extra key. English and Brazilian Portuguese are bundled inline; every other language is fetched as its own chunk when picked, and a stored language survives a reload even when its chunk is still loading.
+- **Catalogs**: `apps/client/src/assets/locales/<code>.json` holds one flat key → string map per language, in the format every i18next-aware translator tool reads. `Dictionary` is derived from the English JSON, so a translation missing a key fails `tsc`; the i18n spec rejects one that invents an extra key. English and Brazilian Portuguese are bundled inline; every other language is fetched as its own chunk when picked, and a stored language survives a reload even when its chunk is still loading.
 - **Interpolation**: the library's defaults, not a hand-rolled formatter — `t('nav.room', { code })` against `"Room: {{code}}"`, with i18next handling nesting and escaping. Components never interpolate strings themselves.
 - **Plurals**: CLDR suffixes — `results.votes_one` / `results.votes_other` — selected by `Intl.PluralRules` from the `count` parameter, so callers write the base key (`t('results.votes', { count })`). A language with more categories (Polish, Russian, Arabic) only adds the extra suffixes.
 - **Picker and persistence**: `components/language-switcher/` renders the menu; the choice is stored in `localStorage` (`planit_language`), the browser preference decides the first visit, and Ant Design's own locale (`ConfigProvider`) follows the same value.
@@ -45,11 +45,11 @@ The interface ships in English, Brazilian Portuguese and Spanish, on top of `i18
 
 #### Adding a language
 
-1. Copy `locales/en.json` to `locales/<code>.json` and translate the values, keeping the keys and the `{{placeholders}}` — the compiler lists every missing key, and add `_few`/`_many` forms only if the language needs them.
+1. Copy `assets/locales/en.json` to `assets/locales/<code>.json` and translate the values, keeping the keys and the `{{placeholders}}` — the compiler lists every missing key, and add `_few`/`_many` forms only if the language needs them.
 2. Add the code to `Language`/`LANGUAGES` in `packages/shared/src/index.ts` and register the loader in `i18n/dictionary.ts`; add the Ant Design locale in `app/app.tsx`.
 3. Add its native name under `language.<code>` in every catalog and run the client tests — the key-set, plural and provider specs fail if something is missing.
 
-Nothing else: `i18n/locales/` is excluded from the Sonar scan as a whole, so a new catalog needs no analysis change. Keep the folder JSON-only — `apps/server/tests/translationCatalogs.test.ts` fails otherwise.
+Nothing else: `assets/locales/` is excluded from the Sonar scan as a whole, so a new catalog needs no analysis change. Keep the folder JSON-only — `apps/server/tests/translationCatalogs.test.ts` fails otherwise.
 
 ### Voting Rounds and Summary
 
