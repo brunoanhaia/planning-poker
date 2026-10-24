@@ -2,6 +2,7 @@ import { Button, Col, Layout, Modal, Result, Row } from 'antd';
 import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { useTranslation } from '../../i18n/use-translation';
 import { ColorMode } from '../../theme/app-theme';
 import { EstimationPanel } from '../estimation-panel/estimation-panel';
 import { Home } from '../home/home';
@@ -36,6 +37,7 @@ export interface MainContentProps {
  */
 export const MainContent: React.FC<MainContentProps> = ({ colorMode, onToggleColorMode }) => {
     const { clearKickedMessage, kickedMessage, roomState } = useSocket();
+    const { t } = useTranslation();
     const [settingsOpen, setSettingsOpen] = useState(false);
 
     const closeSettings = () => setSettingsOpen(false);
@@ -72,13 +74,13 @@ export const MainContent: React.FC<MainContentProps> = ({ colorMode, onToggleCol
                 footer={null}
                 onCancel={clearKickedMessage}
                 open={Boolean(kickedMessage)}
-                title="Session Notice"
+                title={t('notice.title')}
                 width={480}
             >
                 <Result
                     extra={
                         <Button onClick={clearKickedMessage} type="primary">
-                            OK
+                            {t('notice.ok')}
                         </Button>
                     }
                     status="warning"

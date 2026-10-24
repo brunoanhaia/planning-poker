@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { MAX_ROUNDS_PER_STORY } from '@planitpoker/shared';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
 
@@ -202,5 +203,119 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const adminReveal = rm.revealVotes(roomId, hostId);
         expect(adminReveal).not.toBeNull();
         expect(rm.getRoom(roomId)!.votesRevealed).toBe(true);
+    });
+
+    it('records one revealed round per reveal and keeps the votes as they were', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.submitVote(roomId, bobId, 8);
+        rm.revealVotes(roomId, hostId);
+
+        const story = rm.getRoom(roomId)!.stories[0];
+        expect(story.rounds).toHaveLength(1);
+        expect(story.rounds[0].votes.map((vote) => vote.vote)).toEqual([5, 8]);
+        expect(story.rounds[0].votes[1].name).toBe('Bob');
+
+        // A second reveal of an already visible round must not append a copy.
+        rm.revealVotes(roomId, hostId);
+        expect(rm.getRoom(roomId)!.stories[0].rounds).toHaveLength(1);
+    });
+
+    it.each([false, true])('rejects votes after reveal (auto-reveal: %s)', (autoReveal) => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        if (autoReveal) {
+            rm.toggleAutoReveal(roomId, hostId);
+        }
+        expect(rm.submitVote(roomId, hostId, 3)).not.toBeNull();
+        if (!autoReveal) {
+            expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
+            rm.revealVotes(roomId, hostId);
+        }
+        const revealedRoom = structuredClone(rm.getRoom(roomId)!);
+
+        expect(rm.submitVote(roomId, hostId, 8)).toBeNull();
+        expect(rm.getRoom(roomId)).toEqual(revealedRoom);
+
+        rm.resetVotes(roomId, hostId);
+        expect(rm.submitVote(roomId, hostId, 8)).not.toBeNull();
+        expect(rm.getRoom(roomId)!.participants[0].vote).toBe(8);
+    });
+
+    it('rejects a first vote submitted after reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+        const revealedRoom = structuredClone(rm.getRoom(roomId)!);
+
+        expect(rm.submitVote(roomId, bobId, 8)).toBeNull();
+        expect(rm.getRoom(roomId)).toEqual(revealedRoom);
+    });
+
+    it('opens a new round on reset instead of erasing the previous result', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.submitVote(roomId, hostId, 3);
+        rm.revealVotes(roomId, hostId);
+        rm.resetVotes(roomId, hostId);
+        rm.submitVote(roomId, hostId, 13);
+        rm.revealVotes(roomId, hostId);
+
+        const story = rm.getRoom(roomId)!.stories[0];
+        expect(story.rounds.map((round) => round.votes[0].vote)).toEqual([3, 13]);
+    });
+
+    it('keeps the newest rounds when the story is re-estimated past the cap', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        for (let round = 0; round <= MAX_ROUNDS_PER_STORY; round += 1) {
+            rm.submitVote(roomId, hostId, round);
+            rm.revealVotes(roomId, hostId);
+            rm.resetVotes(roomId, hostId);
+        }
+
+        const story = rm.getRoom(roomId)!.stories[0];
+        expect(story.rounds).toHaveLength(MAX_ROUNDS_PER_STORY);
+        expect(story.rounds[story.rounds.length - 1].votes[0].vote).toBe(MAX_ROUNDS_PER_STORY);
+    });
+
+    it('stamps the end of the session for the summary duration', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        expect(rm.getRoom(roomId)!.endedAt).toBeNull();
+
+        rm.endSession(roomId, hostId);
+
+        expect(rm.getRoom(roomId)!.isEnded).toBe(true);
+        expect(rm.getRoom(roomId)!.endedAt).toBeTypeOf('number');
+    });
+
+    it('keeps the original end timestamp when the session is ended twice', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+
+        rm.endSession(roomId, hostId);
+        clock.mockReturnValue(9_000);
+        rm.endSession(roomId, hostId);
+
+        expect(rm.getRoom(roomId)!.endedAt).toBe(1_000);
+        clock.mockRestore();
+    });
+
+    it('records the round when auto-reveal flips the flag inside the last vote', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+
+        const story = rm.getRoom(roomId)!.stories[0];
+        expect(rm.getRoom(roomId)!.votesRevealed).toBe(true);
+        expect(story.rounds).toHaveLength(1);
+        expect(story.rounds[0].votes).toHaveLength(1);
+
+        // A manual reveal afterwards must not append a second copy of the round.
+        rm.revealVotes(roomId, hostId);
+        expect(rm.getRoom(roomId)!.stories[0].rounds).toHaveLength(1);
     });
 });

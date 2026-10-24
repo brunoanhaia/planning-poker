@@ -36,3 +36,13 @@ export const generateStoryId = (): string => {
     const randomSegment = randomUUID().replaceAll('-', '').slice(0, 9);
     return `story_${randomSegment}`;
 };
+
+/**
+ * Generates a unique voting round identifier string.
+ *
+ * @returns A unique round identifier prefixed with 'round_'.
+ */
+export const generateRoundId = (): string => {
+    const randomSegment = randomUUID().replaceAll('-', '').slice(0, 9);
+    return `round_${randomSegment}`;
+};

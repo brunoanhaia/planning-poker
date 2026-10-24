@@ -1,6 +1,9 @@
-import { DeckType, RoomState, WSMessageType } from '@planitpoker/shared';
+import { DeckType, ErrorCode, ErrorPayload, RoomState, WSMessageType } from '@planitpoker/shared';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ERROR_KEYS, TranslationKey } from '../../i18n/dictionary';
+import { Translate } from '../../i18n/i18n-context';
+import { useTranslation } from '../../i18n/use-translation';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
 import { SocketContext, SocketContextValue } from './socket-context';
 
@@ -10,12 +13,44 @@ const RECONNECT_DELAY_MS = 2000;
 /** Session storage key holding the token that survives a page reload. */
 const SESSION_TOKEN_STORAGE_KEY = 'planit_session_token';
 
+/**
+ * A server notice as received, kept untranslated.
+ *
+ * Storing the code instead of the rendered text is what lets an open notice
+ * follow a language change; the provider translates it while building the
+ * context value.
+ */
+interface ErrorNotice {
+    code?: ErrorCode;
+    /** Dictionary key for a notice the client raises itself. */
+    key?: TranslationKey;
+    /** English message the server sent, used when the code is unknown here. */
+    message?: string;
+}
+
+/** Renders a notice in the active language, or `null` when there is none. */
+const translateNotice = (notice: ErrorNotice | null, t: Translate): string | null => {
+    if (!notice) {
+        return null;
+    }
+    const key = notice.code
+        ? (ERROR_KEYS as Partial<Record<string, TranslationKey>>)[notice.code]
+        : notice.key;
+    if (key) {
+        return t(key);
+    }
+    // A code this build does not know: the server's own message is more useful
+    // than the generic one, so it wins over the fallback.
+    return notice.message ?? t('error.generic');
+};
+
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { t } = useTranslation();
     const [roomState, setRoomState] = useState<null | RoomState>(null);
     const [currentUserId, setCurrentUserId] = useState<null | string>(null);
     const [isConnected, setIsConnected] = useState(false);
-    const [error, setError] = useState<null | string>(null);
-    const [kickedMessage, setKickedMessage] = useState<null | string>(null);
+    const [errorNotice, setErrorNotice] = useState<ErrorNotice | null>(null);
+    const [isKicked, setIsKicked] = useState(false);
     const socketRef = useRef<null | WebSocket>(null);
     const sessionTokenRef = useRef<null | string>(null);
 
@@ -48,7 +83,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     return;
                 }
                 setIsConnected(true);
-                setError(null);
+                setErrorNotice(null);
             };
 
             ws.onmessage = (event) => {
@@ -72,11 +107,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         setRoomState(null);
                         sessionTokenRef.current = null;
                         sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
-                        setKickedMessage(
-                            payload.message || 'You have been removed from the session.'
-                        );
+                        setIsKicked(true);
                     } else if (type === 'ERROR') {
-                        setError(payload.message || 'An error occurred');
+                        const errorPayload = payload as ErrorPayload;
+                        setErrorNotice({
+                            code: errorPayload.code,
+                            message: errorPayload.message,
+                        });
                     }
                 } catch (err) {
                     console.error('Failed to parse WS payload:', err);
@@ -122,7 +159,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ payload, type }));
         } else {
-            setError('Connection to server lost. Retrying...');
+            setErrorNotice({ key: 'error.offline' });
         }
     }, []);
 
@@ -286,12 +323,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         window.location.hash = '';
     }, []);
 
-    const clearError = useCallback(() => setError(null), []);
-    const clearKickedMessage = useCallback(() => setKickedMessage(null), []);
+    const clearError = useCallback(() => setErrorNotice(null), []);
+    const clearKickedMessage = useCallback(() => setIsKicked(false), []);
 
+    // Translation happens while the context value is built, not in the socket
+    // handler: a notice already on screen follows a language change instead of
+    // freezing in the language it arrived in.
     const contextValue = useMemo<SocketContextValue>(() => {
         const host = roomState?.hostId === currentUserId;
         const currentParticipant = roomState?.participants.find((p) => p.id === currentUserId);
+        const error = translateNotice(errorNotice, t);
+        const kickedMessage = isKicked ? t('notice.kicked') : null;
+
         return {
             addStory,
             bulkAddStories,
@@ -337,10 +380,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         currentUserId,
         deleteStory,
         endSession,
-        error,
+        errorNotice,
         isConnected,
+        isKicked,
         joinRoom,
-        kickedMessage,
         kickParticipant,
         leaveRoom,
         pauseTimer,
@@ -352,6 +395,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setCurrentStory,
         startTimer,
         submitVote,
+        t,
         toggleAutoReveal,
         toggleLockRoom,
         toggleSpectator,

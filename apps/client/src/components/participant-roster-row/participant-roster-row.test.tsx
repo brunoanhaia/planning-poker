@@ -4,6 +4,7 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import * as SocketContextModule from '../../context/socket-context/use-socket';
+import { enTranslate } from '../../tests/i18n';
 import { createMockSocketValue } from '../../tests/socket-context.mock';
 import { ParticipantRosterRow } from './participant-roster-row';
 import { buildParticipantMenuItems, isParticipantMenuAction } from './participant-roster-row.utils';
@@ -47,6 +48,7 @@ describe('participant roster action menu', () => {
         const items = buildParticipantMenuItems({
             canTransferHost: false,
             participant: participant,
+            t: enTranslate,
         });
 
         expect(items).toEqual([
@@ -62,6 +64,7 @@ describe('participant roster action menu', () => {
         const items = buildParticipantMenuItems({
             canTransferHost: false,
             participant: spectator,
+            t: enTranslate,
         });
 
         expect(items).toEqual([
@@ -76,6 +79,7 @@ describe('participant roster action menu', () => {
         const items = buildParticipantMenuItems({
             canTransferHost: true,
             participant: participant,
+            t: enTranslate,
         });
 
         expect(

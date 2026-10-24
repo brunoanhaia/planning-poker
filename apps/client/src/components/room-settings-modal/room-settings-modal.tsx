@@ -1,8 +1,10 @@
-import { DECK_TYPES, DECK_TYPE_LABELS, DeckType, PRESET_DECKS } from '@planitpoker/shared';
+import { DECK_TYPES, DeckType, PRESET_DECKS } from '@planitpoker/shared';
 import { Button, Divider, Flex, Input, Modal, Popconfirm, Select, Switch, Typography } from 'antd';
 import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { deckLabelKey } from '../../i18n/dictionary';
+import { useTranslation } from '../../i18n/use-translation';
 
 /** Fallback cards offered when a custom deck parses to nothing usable. */
 const FALLBACK_CUSTOM_DECK: (number | string)[] = [1, 2, 3, 5, 8];
@@ -17,9 +19,6 @@ const parseCustomDeck = (raw: string): (number | string)[] => {
 
     return parsed.length > 0 ? parsed : FALLBACK_CUSTOM_DECK;
 };
-
-/** Confirmation copy for the destructive session end. */
-const END_SESSION_CONFIRMATION = 'Are you sure you want to end this planning estimation session?';
 
 export interface RoomSettingsModalProps {
     /** Closes the modal without applying anything. */
@@ -44,6 +43,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         toggleLockRoom,
         updateRoomTitle,
     } = useSocket();
+    const { t } = useTranslation();
 
     const [titleDraft, setTitleDraft] = useState<null | string>(null);
     const [deckTypeDraft, setDeckTypeDraft] = useState<null | DeckType>(null);
@@ -61,10 +61,6 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
     const deckType = deckTypeDraft ?? roomState.deckType;
     const customDeck =
         customDeckDraft ?? roomState.customDeck?.join(', ') ?? FALLBACK_CUSTOM_DECK.join(', ');
-
-    if (!roomState || !isAdmin) {
-        return null;
-    }
 
     const handleSave = () => {
         if (title.trim() && title.trim() !== roomState.title) {
@@ -101,23 +97,21 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         <Modal
             footer={
                 <Flex gap={8} justify="end">
-                    <Button onClick={onClose}>Cancel</Button>
+                    <Button onClick={onClose}>{t('common.cancel')}</Button>
                     <Button onClick={handleSave} type="primary">
-                        Apply Settings
+                        {t('settings.apply')}
                     </Button>
                 </Flex>
             }
             onCancel={onClose}
             open={open}
-            title="Room &amp; Session Settings"
+            title={t('settings.title')}
         >
             <Flex gap={12} vertical>
-                <Typography.Text type="secondary">
-                    Configure room settings, deck rules, and session status.
-                </Typography.Text>
+                <Typography.Text type="secondary">{t('settings.description')}</Typography.Text>
 
                 <div>
-                    <label htmlFor="room-settings-title">Room / Sprint Title</label>
+                    <label htmlFor="room-settings-title">{t('nav.roomTitle')}</label>
                     <Input
                         id="room-settings-title"
                         onChange={(event) => setTitleDraft(event.target.value)}
@@ -126,12 +120,12 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                 </div>
 
                 <div>
-                    <label htmlFor="room-settings-deck">Estimation Deck Type</label>
+                    <label htmlFor="room-settings-deck">{t('settings.deck')}</label>
                     <Select<DeckType>
                         id="room-settings-deck"
                         onChange={setDeckTypeDraft}
                         options={DECK_TYPES.map((option) => ({
-                            label: DECK_TYPE_LABELS[option],
+                            label: t(deckLabelKey(option)),
                             value: option,
                         }))}
                         style={{ width: '100%' }}
@@ -142,18 +136,18 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                 {deckType === 'custom' ? (
                     <div>
                         <label htmlFor="room-settings-custom-deck">
-                            Comma-Separated Custom Cards
+                            {t('settings.customCards')}
                         </label>
                         <Input
                             id="room-settings-custom-deck"
                             onChange={(event) => setCustomDeckDraft(event.target.value)}
-                            placeholder="e.g. 1, 2, 3, 5, 8, 10, ?, ☕"
+                            placeholder={t('settings.customCards.placeholder')}
                             value={customDeck}
                         />
                     </div>
                 ) : (
                     <Typography.Text type="secondary">
-                        {`Selected cards preview: ${PRESET_DECKS[deckType].join('  ·  ')}`}
+                        {t('settings.preview', { cards: PRESET_DECKS[deckType].join('  ·  ') })}
                     </Typography.Text>
                 )}
 
@@ -161,13 +155,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
 
                 <Flex align="center" gap={8} justify="space-between" wrap>
                     <Flex gap={2} vertical>
-                        <Typography.Text>Auto-Reveal Votes</Typography.Text>
+                        <Typography.Text>{t('settings.autoReveal')}</Typography.Text>
                         <Typography.Text type="secondary">
-                            Automatically flip cards when everyone has voted
+                            {t('settings.autoReveal.hint')}
                         </Typography.Text>
                     </Flex>
                     <Switch
-                        aria-label="Auto-Reveal Votes"
+                        aria-label={t('settings.autoReveal')}
                         checked={roomState.autoReveal}
                         onChange={toggleAutoReveal}
                     />
@@ -175,13 +169,13 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
 
                 <Flex align="center" gap={8} justify="space-between" wrap>
                     <Flex gap={2} vertical>
-                        <Typography.Text>Lock Room</Typography.Text>
+                        <Typography.Text>{t('settings.lock')}</Typography.Text>
                         <Typography.Text type="secondary">
-                            Prevent new participants from joining
+                            {t('settings.lock.hint')}
                         </Typography.Text>
                     </Flex>
                     <Switch
-                        aria-label="Lock Room"
+                        aria-label={t('settings.lock')}
                         checked={roomState.isLocked}
                         onChange={toggleLockRoom}
                     />
@@ -193,10 +187,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <Popconfirm
                         onConfirm={handleEndSession}
                         okButtonProps={{ danger: true }}
-                        okText="End Session"
-                        title={END_SESSION_CONFIRMATION}
+                        okText={t('settings.end.ok')}
+                        title={t('settings.end.confirm')}
                     >
-                        <Button danger>End Planning Session</Button>
+                        <Button danger>{t('settings.end')}</Button>
                     </Popconfirm>
                 )}
             </Flex>

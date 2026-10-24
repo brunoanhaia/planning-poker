@@ -1,5 +1,5 @@
 import { RoomState } from '@planitpoker/shared';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -13,6 +13,7 @@ const mockRevealedRoomState: RoomState = {
     createdAt: Date.now(),
     currentStoryIndex: 0,
     deckType: 'fibonacci',
+    endedAt: null,
     hostId: 'user_1',
     id: 'ROOM01',
     isEnded: false,
@@ -46,6 +47,7 @@ const mockRevealedRoomState: RoomState = {
     stories: [
         {
             id: 'story_1',
+            rounds: [],
             status: 'estimating',
             title: 'Setup Database Migration',
         },
@@ -65,8 +67,20 @@ describe('ResultsPanel', () => {
 
         expect(screen.getByText('Estimation Results')).toBeInTheDocument();
         expect(screen.getByText(/100% Consensus/i)).toBeInTheDocument();
-        expect(screen.getByText('5.0')).toBeInTheDocument();
+        // Unanimous votes put the average and the median on the same figure.
+        expect(screen.getAllByText('5.0')).toHaveLength(2);
         expect(screen.getByRole('button', { name: /Accept Avg/i })).toBeInTheDocument();
+    });
+
+    it('accepts the suggested estimate as a number, not the formatted text', () => {
+        const socket = createMockSocketValue({ roomState: mockRevealedRoomState });
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+
+        const screen = render(<ResultsPanel />);
+        fireEvent.click(screen.getByRole('button', { name: /Accept Avg/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Save & Advance/i }));
+
+        expect(socket.updateStoryEstimate).toHaveBeenCalledWith('story_1', 5);
     });
 
     it('hides the accept action from non-admin participants', () => {

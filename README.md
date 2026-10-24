@@ -33,6 +33,30 @@ The client renders entirely with [Ant Design](https://ant.design) 6 components �
 - **Component layout**: one component per folder, kebab-case, under `apps/client/src/components/`. Logic lives in colocated hooks or `.utils.ts` files; only the component itself lives in the `.tsx`.
 - **Accessibility**: `apps/e2e/tests/overlap-axe.spec.ts` scans the lobby, the room and the revealed results on four viewports in both colour schemes, asserting zero axe violations and zero overlapping text or interactive elements.
 
+### Internationalization
+
+The interface ships in English, Brazilian Portuguese and Spanish, on top of `i18next` + `react-i18next`.
+
+- **Catalogs**: `apps/client/src/assets/locales/<code>.json` holds one flat key → string map per language, in the format every i18next-aware translator tool reads. `Dictionary` is derived from the English JSON, so a translation missing a key fails `tsc`; the i18n spec rejects one that invents an extra key. English and Brazilian Portuguese are bundled inline; every other language is fetched as its own chunk when picked, and a stored language survives a reload even when its chunk is still loading.
+- **Interpolation**: the library's defaults, not a hand-rolled formatter — `t('nav.room', { code })` against `"Room: {{code}}"`, with i18next handling nesting and escaping. Components never interpolate strings themselves.
+- **Plurals**: CLDR suffixes — `results.votes_one` / `results.votes_other` — selected by `Intl.PluralRules` from the `count` parameter, so callers write the base key (`t('results.votes', { count })`). A language with more categories (Polish, Russian, Arabic) only adds the extra suffixes.
+- **Picker and persistence**: `components/language-switcher/` renders the menu; the choice is stored in `localStorage` (`planit_language`), the browser preference decides the first visit, and Ant Design's own locale (`ConfigProvider`) follows the same value.
+- **Server failures**: the server keeps sending an English `message` for its logs, and the client renders the localized text of the accompanying `ErrorCode` through `ERROR_KEYS`; deck names go through `deckLabelKey` so a new `DeckType` or `ErrorCode` cannot be silently untranslated.
+
+#### Adding a language
+
+1. Copy `assets/locales/en.json` to `assets/locales/<code>.json` and translate the values, keeping the keys and the `{{placeholders}}` — the compiler lists every missing key, and add `_few`/`_many` forms only if the language needs them.
+2. Add the code to `Language`/`LANGUAGES` in `apps/client/src/i18n/languages.ts` and register the loader in `i18n/dictionary.ts`; add the Ant Design locale in `app/app.tsx`.
+3. Add its native name under `language.<code>` in every catalog and run the client tests — the key-set, plural and provider specs fail if something is missing.
+
+Nothing else: `assets/locales/` is excluded from the Sonar scan as a whole, so a new catalog needs no analysis change. Keep the folder JSON-only — the i18n spec fails otherwise.
+
+### Voting Rounds and Summary
+
+- **Rounds**: each reveal appends a snapshot of the active story (`rounds`, capped at `MAX_ROUNDS_PER_STORY = 10`), holding the card, the voter name and the reveal timestamp; resetting the votes opens the next round instead of erasing the previous one. Only revealed rounds are stored, so this introduces no way to read a hidden card.
+- **Summary**: `components/session-summary/` derives the end-of-session overview from the broadcast state — estimated stories, accepted points, rounds, duration and a CSV export — and opens once when the host ends the session.
+- **Statistics**: `apps/client/src/utils/estimation-stats.ts` computes average, median, population standard deviation, consensus, mode and Tukey outliers from the numeric cards only; symbolic cards still shape the distribution.
+
 ### System Diagram
 
 ```mermaid
@@ -65,7 +89,11 @@ The application supports multiple users connecting to a single room to vote on t
     - Join a room using a unique URL.
     - Select a card to submit an estimate.
     - Toggle personal status between Voter and Spectator.
-    - View the current story backlog.
+    - View the current story backlog, with a per-story breakdown of every revealed round.
+    - **Voting rounds**: re-voting a story keeps the previous rounds instead of erasing them, so the room can compare attempts before accepting a number.
+    - **Result statistics**: average, median, consensus, top vote, voters and population standard deviation, plus the voters whose card falls outside 1.5 interquartile ranges.
+    - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it.
+    - **Interface languages**: English, Brazilian Portuguese and Spanish, switchable from the application bar and remembered across reloads.
     - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
 
 - **Administrative Features** (Restricted to Admin and Co-host):

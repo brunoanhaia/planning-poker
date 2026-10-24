@@ -179,7 +179,7 @@ describe('Message dispatch hardening', () => {
         expect(errors).toHaveLength(5);
         errors.forEach((error) => {
             expect(error.payload.message).toContain('Unknown action type:');
-            expect(error.payload.code).toBe('FORBIDDEN');
+            expect(error.payload.code).toBe('UNKNOWN_ACTION');
         });
         expect(messagesOf(host, 'ROOM_STATE')).toHaveLength(0);
     });
@@ -323,6 +323,33 @@ describe('Ended sessions', () => {
 
         expect(lastMessage(latecomer, 'ERROR')?.payload.code).toBe('SESSION_ENDED');
         expect(latecomer.userId).toBeUndefined();
+    });
+});
+
+describe('Revealed rounds', () => {
+    it('refuses a vote after the reveal until the room is reset', () => {
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        const bob = connect();
+        send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });
+
+        send(bob, 'VOTE', { vote: 5 });
+        send(host, 'REVEAL_VOTES', {});
+        bob.sent.length = 0;
+
+        send(bob, 'VOTE', { vote: 8 });
+
+        expect(lastMessage(bob, 'ERROR')?.payload.code).toBe('VOTES_REVEALED');
+
+        send(host, 'RESET_VOTES', {});
+        bob.sent.length = 0;
+        send(bob, 'VOTE', { vote: 8 });
+
+        expect(lastMessage(bob, 'ERROR')).toBeUndefined();
     });
 });
 

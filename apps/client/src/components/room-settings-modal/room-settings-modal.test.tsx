@@ -13,6 +13,7 @@ const buildRoomState = (overrides?: Partial<RoomState>): RoomState => ({
     createdAt: Date.now(),
     currentStoryIndex: 0,
     deckType: 'fibonacci',
+    endedAt: null,
     hostId: 'user_1',
     id: 'ROOM01',
     isEnded: false,

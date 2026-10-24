@@ -2,6 +2,7 @@ import { Card, Empty, Flex, Typography } from 'antd';
 import React from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { useTranslation } from '../../i18n/use-translation';
 import { ParticipantRosterRow } from '../participant-roster-row/participant-roster-row';
 
 /** Empty-state padding of the panel, in pixels. */
@@ -25,6 +26,7 @@ const ROSTER_LIST_STYLE = { listStyle: 'none', margin: 0, padding: 0 } as const;
  */
 export const ParticipantsPanel: React.FC = () => {
     const { currentUserId, isAdmin, isHost, roomState } = useSocket();
+    const { t } = useTranslation();
 
     if (!roomState) return null;
 
@@ -33,12 +35,16 @@ export const ParticipantsPanel: React.FC = () => {
     return (
         <Card
             styles={{ body: { padding: 0 } }}
-            title={<Typography.Text>Participants ({participants.length})</Typography.Text>}
+            title={
+                <Typography.Text>
+                    {t('participants.title', { total: participants.length })}
+                </Typography.Text>
+            }
         >
             {participants.length === 0 ? (
                 <div style={{ padding: EMPTY_STATE_PADDING }}>
                     <Empty
-                        description="Waiting for participants…"
+                        description={t('participants.empty')}
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
                     />
                 </div>

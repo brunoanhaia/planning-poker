@@ -13,6 +13,7 @@ const mockRoomState: RoomState = {
     createdAt: Date.now(),
     currentStoryIndex: 0,
     deckType: 'fibonacci',
+    endedAt: null,
     hostId: 'user_1',
     id: 'ROOM01',
     isEnded: false,
@@ -47,6 +48,7 @@ const mockRoomState: RoomState = {
         {
             description: 'Run initial migration script for postgres schema',
             id: 'story_1',
+            rounds: [],
             status: 'estimating',
             title: 'Setup Database Migration',
         },
@@ -131,6 +133,7 @@ describe('MainContent', () => {
                             id: 'stable-story-id',
                             title: 'Bug #42',
                             description: 'Keep #, ; and |',
+                            rounds: [],
                             status: 'completed',
                             finalEstimate: 0,
                         },

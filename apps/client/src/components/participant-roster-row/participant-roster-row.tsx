@@ -15,6 +15,7 @@ import {
 } from 'antd';
 import React from 'react';
 
+import { useTranslation } from '../../i18n/use-translation';
 import { useParticipantMenuAction } from './participant-roster-row.hooks';
 import { buildParticipantMenuItems, isParticipantMenuAction } from './participant-roster-row.utils';
 
@@ -64,6 +65,7 @@ export const ParticipantRosterRow: React.FC<ParticipantRosterRowProps> = ({
     showSeparator,
 }) => {
     const runAction = useParticipantMenuAction();
+    const { t } = useTranslation();
     const { token } = theme.useToken();
 
     const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
@@ -97,26 +99,30 @@ export const ParticipantRosterRow: React.FC<ParticipantRosterRowProps> = ({
                 >
                     {participant.name}
                 </Typography.Text>
-                {isSelf && <Typography.Text type="secondary">(you)</Typography.Text>}
+                {isSelf && (
+                    <Typography.Text type="secondary">{t('participants.you')}</Typography.Text>
+                )}
             </Flex>
 
             <Space size={4}>
                 {participant.hasVoted && !participant.isSpectator && (
-                    <Badge status="success" text="Voted" />
+                    <Badge status="success" text={t('participants.voted')} />
                 )}
-                {participant.isSpectator && <Tag icon={<EyeOutlined />}>Spectator</Tag>}
+                {participant.isSpectator && (
+                    <Tag icon={<EyeOutlined />}>{t('participants.spectator')}</Tag>
+                )}
 
                 {canManage && (
                     <Dropdown
                         menu={{
-                            items: buildParticipantMenuItems({ canTransferHost, participant }),
+                            items: buildParticipantMenuItems({ canTransferHost, participant, t }),
                             onClick: handleMenuClick,
                         }}
                         trigger={['click']}
                     >
-                        <Tooltip title="Manage participant">
+                        <Tooltip title={t('participants.menu.account')}>
                             <Button
-                                aria-label={`Manage ${participant.name}`}
+                                aria-label={t('participants.manage', { name: participant.name })}
                                 icon={<MoreOutlined aria-hidden />}
                                 size="small"
                                 type="text"

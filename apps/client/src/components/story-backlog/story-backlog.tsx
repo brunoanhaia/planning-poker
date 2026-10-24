@@ -4,6 +4,7 @@ import {
     EditOutlined,
     PlayCircleOutlined,
     PlusOutlined,
+    ProfileOutlined,
     UploadOutlined,
 } from '@ant-design/icons';
 import { EstimateValue, MAX_STORIES_PER_ROOM, RoomState, Story } from '@planitpoker/shared';
@@ -25,7 +26,10 @@ import {
 import React, { Fragment, useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
+import { Translate } from '../../i18n/i18n-context';
+import { useTranslation } from '../../i18n/use-translation';
 import { DeckChipPicker } from '../deck-chip-picker/deck-chip-picker';
+import { StoryBreakdownModal } from '../story-breakdown-modal/story-breakdown-modal';
 import { buildBacklogCsvFilename, escapeCsvCell, parseBulkStories } from './story-backlog.utils';
 
 /** CSV columns emitted by the export, in order. */
@@ -50,20 +54,15 @@ const toFinalEstimate = (value: string): number | string => {
     return Number.isNaN(parsed) ? value : parsed;
 };
 
-/**
- * Renders the story lifecycle as a status badge.
- *
- * `Badge` keeps the label in Ant Design's body text colour and carries the state
- * in the dot, which stays legible in both colour schemes.
- */
-const renderStoryStatus = (story: Story) => {
-    if (story.status === 'completed') {
-        return <Badge status="success" text="Done" />;
+/** Renders the story lifecycle as a status badge. */
+const renderStoryStatus = (status: Story['status'], t: Translate): React.ReactNode => {
+    if (status === 'completed') {
+        return <Badge status="success" text={t('backlog.status.done')} />;
     }
-    if (story.status === 'estimating') {
-        return <Badge status="processing" text="Estimating" />;
+    if (status === 'estimating') {
+        return <Badge status="processing" text={t('backlog.status.estimating')} />;
     }
-    return <Badge status="default" text="Pending" />;
+    return <Badge status="default" text={t('backlog.status.pending')} />;
 };
 
 /** Triggers a client side CSV download for the whole backlog. */
@@ -103,6 +102,7 @@ export const StoryBacklog: React.FC = () => {
         updateStoryEstimate,
     } = useSocket();
     const { message } = AntApp.useApp();
+    const { t } = useTranslation();
 
     const [isAdding, setIsAdding] = useState(false);
     const [title, setTitle] = useState('');
@@ -112,6 +112,7 @@ export const StoryBacklog: React.FC = () => {
     const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [bulkText, setBulkText] = useState('');
     const [pendingStoryIndex, setPendingStoryIndex] = useState<null | number>(null);
+    const [breakdownStoryId, setBreakdownStoryId] = useState<null | string>(null);
 
     if (!roomState) {
         return null;
@@ -144,18 +145,24 @@ export const StoryBacklog: React.FC = () => {
             // backlog, and telling an admin the wrong one wastes their time.
             const nothingToImport = parsed.length === 0;
             const warning = nothingToImport
-                ? 'No story could be read. Give each line a title, as "Title; Description".'
-                : `The backlog already holds its maximum of ${MAX_STORIES_PER_ROOM} stories. Delete a story before importing.`;
+                ? t('backlog.imported.none')
+                : t('backlog.imported.skipped', {
+                      max: MAX_STORIES_PER_ROOM,
+                      skipped: parsed.length,
+                  });
             void message.warning(warning);
             return;
         }
         bulkAddStories(stories);
         setBulkText('');
         setIsBulkOpen(false);
-        void message.success(`Imported ${stories.length} stories.`);
+        void message.success(t('backlog.imported', { count: stories.length }));
         if (parsed.length > stories.length) {
             void message.warning(
-                `The backlog holds at most ${MAX_STORIES_PER_ROOM} stories; ${parsed.length - stories.length} were skipped.`
+                t('backlog.imported.skipped', {
+                    max: MAX_STORIES_PER_ROOM,
+                    skipped: parsed.length - stories.length,
+                })
             );
         }
     };
@@ -187,7 +194,9 @@ export const StoryBacklog: React.FC = () => {
             <Card
                 styles={{ body: { padding: 0 } }}
                 title={
-                    <Typography.Text>Story Backlog ({roomState.stories.length})</Typography.Text>
+                    <Typography.Text>
+                        {t('backlog.title', { total: roomState.stories.length })}
+                    </Typography.Text>
                 }
             >
                 <Flex gap={8} style={{ padding: PANEL_PADDING }} wrap>
@@ -198,11 +207,11 @@ export const StoryBacklog: React.FC = () => {
                                 onClick={() => setIsAdding((previous) => !previous)}
                                 type="primary"
                             >
-                                Add Story
+                                {t('backlog.add')}
                             </Button>
-                            <Tooltip title="Bulk Import Stories (Admin)">
+                            <Tooltip title={t('backlog.bulk')}>
                                 <Button
-                                    aria-label="Bulk import stories"
+                                    aria-label={t('backlog.bulk.aria')}
                                     icon={<UploadOutlined />}
                                     onClick={() => setIsBulkOpen(true)}
                                 />
@@ -210,9 +219,9 @@ export const StoryBacklog: React.FC = () => {
                         </>
                     )}
 
-                    <Tooltip title="Export to CSV">
+                    <Tooltip title={t('backlog.export')}>
                         <Button
-                            aria-label="Export backlog to CSV"
+                            aria-label={t('backlog.export.aria')}
                             icon={<DownloadOutlined />}
                             onClick={() => downloadBacklogCsv(roomState)}
                         />
@@ -222,10 +231,12 @@ export const StoryBacklog: React.FC = () => {
                 {isAdding && isAdmin && (
                     <form onSubmit={handleCreateStory}>
                         <Flex gap={8} style={{ padding: PANEL_PADDING }} vertical>
-                            <Typography.Text strong>New Story Details</Typography.Text>
+                            <Typography.Text strong>{t('backlog.new')}</Typography.Text>
 
                             <div>
-                                <label htmlFor="backlog-new-story-title">Story Title</label>
+                                <label htmlFor="backlog-new-story-title">
+                                    {t('backlog.titleLabel')}
+                                </label>
                                 <Input
                                     id="backlog-new-story-title"
                                     onChange={(event) => setTitle(event.target.value)}
@@ -235,7 +246,7 @@ export const StoryBacklog: React.FC = () => {
 
                             <div>
                                 <label htmlFor="backlog-new-story-description">
-                                    Description / Acceptance Criteria
+                                    {t('backlog.description')}
                                 </label>
                                 <Input.TextArea
                                     autoSize={{ minRows: 2 }}
@@ -246,9 +257,9 @@ export const StoryBacklog: React.FC = () => {
                             </div>
 
                             <Flex gap={8} justify="end">
-                                <Button onClick={closeAddForm}>Cancel</Button>
+                                <Button onClick={closeAddForm}>{t('common.cancel')}</Button>
                                 <Button disabled={!title.trim()} htmlType="submit" type="primary">
-                                    Save Story
+                                    {t('backlog.save')}
                                 </Button>
                             </Flex>
                         </Flex>
@@ -257,7 +268,10 @@ export const StoryBacklog: React.FC = () => {
 
                 {roomState.stories.length === 0 ? (
                     <Flex justify="center" style={{ padding: PANEL_PADDING }}>
-                        <Empty description="No stories yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                        <Empty
+                            description={t('backlog.empty')}
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        />
                     </Flex>
                 ) : (
                     <Flex component="ul" vertical>
@@ -286,9 +300,20 @@ export const StoryBacklog: React.FC = () => {
                                                 >
                                                     {`${index + 1}. ${story.title}`}
                                                 </Typography.Text>
-                                                {renderStoryStatus(story)}
+                                                {renderStoryStatus(story.status, t)}
                                                 {hasEstimate && (
-                                                    <Tag>{`Score: ${story.finalEstimate}`}</Tag>
+                                                    <Tag>
+                                                        {t('backlog.score', {
+                                                            value: String(story.finalEstimate),
+                                                        })}
+                                                    </Tag>
+                                                )}
+                                                {story.rounds.length > 0 && (
+                                                    <Tag>
+                                                        {t('backlog.rounds', {
+                                                            count: story.rounds.length,
+                                                        })}
+                                                    </Tag>
                                                 )}
                                             </Space>
                                             {story.description && (
@@ -298,44 +323,82 @@ export const StoryBacklog: React.FC = () => {
                                             )}
                                         </Flex>
 
-                                        {isAdmin && (
-                                            <Space size={4}>
-                                                <Tooltip title="Edit Score">
-                                                    <Button
-                                                        aria-label={`Edit score for ${story.title}`}
-                                                        icon={<EditOutlined />}
-                                                        onClick={() => openScoreDraft(story)}
-                                                        size="small"
-                                                        type="text"
-                                                    />
-                                                </Tooltip>
-                                                {!isActive && (
-                                                    <Tooltip title="Estimate This Story (Admin)">
+                                        <Space size={4}>
+                                            <Tooltip title={t('backlog.breakdown')}>
+                                                <Button
+                                                    aria-label={t('backlog.breakdown')}
+                                                    icon={<ProfileOutlined />}
+                                                    onClick={() => setBreakdownStoryId(story.id)}
+                                                    size="small"
+                                                    type="text"
+                                                />
+                                            </Tooltip>
+
+                                            {isAdmin && (
+                                                <>
+                                                    <Tooltip
+                                                        title={t('backlog.edit.aria', {
+                                                            title: story.title,
+                                                        })}
+                                                    >
                                                         <Button
-                                                            aria-label={`Estimate ${story.title}`}
-                                                            icon={<PlayCircleOutlined />}
-                                                            onClick={() =>
-                                                                setPendingStoryIndex(index)
-                                                            }
+                                                            aria-label={t('backlog.edit.aria', {
+                                                                title: story.title,
+                                                            })}
+                                                            icon={<EditOutlined />}
+                                                            onClick={() => openScoreDraft(story)}
                                                             size="small"
                                                             type="text"
                                                         />
                                                     </Tooltip>
-                                                )}
-                                                {roomState.stories.length > 1 && (
-                                                    <Tooltip title="Delete Story">
-                                                        <Button
-                                                            aria-label={`Delete ${story.title}`}
-                                                            danger
-                                                            icon={<DeleteOutlined />}
-                                                            onClick={() => deleteStory(story.id)}
-                                                            size="small"
-                                                            type="text"
-                                                        />
-                                                    </Tooltip>
-                                                )}
-                                            </Space>
-                                        )}
+                                                    {!isActive && (
+                                                        <Tooltip
+                                                            title={t('backlog.estimate.aria', {
+                                                                title: story.title,
+                                                            })}
+                                                        >
+                                                            <Button
+                                                                aria-label={t(
+                                                                    'backlog.estimate.aria',
+                                                                    {
+                                                                        title: story.title,
+                                                                    }
+                                                                )}
+                                                                icon={<PlayCircleOutlined />}
+                                                                onClick={() =>
+                                                                    setPendingStoryIndex(index)
+                                                                }
+                                                                size="small"
+                                                                type="text"
+                                                            />
+                                                        </Tooltip>
+                                                    )}
+                                                    {roomState.stories.length > 1 && (
+                                                        <Tooltip
+                                                            title={t('backlog.delete.aria', {
+                                                                title: story.title,
+                                                            })}
+                                                        >
+                                                            <Button
+                                                                aria-label={t(
+                                                                    'backlog.delete.aria',
+                                                                    {
+                                                                        title: story.title,
+                                                                    }
+                                                                )}
+                                                                danger
+                                                                icon={<DeleteOutlined />}
+                                                                onClick={() =>
+                                                                    deleteStory(story.id)
+                                                                }
+                                                                size="small"
+                                                                type="text"
+                                                            />
+                                                        </Tooltip>
+                                                    )}
+                                                </>
+                                            )}
+                                        </Space>
                                     </Flex>
                                 </Fragment>
                             );
@@ -357,35 +420,35 @@ export const StoryBacklog: React.FC = () => {
                                 }
                             }}
                         >
-                            Reset Score
+                            {t('results.resetScore')}
                         </Button>
                         <Space>
-                            <Button onClick={closeScoreDraft}>Cancel</Button>
+                            <Button onClick={closeScoreDraft}>{t('common.cancel')}</Button>
                             <Button
                                 disabled={!editScoreValue.trim()}
                                 onClick={saveScoreDraft}
                                 type="primary"
                             >
-                                Save Score
+                                {t('backlog.saveScore')}
                             </Button>
                         </Space>
                     </Flex>
                 }
                 onCancel={closeScoreDraft}
                 open={Boolean(scoreDraft)}
-                title="Edit Story Score"
+                title={t('backlog.edit.title')}
             >
                 <Flex gap={12} vertical>
                     <Typography.Text type="secondary">
-                        {`Set the final score for "${scoreDraft?.title ?? ''}".`}
+                        {t('backlog.edit.body', { title: scoreDraft?.title ?? '' })}
                     </Typography.Text>
 
                     <div>
-                        <label htmlFor="backlog-story-score">Final Estimate / Points</label>
+                        <label htmlFor="backlog-story-score">{t('backlog.edit.label')}</label>
                         <Input
                             id="backlog-story-score"
                             onChange={(event) => setEditScoreValue(event.target.value)}
-                            placeholder="e.g. 1, 2, 3, 5, 8, M"
+                            placeholder={t('backlog.edit.placeholder')}
                             value={editScoreValue}
                         />
                     </div>
@@ -400,26 +463,22 @@ export const StoryBacklog: React.FC = () => {
 
             <Modal
                 okButtonProps={{ disabled: !bulkText.trim() }}
-                okText="Import Stories"
+                okText={t('backlog.import.button')}
                 onCancel={() => setIsBulkOpen(false)}
                 onOk={handleBulkImport}
                 open={isBulkOpen}
-                title="Bulk Import User Stories"
+                title={t('backlog.import.title')}
             >
                 <Flex gap={12} vertical>
-                    <Typography.Text type="secondary">
-                        Paste one story per line, as Title; Description.
-                    </Typography.Text>
+                    <Typography.Text type="secondary">{t('backlog.import.hint')}</Typography.Text>
 
                     <div>
-                        <label htmlFor="backlog-bulk-text">User Stories (One per line)</label>
+                        <label htmlFor="backlog-bulk-text">{t('backlog.import.label')}</label>
                         <Input.TextArea
                             autoSize={{ minRows: 8 }}
                             id="backlog-bulk-text"
                             onChange={(event) => setBulkText(event.target.value)}
-                            placeholder={
-                                'User Login API; Implement OAuth authentication\nDashboard Widgets; Build responsive metrics cards'
-                            }
+                            placeholder={t('backlog.import.placeholder')}
                             value={bulkText}
                         />
                     </div>
@@ -427,7 +486,7 @@ export const StoryBacklog: React.FC = () => {
             </Modal>
 
             <Modal
-                okText="Change Story"
+                okText={t('backlog.change.ok')}
                 onCancel={() => setPendingStoryIndex(null)}
                 onOk={() => {
                     if (pendingStoryIndex !== null) {
@@ -436,13 +495,15 @@ export const StoryBacklog: React.FC = () => {
                     }
                 }}
                 open={pendingStoryIndex !== null}
-                title="Confirm Story Change"
+                title={t('backlog.change.title')}
             >
-                <Typography.Paragraph>
-                    Are you sure you want to change the active story? This will affect all
-                    participants and reset the timer.
-                </Typography.Paragraph>
+                <Typography.Paragraph>{t('backlog.change.body')}</Typography.Paragraph>
             </Modal>
+
+            <StoryBreakdownModal
+                onClose={() => setBreakdownStoryId(null)}
+                story={roomState.stories.find((story) => story.id === breakdownStoryId) ?? null}
+            />
         </>
     );
 };

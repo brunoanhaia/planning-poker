@@ -6,6 +6,7 @@ import {
     DeckType,
     MAX_CUSTOM_DECK_SIZE,
     MAX_ROOMS,
+    MAX_ROUNDS_PER_STORY,
     MAX_TIMER_DURATION_SECONDS,
     MAX_TITLE_LENGTH,
     MIN_CUSTOM_DECK_SIZE,
@@ -18,7 +19,7 @@ import {
 } from '@planitpoker/shared';
 
 import { DEFAULT_AVATAR, DEFAULT_HOST_COLOR, DEFAULT_TIMER_DURATION_SECONDS } from './constants.js';
-import { generateRoomId, generateStoryId, generateUserId } from './idGenerator.js';
+import { generateRoomId, generateRoundId, generateStoryId, generateUserId } from './idGenerator.js';
 import {
     joinParticipant,
     JoinParticipantResult,
@@ -169,6 +170,7 @@ export class RoomManager {
         const initialStory: Story = {
             description: 'Welcome to Planit Poker! Add story details or estimate this topic.',
             id: generateStoryId(),
+            rounds: [],
             status: 'estimating',
             title: 'First User Story',
         };
@@ -180,6 +182,7 @@ export class RoomManager {
             currentStoryIndex: 0,
             customDeck,
             deckType,
+            endedAt: null,
             hostId,
             id: roomId,
             isEnded: false,
@@ -455,10 +458,19 @@ export class RoomManager {
      */
     public submitVote(roomId: string, userId: string, vote: CardValue): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room) {
+        if (!room || room.votesRevealed) {
             return null;
         }
-        return submitVoteForParticipant(room, userId, vote);
+
+        // Auto-reveal flips the flag from inside the vote, so the round has to be
+        // recorded here: the following manual reveal would see it already true
+        // and skip the snapshot.
+        const wasRevealed = room.votesRevealed;
+        const updated = submitVoteForParticipant(room, userId, vote);
+        if (updated && !wasRevealed && updated.votesRevealed) {
+            this.recordRound(updated);
+        }
+        return updated;
     }
 
     /**
@@ -474,8 +486,47 @@ export class RoomManager {
             return null;
         }
 
+        const wasRevealed = room.votesRevealed;
         room.votesRevealed = true;
+        if (!wasRevealed) {
+            this.recordRound(room);
+        }
         return room;
+    }
+
+    /**
+     * Appends the revealed cards of the active story as a round.
+     *
+     * Called exactly once per reveal: re-revealing an already visible round
+     * would otherwise append a duplicate of the same cards. Only non-spectator
+     * participants that actually cast a card take part, which is what the
+     * results panel counts as a vote.
+     *
+     * @param room - The room whose votes were just revealed.
+     */
+    private recordRound(room: RoomState): void {
+        const story = room.stories[room.currentStoryIndex];
+        if (!story) {
+            return;
+        }
+
+        const votes = room.participants
+            .filter(
+                (participant) =>
+                    !participant.isSpectator &&
+                    participant.vote !== null &&
+                    participant.vote !== undefined
+            )
+            .map((participant) => ({
+                name: participant.name,
+                participantId: participant.id,
+                vote: participant.vote as CardValue,
+            }));
+
+        story.rounds.push({ id: generateRoundId(), revealedAt: Date.now(), votes });
+        if (story.rounds.length > MAX_ROUNDS_PER_STORY) {
+            story.rounds.splice(0, story.rounds.length - MAX_ROUNDS_PER_STORY);
+        }
     }
 
     /**
@@ -759,7 +810,13 @@ export class RoomManager {
             return null;
         }
 
-        room.isEnded = true;
+        // A second END_SESSION — a retry, or a stale tab — must not move the
+        // timestamp: it is the summary's duration, and the client reopens the
+        // dialog whenever it changes.
+        if (!room.isEnded) {
+            room.isEnded = true;
+            room.endedAt = Date.now();
+        }
         return room;
     }
 

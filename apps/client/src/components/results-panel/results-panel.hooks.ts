@@ -1,6 +1,8 @@
-import { Participant, RoomState } from '@planitpoker/shared';
+import { CardValue, Participant, RoomState } from '@planitpoker/shared';
 import confetti from 'canvas-confetti';
 import { useEffect, useMemo } from 'react';
+
+import { VoteStats, computeVoteStats, formatStatValue } from '../../utils/estimation-stats';
 
 /** Particle count and spread used for the full-consensus celebration. */
 const CONFETTI_OPTIONS: confetti.Options = {
@@ -12,14 +14,25 @@ const CONFETTI_OPTIONS: confetti.Options = {
 /** Minimum number of voters before unanimity counts as a consensus. */
 const MIN_CONSENSUS_VOTERS = 2;
 
-interface EstimationStats {
-    average: string;
-    consensusPercentage: number;
+/** Decimals used for the mean, the median and the spread. */
+const DECIMALS_MEAN = 1;
+
+/** Decimals used for the standard deviation, which needs more resolution. */
+const DECIMALS_DEVIATION = 2;
+
+/** Statistics of the active story plus the participants behind them. */
+export interface EstimationStats extends VoteStats {
+    /** Mean rendered for display, or `N/A` when no card carries a number. */
+    averageText: string;
+    /** Whether at least one card carries a number. */
     hasNumeric: boolean;
+    /** `true` when every voter chose the same card. */
     isFullConsensus: boolean;
-    modeVote: string;
-    totalVotes: number;
-    voteCounts: Record<string, number>;
+    /** Median rendered for display, or `N/A` when no card carries a number. */
+    medianText: string;
+    /** Standard deviation rendered for display, or `N/A` without numbers. */
+    deviationText: string;
+    /** Participants whose vote counts towards this story. */
     votedParticipants: Participant[];
 }
 
@@ -40,66 +53,37 @@ export const useEstimationStats = (roomState: null | RoomState): EstimationStats
         );
     }, [roomState]);
 
-    const {
-        average,
-        consensusPercentage,
-        hasNumeric,
-        isFullConsensus,
-        modeVote,
-        totalVotes,
-        voteCounts,
-    } = useMemo(() => {
-        const counts: Record<string, number> = {};
-        const numericVotes: number[] = [];
+    const stats = useMemo(
+        () =>
+            computeVoteStats(
+                votedParticipants.map((participant) => ({
+                    name: participant.name,
+                    vote: participant.vote as CardValue,
+                }))
+            ),
+        [votedParticipants]
+    );
 
-        votedParticipants.forEach((participant) => {
-            const voteKey = String(participant.vote);
-            counts[voteKey] = (counts[voteKey] || 0) + 1;
+    const isFullConsensus =
+        stats.totalVotes >= MIN_CONSENSUS_VOTERS &&
+        stats.totalVotes > 0 &&
+        Object.keys(stats.voteCounts).length === 1;
 
-            const numeric = Number(participant.vote);
-            if (!Number.isNaN(numeric) && typeof participant.vote !== 'symbol') {
-                numericVotes.push(numeric);
-            }
-        });
-
-        const total = votedParticipants.length;
-        const hasNums = numericVotes.length > 0;
-        const sum = numericVotes.reduce((acc, value) => acc + value, 0);
-        const avg = hasNums ? (sum / numericVotes.length).toFixed(1) : 'N/A';
-
-        const highestFreq = Math.max(0, ...Object.values(counts));
-        const consensus = total > 0 ? Math.round((highestFreq / total) * 100) : 0;
-
-        const mode = Object.keys(counts).reduce<null | string>(
-            (best, key) => (best === null || counts[key] > counts[best] ? key : best),
-            null
-        );
-
-        return {
-            average: avg,
-            consensusPercentage: consensus,
-            hasNumeric: hasNums,
-            isFullConsensus: consensus === 100 && total >= MIN_CONSENSUS_VOTERS,
-            modeVote: mode ?? '-',
-            totalVotes: total,
-            voteCounts: counts,
-        };
-    }, [votedParticipants]);
+    const isRevealed = roomState?.votesRevealed === true;
 
     useEffect(() => {
-        if (isFullConsensus && roomState?.votesRevealed) {
+        if (isFullConsensus && isRevealed) {
             confetti(CONFETTI_OPTIONS);
         }
-    }, [isFullConsensus, roomState?.votesRevealed]);
+    }, [isFullConsensus, isRevealed]);
 
     return {
-        average,
-        consensusPercentage,
-        hasNumeric,
+        ...stats,
+        averageText: formatStatValue(stats.average, DECIMALS_MEAN),
+        deviationText: formatStatValue(stats.standardDeviation, DECIMALS_DEVIATION),
+        hasNumeric: stats.numericVotes.length > 0,
         isFullConsensus,
-        modeVote,
-        totalVotes,
-        voteCounts,
+        medianText: formatStatValue(stats.median, DECIMALS_MEAN),
         votedParticipants,
     };
 };

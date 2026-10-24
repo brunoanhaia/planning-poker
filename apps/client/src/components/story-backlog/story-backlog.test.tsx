@@ -1,5 +1,5 @@
 import { MAX_STORIES_PER_ROOM, RoomState, Story } from '@planitpoker/shared';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App as AntApp } from 'antd';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -12,6 +12,7 @@ import { StoryBacklog } from './story-backlog';
 const roomWithStories = (storyCount: number): RoomState => {
     const stories: Story[] = Array.from({ length: storyCount }, (_, index) => ({
         id: `story_${index}`,
+        rounds: [],
         status: 'pending',
         title: `Story ${index}`,
     }));
@@ -22,6 +23,7 @@ const roomWithStories = (storyCount: number): RoomState => {
         createdAt: Date.now(),
         currentStoryIndex: 0,
         deckType: 'fibonacci',
+        endedAt: null,
         hostId: 'user_1',
         id: 'ROOM01',
         isEnded: false,
@@ -120,5 +122,82 @@ describe('StoryBacklog bulk import', () => {
 
         expect(bulkAddStories).not.toHaveBeenCalled();
         expect(screen.getByRole('button', { name: 'Import Stories' })).toBeInTheDocument();
+    });
+});
+
+describe('StoryBacklog breakdown', () => {
+    it('reflects updates and deletion of the selected story', async () => {
+        const roomState = roomWithStories(2);
+        const socket = vi
+            .spyOn(SocketContextModule, 'useSocket')
+            .mockReturnValue(createMockSocketValue({ roomState }));
+        const backlog = (
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+        const { rerender } = render(backlog);
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Breakdown' })[0]);
+        expect(screen.getByRole('dialog')).toHaveTextContent('Story 0');
+
+        const updatedStory: Story = {
+            ...roomState.stories[0],
+            finalEstimate: 8,
+            rounds: [
+                {
+                    id: 'round_1',
+                    revealedAt: Date.now(),
+                    votes: [{ name: 'Alice', participantId: 'user_1', vote: 5 }],
+                },
+            ],
+            title: 'Updated story',
+        };
+        socket.mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...roomState, stories: [updatedStory, roomState.stories[1]] },
+            })
+        );
+        rerender(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        const dialog = within(screen.getByRole('dialog'));
+        expect(dialog.getByText(/Updated story/)).toBeInTheDocument();
+        expect(dialog.getByText('Alice: 5')).toBeInTheDocument();
+        expect(dialog.getByText('8')).toBeInTheDocument();
+
+        socket.mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...roomState, stories: [roomState.stories[1]] },
+            })
+        );
+        rerender(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('clears the selection when closed', async () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ roomState: roomWithStories(2) })
+        );
+        render(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Breakdown' })[0]);
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Breakdown' })[1]);
+        expect(screen.getByRole('dialog')).toHaveTextContent('Story 1');
     });
 });
