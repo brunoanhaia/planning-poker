@@ -1,4 +1,4 @@
-// Consolidated ESLint flat config (ESLint v9+) for the whole monorepo.
+// Consolidated ESLint flat config (ESLint v9/v10) for the whole monorepo.
 //
 // ESLint 9 requires an `eslint.config.*` file at the location it is invoked from.
 // Tooling such as CodeRabbit runs ESLint from the repository root, so a single
@@ -10,7 +10,7 @@ import eslintReact from '@eslint-react/eslint-plugin';
 import eslintPluginPrettier from 'eslint-plugin-prettier/recommended';
 import eslintPluginPerfectionist from 'eslint-plugin-perfectionist';
 import eslintPluginReactHooks from 'eslint-plugin-react-hooks';
-import eslintPluginVitest from 'eslint-plugin-vitest';
+import eslintPluginVitest from '@vitest/eslint-plugin';
 import globals from 'globals';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';

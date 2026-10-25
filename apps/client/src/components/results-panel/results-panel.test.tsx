@@ -1,5 +1,6 @@
 import { RoomState } from '@planitpoker/shared';
 import { fireEvent, render } from '@testing-library/react';
+import { App as AntApp } from 'antd';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -63,7 +64,11 @@ describe('ResultsPanel', () => {
             createMockSocketValue({ roomState: mockRevealedRoomState })
         );
 
-        const screen = render(<ResultsPanel />);
+        const screen = render(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
 
         expect(screen.getByText('Estimation Results')).toBeInTheDocument();
         expect(screen.getByText(/100% Consensus/i)).toBeInTheDocument();
@@ -76,7 +81,11 @@ describe('ResultsPanel', () => {
         const socket = createMockSocketValue({ roomState: mockRevealedRoomState });
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
 
-        const screen = render(<ResultsPanel />);
+        const screen = render(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
         fireEvent.click(screen.getByRole('button', { name: /Accept Avg/i }));
         fireEvent.click(screen.getByRole('button', { name: /Save & Advance/i }));
 
@@ -93,7 +102,11 @@ describe('ResultsPanel', () => {
             })
         );
 
-        const screen = render(<ResultsPanel />);
+        const screen = render(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
 
         expect(screen.getByText('Estimation Results')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Accept Avg/i })).not.toBeInTheDocument();
