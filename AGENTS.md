@@ -58,11 +58,18 @@ npm run format           # prettier across repo
 
 - ESLint is **owned by the root `package.json`** (`lint` / `lint:fix` run `eslint .`). Workspaces have **no** `lint` script — do not add one.
 - ESLint config is **consolidated at the repo root** (`eslint.config.mjs`, flat config). There are no per-workspace `eslint.config.mjs` files.
-- ESLint 9 requires a config at the invocation directory, so the root file is what makes root-level runs (CI, CodeRabbit, editors) work.
+- ESLint 10 requires a config at the invocation directory, so the root file is what makes root-level runs (CI, CodeRabbit, editors) work.
 - Prettier config: 4 spaces, single quotes, `printWidth: 100`, trailing commas `es5`.
 - ESLint forbids `any`: `@typescript-eslint/no-explicit-any` is an **error** in all packages. Use `unknown` and narrow it, or a precise type. (TypeScript's `strict` only blocks _implicit_ `any`; the explicit form is caught by ESLint.)
-- `vitest/no-focused-tests` is an error in client/server.
+- `vitest/no-focused-tests` is an error in client/server, enforced through `@vitest/eslint-plugin` (the successor of `eslint-plugin-vitest`, which stops at ESLint 9).
 - Imports are sorted with `perfectionist/sort-imports`.
+
+## Toolchain
+
+- **ESLint 10** with flat config; the root `package.json` owns the binary so a single install serves every workspace.
+- **TypeScript is held at 6.x**: `typescript-eslint` 8.x peers on `>=4.8.4 <6.1.0`, so 7.x cannot be adopted until the plugin widens that range.
+- **Vitest 5** for the unit suites and **Playwright 1.64** for e2e; after a Playwright bump run `npx playwright install chromium`, since the browser build is pinned per version.
+- **`conventional-changelog` 8** owns the changelog CLI; the older `conventional-changelog-cli` package is stuck on `conventional-changelog` 6 and cannot render the v10 conventionalcommits preset.
 
 ## Versioning & Commits
 
