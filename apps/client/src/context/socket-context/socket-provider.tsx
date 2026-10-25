@@ -5,6 +5,7 @@ import { ERROR_KEYS, TranslationKey } from '../../i18n/dictionary';
 import { Translate } from '../../i18n/i18n-context';
 import { useTranslation } from '../../i18n/use-translation';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
+import { resolveSocketUrl } from '../../utils/socket-url';
 import { SocketContext, SocketContextValue } from './socket-context';
 
 /** Reconnection delay applied whenever the socket drops. */
@@ -71,10 +72,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return;
             }
 
-            const defaultProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const defaultProdUrl = `${defaultProtocol}//${window.location.host}`;
-            const fallbackUrl = import.meta.env.DEV ? 'ws://localhost:5000' : defaultProdUrl;
-            const wsUrl = import.meta.env.VITE_WS_URL || fallbackUrl;
+            const wsUrl = resolveSocketUrl({
+                configuredUrl: import.meta.env.VITE_WS_URL,
+                isDev: import.meta.env.DEV,
+                location: window.location,
+            });
 
             const ws = new WebSocket(wsUrl);
 
