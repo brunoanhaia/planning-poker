@@ -219,7 +219,7 @@ docker compose up --build
 - Client: `http://localhost` (Nginx serves the SPA, proxies `/api/*` and `/ws` to `server`).
 - Server: `http://localhost:5000` (health at `GET /api/health`).
 - Same-origin by default: leave `VITE_WS_URL` empty and the browser uses
-  `window.location.host` through the Nginx `/ws` proxy (no CORS setup needed).
+  `window.location.host` **at `/ws`** through the Nginx proxy (no CORS setup needed); the path is mandatory, because `/` serves the SPA.
 - External backend: `VITE_WS_URL=wss://api.exemplo.com docker compose up --build`
   bakes the URL into the client bundle so the browser dials it directly.
 - Behind TLS: set `CLIENT_ID_COOKIE_SECURE=true` on the server so the
