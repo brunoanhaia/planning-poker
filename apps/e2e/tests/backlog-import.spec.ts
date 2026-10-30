@@ -15,11 +15,7 @@ test.describe('Backlog Import', () => {
             await adminPage.getByRole('button', { name: /^Import Stories$/ }).click();
 
             await expect(adminPage.getByText('Imported 3 stories.')).toBeVisible();
-            await expect(
-                adminPage
-                    .getByRole('heading', { name: 'Story Backlog (4)' })
-                    .or(adminPage.getByText('Story Backlog (4)'))
-            ).toBeVisible();
+            await expect(adminPage.getByText('Story Backlog (4)')).toBeVisible();
             for (const title of ['Story A', 'Story B', 'Story C']) {
                 await expect(
                     adminPage.getByRole('listitem').filter({ hasText: title })
@@ -45,11 +41,7 @@ test.describe('Backlog Import', () => {
             ).toBeVisible();
 
             await adminPage.getByRole('button', { name: 'Cancel' }).click();
-            await expect(
-                adminPage
-                    .getByRole('heading', { name: 'Story Backlog (1)' })
-                    .or(adminPage.getByText('Story Backlog (1)'))
-            ).toBeVisible();
+            await expect(adminPage.getByText('Story Backlog (1)')).toBeVisible();
         } finally {
             await adminContext.close();
         }

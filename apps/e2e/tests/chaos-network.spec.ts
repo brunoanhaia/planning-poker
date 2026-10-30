@@ -10,6 +10,16 @@ import { castVote, createRoom, joinRoom } from './support/room-session';
 
 test.use({ locale: 'en-US' });
 
+/**
+ * Matches only the application socket.
+ *
+ * The protocol is not enough in dev: Vite's HMR socket is a `ws:` URL too, and it
+ * always carries a `?token=` query. Routing it would make the close target depend
+ * on document order and can leave HMR detached, which reloads the page mid-test.
+ */
+const isAppSocket = (url: URL): boolean =>
+    (url.protocol === 'ws:' || url.protocol === 'wss:') && !url.searchParams.has('token');
+
 test.describe('Chaos Network & WebSocket Interception', () => {
     test('a dropped socket reconnects and resumes the session', async ({ browser }) => {
         let adminContext: BrowserContext | undefined;
@@ -24,13 +34,10 @@ test.describe('Chaos Network & WebSocket Interception', () => {
 
             const voterSession = await joinRoom(browser, roomCode, 'Voter 1', {
                 preparePage: async (page) => {
-                    await page.routeWebSocket(
-                        (url) => url.protocol === 'ws:' || url.protocol === 'wss:',
-                        (ws) => {
-                            currentRoute = ws;
-                            ws.connectToServer();
-                        }
-                    );
+                    await page.routeWebSocket(isAppSocket, (ws) => {
+                        currentRoute = ws;
+                        ws.connectToServer();
+                    });
                 },
             });
             voterContext = voterSession.voterContext;
@@ -77,40 +84,37 @@ test.describe('Chaos Network & WebSocket Interception', () => {
 
             const voterSession = await joinRoom(browser, roomCode, 'Voter 1', {
                 preparePage: async (page) => {
-                    await page.routeWebSocket(
-                        (url) => url.protocol === 'ws:' || url.protocol === 'wss:',
-                        (ws) => {
-                            if (!rejectReconnects) {
-                                currentRoute = ws;
-                                ws.connectToServer();
-                                return;
-                            }
-                            // The server the client comes back to no longer
-                            // knows the room, so the rejoin is answered with an
-                            // error instead of a room state.
-                            ws.onMessage((msg) => {
-                                try {
-                                    const parsed =
-                                        typeof msg === 'string'
-                                            ? JSON.parse(msg)
-                                            : JSON.parse(msg.toString('utf-8'));
-                                    if (parsed.type === 'JOIN_ROOM') {
-                                        ws.send(
-                                            JSON.stringify({
-                                                payload: {
-                                                    code: 'ROOM_NOT_FOUND',
-                                                    message: 'Room not found.',
-                                                },
-                                                type: 'ERROR',
-                                            })
-                                        );
-                                    }
-                                } catch {
-                                    // Ignore malformed frames
-                                }
-                            });
+                    await page.routeWebSocket(isAppSocket, (ws) => {
+                        if (!rejectReconnects) {
+                            currentRoute = ws;
+                            ws.connectToServer();
+                            return;
                         }
-                    );
+                        // The server the client comes back to no longer
+                        // knows the room, so the rejoin is answered with an
+                        // error instead of a room state.
+                        ws.onMessage((msg) => {
+                            try {
+                                const parsed =
+                                    typeof msg === 'string'
+                                        ? JSON.parse(msg)
+                                        : JSON.parse(msg.toString('utf-8'));
+                                if (parsed.type === 'JOIN_ROOM') {
+                                    ws.send(
+                                        JSON.stringify({
+                                            payload: {
+                                                code: 'ROOM_NOT_FOUND',
+                                                message: 'Room not found.',
+                                            },
+                                            type: 'ERROR',
+                                        })
+                                    );
+                                }
+                            } catch {
+                                // Ignore malformed frames
+                            }
+                        });
+                    });
                 },
             });
             voterContext = voterSession.voterContext;
@@ -139,28 +143,27 @@ test.describe('Chaos Network & WebSocket Interception', () => {
         let adminPage: Page | undefined;
         let voterPage: Page | undefined;
         let duplicateFrames = false;
+        let duplicatedFrames = 0;
         let adminServer: WebSocketRoute | null = null;
 
         /** Routes the socket through the proxy and optionally duplicates page frames. */
         const proxyAndDuplicate = (captureServerRoute: boolean) => async (page: Page) => {
-            await page.routeWebSocket(
-                (url) => url.protocol === 'ws:' || url.protocol === 'wss:',
-                (ws) => {
-                    const server = ws.connectToServer();
-                    if (captureServerRoute) {
-                        // The server-side half of the route is how the test plays
-                        // the page: a frame sent there reaches the server as if
-                        // the browser had sent it.
-                        adminServer = server;
-                    }
-                    ws.onMessage((message) => {
-                        server.send(message);
-                        if (duplicateFrames) {
-                            server.send(message);
-                        }
-                    });
+            await page.routeWebSocket(isAppSocket, (ws) => {
+                const server = ws.connectToServer();
+                if (captureServerRoute) {
+                    // The server-side half of the route is how the test plays
+                    // the page: a frame sent there reaches the server as if
+                    // the browser had sent it.
+                    adminServer = server;
                 }
-            );
+                ws.onMessage((message) => {
+                    server.send(message);
+                    if (duplicateFrames) {
+                        server.send(message);
+                        duplicatedFrames += 1;
+                    }
+                });
+            });
         };
 
         try {
@@ -180,6 +183,11 @@ test.describe('Chaos Network & WebSocket Interception', () => {
             duplicateFrames = true;
 
             await castVote(voterPage, 5);
+
+            // The duplicated delivery has to have happened before the state
+            // assertions below mean anything: without this, a harness that never
+            // duplicates would keep the test green.
+            await expect.poll(() => duplicatedFrames).toBeGreaterThan(0);
 
             await adminPage.getByRole('button', { name: /Reveal Votes/i }).click();
 
@@ -234,16 +242,13 @@ test.describe('Chaos Network & WebSocket Interception', () => {
         };
 
         const setupDelayedRoute = async (page: Page) => {
-            await page.routeWebSocket(
-                (url) => url.protocol === 'ws:' || url.protocol === 'wss:',
-                (ws) => {
-                    const server = ws.connectToServer();
-                    const sendToServer = createDelayedSender((msg) => server.send(msg), 800);
-                    const sendToClient = createDelayedSender((msg) => ws.send(msg), 800);
-                    ws.onMessage(sendToServer);
-                    server.onMessage(sendToClient);
-                }
-            );
+            await page.routeWebSocket(isAppSocket, (ws) => {
+                const server = ws.connectToServer();
+                const sendToServer = createDelayedSender((msg) => server.send(msg), 800);
+                const sendToClient = createDelayedSender((msg) => ws.send(msg), 800);
+                ws.onMessage(sendToServer);
+                server.onMessage(sendToClient);
+            });
         };
 
         try {
@@ -289,27 +294,24 @@ test.describe('Chaos Network & WebSocket Interception', () => {
 
             const voterSession = await joinRoom(browser, roomCode, 'Voter 1', {
                 preparePage: async (page) => {
-                    await page.routeWebSocket(
-                        (url) => url.protocol === 'ws:' || url.protocol === 'wss:',
-                        (ws) => {
-                            const server = ws.connectToServer();
-                            ws.onMessage((message) => {
-                                try {
-                                    const parsed =
-                                        typeof message === 'string'
-                                            ? JSON.parse(message)
-                                            : JSON.parse(message.toString('utf-8'));
-                                    if (parsed.type === 'VOTE' && !droppedFirstVote) {
-                                        droppedFirstVote = true;
-                                        return;
-                                    }
-                                } catch {
-                                    // Ignore non-json frames
+                    await page.routeWebSocket(isAppSocket, (ws) => {
+                        const server = ws.connectToServer();
+                        ws.onMessage((message) => {
+                            try {
+                                const parsed =
+                                    typeof message === 'string'
+                                        ? JSON.parse(message)
+                                        : JSON.parse(message.toString('utf-8'));
+                                if (parsed.type === 'VOTE' && !droppedFirstVote) {
+                                    droppedFirstVote = true;
+                                    return;
                                 }
-                                server.send(message);
-                            });
-                        }
-                    );
+                            } catch {
+                                // Ignore non-json frames
+                            }
+                            server.send(message);
+                        });
+                    });
                 },
             });
             voterContext = voterSession.voterContext;

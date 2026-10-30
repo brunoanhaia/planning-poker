@@ -28,9 +28,18 @@ test.describe('Content Stress', () => {
                     name: /^(Import Stories|Importar Histórias)$/i,
                 });
                 await importSubmit.click();
-                // The dialog closing is the completion signal: measuring before
-                // the imported rows render would pass without exercising them.
-                await expect(bulkInput).toBeHidden();
+                // The import dialog closes before the server answers, so the
+                // dialog is not a completion signal: assert the row itself, the
+                // 120-character title and the 2000-character description that
+                // have to survive a 320 px viewport.
+                const importedRow = adminPage
+                    .getByRole('listitem')
+                    .filter({ hasText: 'T'.repeat(120) });
+                await expect(importedRow).toBeVisible();
+                await expect(importedRow).toContainText('D'.repeat(2000));
+                await expect(
+                    adminPage.getByText(/Story Backlog \(2\)|Backlog de Histórias \(2\)/)
+                ).toBeVisible();
 
                 await expect
                     .poll(async () =>

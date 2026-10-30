@@ -248,10 +248,13 @@ async function testRepeatedCreate(wsUrl, httpUrl) {
 
 /**
  * Case 5: Connection storm.
- * Opens 50 sockets and closes them immediately. Expects health 200.
+ * Opens 50 sockets and closes them immediately. Expects every handshake to be
+ * accepted and health 200: a storm that is refused outright would otherwise
+ * pass with no socket ever opened.
  */
 async function testConnectionStorm(wsUrl, httpUrl) {
     const STORM_COUNT = 50;
+    let opened = 0;
     const socketPromises = [];
 
     for (let i = 0; i < STORM_COUNT; i++) {
@@ -259,6 +262,7 @@ async function testConnectionStorm(wsUrl, httpUrl) {
             new Promise((resolve) => {
                 const ws = new WebSocket(wsUrl);
                 ws.on('open', () => {
+                    opened += 1;
                     ws.close();
                 });
                 ws.on('close', () => resolve());
@@ -270,6 +274,11 @@ async function testConnectionStorm(wsUrl, httpUrl) {
     }
 
     await Promise.all(socketPromises);
+
+    if (opened !== STORM_COUNT) {
+        throw new Error(`Expected ${STORM_COUNT} accepted handshakes, got ${opened}`);
+    }
+
     await checkHealth(httpUrl);
 }
 
@@ -327,9 +336,12 @@ async function main() {
         `\nChaos summary: ${passedCount} passed, ${failedCount} failed (${cases.length} total)`
     );
 
-    // Exit explicitly: a case that timed out may still hold a socket open, and
-    // an open socket would keep the event loop alive after the FAIL is printed.
-    process.exit(failedCount > 0 ? 1 : 0);
+    // `process.exit()` drops pending writes, and stdout is a pipe when the gate
+    // captures this run, so the report is flushed first and the exit code set
+    // before exiting; a timed-out case may still hold a socket open.
+    process.exitCode = failedCount > 0 ? 1 : 0;
+    await new Promise((resolve) => process.stdout.write('', resolve));
+    process.exit(process.exitCode);
 }
 
 main().catch((err) => {

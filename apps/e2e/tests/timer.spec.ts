@@ -13,10 +13,14 @@ test.describe('Timer', () => {
             voterContext = voterSession.voterContext;
             const { voterPage } = voterSession;
 
-            await expect(voterPage.getByRole('button', { name: 'Reset Timer' })).toHaveCount(0);
+            await expect(voterPage.getByRole('button', { name: 'Start Timer' })).toHaveCount(0);
 
             await adminPage.getByRole('button', { name: 'Start Timer' }).click();
             await adminPage.getByRole('menuitem', { name: '30 Seconds' }).click();
+
+            // The reset control only exists once the timer does, so the role gate
+            // has to be asserted here rather than before the countdown starts.
+            await expect(voterPage.getByRole('button', { name: 'Reset Timer' })).toHaveCount(0);
 
             const adminTimer = adminPage.getByText(/^\d:\d{2}$/);
             const voterTimer = voterPage.getByText(/^\d:\d{2}$/);

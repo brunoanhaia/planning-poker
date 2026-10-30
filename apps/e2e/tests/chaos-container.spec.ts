@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 
 import { createRoom, joinRoom } from './support/room-session';
 
@@ -9,9 +9,14 @@ const clientContainer = process.env.CHAOS_CLIENT_CONTAINER ?? 'planitpoker-clien
 
 test.use({ locale: 'en-US' });
 
-/** Restarts a compose container through podman and waits for it to exit the call. */
+/**
+ * Restarts a compose container through podman.
+ *
+ * `execFileSync` blocks the event loop, so the test timeout cannot fire while a
+ * stuck `podman stop` is running: the call carries its own bound instead.
+ */
 const restartContainer = (name: string): void => {
-    execFileSync('podman', ['restart', name], { stdio: 'pipe' });
+    execFileSync('podman', ['restart', name], { stdio: 'pipe', timeout: 60_000 });
 };
 
 test.describe('Deployment chaos', () => {
@@ -22,9 +27,13 @@ test.describe('Deployment chaos', () => {
             'Admin',
             'Web tier'
         );
-        const { voterContext, voterPage } = await joinRoom(browser, roomCode, 'Voter 1');
+        let voterContext: BrowserContext | undefined;
 
         try {
+            const voterSession = await joinRoom(browser, roomCode, 'Voter 1');
+            voterContext = voterSession.voterContext;
+            const { voterPage } = voterSession;
+
             restartContainer(clientContainer);
 
             // The browser reconnects through the restarted proxy and rejoins on
@@ -53,7 +62,7 @@ test.describe('Deployment chaos', () => {
                     .getByText('5.0')
             ).toBeVisible();
         } finally {
-            await voterContext.close();
+            await voterContext?.close();
             await adminContext.close();
         }
     });
@@ -61,9 +70,13 @@ test.describe('Deployment chaos', () => {
     test('restarting the server loses the room and the client says so', async ({ browser }) => {
         test.setTimeout(90_000);
         const { adminContext, roomCode } = await createRoom(browser, 'Admin', 'Server tier');
-        const { voterContext, voterPage } = await joinRoom(browser, roomCode, 'Voter 1');
+        let voterContext: BrowserContext | undefined;
 
         try {
+            const voterSession = await joinRoom(browser, roomCode, 'Voter 1');
+            voterContext = voterSession.voterContext;
+            const { voterPage } = voterSession;
+
             restartContainer(serverContainer);
             // Nginx keeps the resolved upstream address, so the deploy order
             // restarts the proxy right after the server.
@@ -83,7 +96,7 @@ test.describe('Deployment chaos', () => {
                 .click();
             await expect(voterPage.getByText(/^Room: /i).first()).toBeVisible();
         } finally {
-            await voterContext.close();
+            await voterContext?.close();
             await adminContext.close();
         }
     });

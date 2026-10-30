@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 
 import {
     castVote,
@@ -19,10 +19,14 @@ test.describe('Rounds and Session Summary', () => {
             'Admin',
             'Two Rounds Session'
         );
-        const { voterContext, voterPage } = await joinRoom(browser, roomCode, 'Voter 1');
-        // The contexts are closed in `finally` below, so a failed assertion
-        // cannot leave sockets open for the rest of the worker.
+        let voterContext: BrowserContext | undefined;
+        // Everything after the room exists lives in `try`, so a failed join or a
+        // failed assertion cannot leave a socket open for the rest of the worker.
         try {
+            const voterSession = await joinRoom(browser, roomCode, 'Voter 1');
+            voterContext = voterSession.voterContext;
+            const { voterPage } = voterSession;
+
             // Round 1: Both cast votes
             await castVote(adminPage, 3);
             await castVote(voterPage, 5);
@@ -86,7 +90,7 @@ test.describe('Rounds and Session Summary', () => {
             await expect(breakdownModal.getByText('Round 1')).toBeVisible();
             await expect(breakdownModal.getByText('Round 2')).toBeVisible();
         } finally {
-            await voterContext.close();
+            await voterContext?.close();
             await adminContext.close();
         }
     });
@@ -99,9 +103,13 @@ test.describe('Rounds and Session Summary', () => {
             'Admin',
             'Summary Test Session'
         );
-        const { voterContext, voterPage } = await joinRoom(browser, roomCode, 'Voter 1');
+        let voterContext: BrowserContext | undefined;
 
         try {
+            const voterSession = await joinRoom(browser, roomCode, 'Voter 1');
+            voterContext = voterSession.voterContext;
+            const { voterPage } = voterSession;
+
             // Cast votes and reveal
             await castVote(adminPage, 5);
             await castVote(voterPage, 5);
@@ -140,7 +148,7 @@ test.describe('Rounds and Session Summary', () => {
             await summaryDialog.getByText('1. First User Story').click();
             await expect(summaryDialog.getByText(/Final estimate:/i)).toBeVisible();
         } finally {
-            await voterContext.close();
+            await voterContext?.close();
             await adminContext.close();
         }
     });
@@ -151,9 +159,13 @@ test.describe('Rounds and Session Summary', () => {
             'Admin',
             'Export Test Session'
         );
-        const { voterContext, voterPage } = await joinRoom(browser, roomCode, 'Voter 1');
+        let voterContext: BrowserContext | undefined;
 
         try {
+            const voterSession = await joinRoom(browser, roomCode, 'Voter 1');
+            voterContext = voterSession.voterContext;
+            const { voterPage } = voterSession;
+
             // Round 1
             await castVote(adminPage, 3);
             await castVote(voterPage, 5);
@@ -201,7 +213,7 @@ test.describe('Rounds and Session Summary', () => {
             expect(lines[2]).toContain('"First User Story"');
             expect(lines[2]).toContain('"2"');
         } finally {
-            await voterContext.close();
+            await voterContext?.close();
             await adminContext.close();
         }
     });
