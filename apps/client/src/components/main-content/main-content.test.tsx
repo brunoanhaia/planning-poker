@@ -1,5 +1,5 @@
 import { RoomState } from '@planitpoker/shared';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, within } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -170,6 +170,20 @@ describe('MainContent', () => {
         expect(reset).toBeEnabled();
         fireEvent.click(reset);
         expect(socket.updateStoryEstimate).toHaveBeenCalledWith('story_1', null);
+    });
+
+    it('shows a server rejection inside the room and lets it be dismissed', () => {
+        const socket = createMockSocketValue({
+            error: 'Too many requests. Try again in a minute.',
+            roomState: mockRoomState,
+        });
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+
+        const screen = renderMainContent();
+
+        expect(screen.getByText('Too many requests. Try again in a minute.')).toBeInTheDocument();
+        fireEvent.click(within(screen.getByRole('alert')).getByRole('button'));
+        expect(socket.clearError).toHaveBeenCalled();
     });
 
     it('waits for the host instead of offering reveal to a plain voter', () => {
