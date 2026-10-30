@@ -12,6 +12,7 @@ import {
 import {
     App as AntApp,
     Avatar,
+    Badge,
     Button,
     Flex,
     Input,
@@ -66,8 +67,15 @@ export interface NavbarProps {
  * header degrades from a single row into several rows instead of overlapping.
  */
 export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onToggleColorMode }) => {
-    const { currentUserId, isAdmin, leaveRoom, roomState, toggleSpectator, updateRoomTitle } =
-        useSocket();
+    const {
+        currentUserId,
+        isAdmin,
+        isConnected,
+        leaveRoom,
+        roomState,
+        toggleSpectator,
+        updateRoomTitle,
+    } = useSocket();
     const { t } = useTranslation();
     const { message } = AntApp.useApp();
     const { token } = theme.useToken();
@@ -218,6 +226,13 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                 />
                             </Tooltip>
                         )}
+
+                        {/* The live region stays mounted: a region inserted with
+                            its content already inside is often skipped by screen
+                            readers, so only the badge is conditional. */}
+                        <span aria-live="polite" role="status">
+                            {!isConnected && <Badge status="error" text={t('error.offline')} />}
+                        </span>
 
                         <Tooltip title={t('nav.leave')}>
                             <Button

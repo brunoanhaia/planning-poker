@@ -14,6 +14,13 @@ const RECONNECT_DELAY_MS = 2000;
 /** Session storage key holding the token that survives a page reload. */
 const SESSION_TOKEN_STORAGE_KEY = 'planit_session_token';
 
+/** Errors that mean the room or session the client holds is gone, not merely unreachable. */
+const SESSION_LOST_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
+    'BANNED',
+    'NO_SESSION',
+    'ROOM_NOT_FOUND',
+]);
+
 /**
  * A server notice as received, kept untranslated.
  *
@@ -54,9 +61,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [isKicked, setIsKicked] = useState(false);
     const socketRef = useRef<null | WebSocket>(null);
     const sessionTokenRef = useRef<null | string>(null);
+    const roomStateRef = useRef<null | RoomState>(null);
+    const currentUserIdRef = useRef<null | string>(null);
 
     useEffect(() => {
         sessionTokenRef.current = sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+    }, []);
+
+    const forgetSession = useCallback(() => {
+        roomStateRef.current = null;
+        currentUserIdRef.current = null;
+        sessionTokenRef.current = null;
+        sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+        setRoomState(null);
+        setCurrentUserId(null);
+    }, []);
+
+    const send = useCallback((type: WSMessageType, payload: unknown) => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ payload, type }));
+        } else {
+            setErrorNotice({ key: 'error.offline' });
+        }
     }, []);
 
     useEffect(() => {
@@ -79,6 +105,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
 
             const ws = new WebSocket(wsUrl);
+            socketRef.current = ws;
 
             ws.onopen = () => {
                 if (!isMounted) {
@@ -86,6 +113,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
                 setIsConnected(true);
                 setErrorNotice(null);
+
+                const room = roomStateRef.current;
+                const userId = currentUserIdRef.current;
+                const token = sessionTokenRef.current;
+                const self = room?.participants.find((participant) => participant.id === userId);
+                if (room && token && userId && self) {
+                    send('JOIN_ROOM', {
+                        avatar: self.avatar,
+                        color: self.color,
+                        name: self.name,
+                        roomId: room.id,
+                        sessionToken: token,
+                        userId,
+                    });
+                }
             };
 
             ws.onmessage = (event) => {
@@ -95,20 +137,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 try {
                     const { payload, type } = JSON.parse(event.data);
                     if (type === 'ROOM_STATE') {
+                        roomStateRef.current = payload.roomState;
                         setRoomState(payload.roomState);
                         if (payload.currentUserId) {
+                            currentUserIdRef.current = payload.currentUserId;
                             setCurrentUserId(payload.currentUserId);
                         }
                     } else if (type === 'SESSION') {
                         sessionTokenRef.current = payload.sessionToken;
                         sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, payload.sessionToken);
                         if (payload.userId) {
+                            currentUserIdRef.current = payload.userId;
                             setCurrentUserId(payload.userId);
                         }
                     } else if (type === 'KICKED') {
-                        setRoomState(null);
-                        sessionTokenRef.current = null;
-                        sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+                        forgetSession();
                         setIsKicked(true);
                     } else if (type === 'ERROR') {
                         const errorPayload = payload as ErrorPayload;
@@ -116,6 +159,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             code: errorPayload.code,
                             message: errorPayload.message,
                         });
+                        if (errorPayload.code && SESSION_LOST_CODES.has(errorPayload.code)) {
+                            forgetSession();
+                        }
                     }
                 } catch (err) {
                     console.error('Failed to parse WS payload:', err);
@@ -140,8 +186,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setIsConnected(false);
                 }
             };
-
-            socketRef.current = ws;
         };
 
         connect();
@@ -155,15 +199,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 socketRef.current.close();
             }
         };
-    }, []);
-
-    const send = useCallback((type: WSMessageType, payload: unknown) => {
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ payload, type }));
-        } else {
-            setErrorNotice({ key: 'error.offline' });
-        }
-    }, []);
+    }, [forgetSession, send]);
 
     const createRoom = useCallback(
         (
@@ -321,9 +357,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [send]);
 
     const leaveRoom = useCallback(() => {
-        setRoomState(null);
+        forgetSession();
         window.location.hash = '';
-    }, []);
+    }, [forgetSession]);
 
     const clearError = useCallback(() => setErrorNotice(null), []);
     const clearKickedMessage = useCallback(() => setIsKicked(false), []);
