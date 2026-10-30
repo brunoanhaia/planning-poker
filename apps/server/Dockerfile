@@ -43,12 +43,14 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/apps/server/dist ./apps/server/dist
 
+COPY apps/server/healthcheck.mjs ./apps/server/healthcheck.mjs
+
 USER node
 
 EXPOSE 5000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "fetch('http://localhost:5000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+    CMD ["node", "/app/apps/server/healthcheck.mjs"]
 
 WORKDIR /app/apps/server
 

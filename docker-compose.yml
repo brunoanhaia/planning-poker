@@ -36,13 +36,10 @@ services:
             # TRUST_PROXY_HOPS is what applies there.
             - CLOUDFLARE_ENABLED=${CLOUDFLARE_ENABLED:-}
         healthcheck:
-            test:
-                [
-                    'CMD',
-                    'node',
-                    '-e',
-                    "fetch('http://localhost:5000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
-                ]
+            # A file path, not an inline expression: podman-compose flattens
+            # this array into one shell command, where `(` from JavaScript
+            # arrow functions is a syntax error.
+            test: ['CMD', 'node', '/app/apps/server/healthcheck.mjs']
             interval: 30s
             timeout: 5s
             start_period: 10s
