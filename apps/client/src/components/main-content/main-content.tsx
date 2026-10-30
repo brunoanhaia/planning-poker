@@ -36,7 +36,8 @@ export interface MainContentProps {
  * a single panel: the admin settings modal and the "removed from session" notice.
  */
 export const MainContent: React.FC<MainContentProps> = ({ colorMode, onToggleColorMode }) => {
-    const { clearError, clearKickedMessage, error, kickedMessage, roomState } = useSocket();
+    const { clearError, clearKickedMessage, error, isConnected, kickedMessage, roomState } =
+        useSocket();
     const { t } = useTranslation();
     const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -51,13 +52,14 @@ export const MainContent: React.FC<MainContentProps> = ({ colorMode, onToggleCol
             />
 
             <Layout.Content style={CONTENT_PADDING}>
-                {roomState && error && (
+                {roomState && isConnected && error && (
                     // Server rejections (a rate limit, a stale vote) used to be
                     // rendered only on the lobby, leaving an error invisible to
-                    // anyone already inside a room.
+                    // anyone already inside a room. While the transport is down
+                    // the navbar announces the outage instead, so the same string
+                    // is not shown twice.
                     <Alert
-                        closable
-                        onClose={clearError}
+                        closable={{ onClose: clearError }}
                         style={{ marginBlockEnd: PANEL_GUTTER }}
                         title={error}
                         type="error"

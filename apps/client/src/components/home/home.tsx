@@ -89,7 +89,11 @@ export const Home: React.FC = () => {
                                 heading-5 token so the step label is unchanged. */}
                             <Typography.Title
                                 level={2}
-                                style={{ fontSize: token.fontSizeHeading5, marginBlock: 0 }}
+                                style={{
+                                    fontSize: token.fontSizeHeading5,
+                                    lineHeight: token.lineHeightHeading5,
+                                    marginBlock: 0,
+                                }}
                             >
                                 {t('home.profile')}
                             </Typography.Title>

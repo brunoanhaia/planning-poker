@@ -86,11 +86,14 @@ const room: RoomState = {
 
 /** Renders the connection state the provider exposes. */
 const Probe = () => {
-    const { error, roomState } = useSocket();
+    const { error, leaveRoom, roomState } = useSocket();
     return (
         <>
             <span>{roomState ? 'room' : 'lobby'}</span>
             <span>{error ?? ''}</span>
+            <button onClick={leaveRoom} type="button">
+                leave
+            </button>
         </>
     );
 };
@@ -183,5 +186,48 @@ describe('SocketProvider reconnection', () => {
         expect(screen.getByText('lobby')).toBeInTheDocument();
         expect(screen.getByText('Room not found. Please check the room code.')).toBeInTheDocument();
         expect(sessionStorage.getItem('planit_session_token')).toBeNull();
+    });
+
+    it('keeps the credential when the user leaves, so nothing rejoins on its own', () => {
+        renderProbe();
+        const first = enterRoom();
+
+        act(() => screen.getByRole('button', { name: 'leave' }).click());
+        expect(screen.getByText('lobby')).toBeInTheDocument();
+        // The server keeps the participant and only this token can rebind it, so
+        // dropping it here would mint a duplicate on the next manual join.
+        expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
+
+        act(() => first.drop());
+        act(() => vi.advanceTimersByTime(2000));
+
+        const second = FakeWebSocket.instances[1];
+        act(() => second.open());
+
+        expect(second.sent).toEqual([]);
+    });
+
+    it('drops a notice raised on the lobby once the room is entered', () => {
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => socket.open());
+
+        act(() =>
+            socket.receive({
+                payload: { code: 'ROOM_NOT_FOUND', message: 'Room not found.' },
+                type: 'ERROR',
+            })
+        );
+        expect(screen.getByText('Room not found. Please check the room code.')).toBeInTheDocument();
+
+        act(() =>
+            socket.receive({
+                payload: { currentUserId: 'u1', roomState: room },
+                type: 'ROOM_STATE',
+            })
+        );
+
+        expect(screen.getByText('room')).toBeInTheDocument();
+        expect(screen.queryByText('Room not found. Please check the room code.')).toBeNull();
     });
 });

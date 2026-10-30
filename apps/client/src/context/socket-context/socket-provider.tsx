@@ -137,8 +137,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 try {
                     const { payload, type } = JSON.parse(event.data);
                     if (type === 'ROOM_STATE') {
+                        const isEnteringRoom = roomStateRef.current === null;
                         roomStateRef.current = payload.roomState;
                         setRoomState(payload.roomState);
+                        if (isEnteringRoom) {
+                            // A notice raised on the lobby (a stale room code, a
+                            // rate limit) must not follow the user into the room
+                            // they just entered; notices raised inside a room stay.
+                            setErrorNotice(null);
+                        }
                         if (payload.currentUserId) {
                             currentUserIdRef.current = payload.currentUserId;
                             setCurrentUserId(payload.currentUserId);
@@ -357,9 +364,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [send]);
 
     const leaveRoom = useCallback(() => {
-        forgetSession();
+        // Leaving is client-side only: no LEAVE message exists, so the server
+        // keeps this participant bound to the socket and only the session token
+        // can rebind it. The token therefore survives, while the room refs are
+        // cleared so `onopen` cannot re-enter the room on its own.
+        roomStateRef.current = null;
+        currentUserIdRef.current = null;
+        setRoomState(null);
+        setCurrentUserId(null);
         window.location.hash = '';
-    }, [forgetSession]);
+    }, []);
 
     const clearError = useCallback(() => setErrorNotice(null), []);
     const clearKickedMessage = useCallback(() => setIsKicked(false), []);
