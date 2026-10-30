@@ -10,4 +10,10 @@
  */
 export default {
     extends: ['@commitlint/config-conventional'],
+    rules: {
+        // The conventional preset only warns on this one, while AGENTS.md says a
+        // body without a leading blank line is rejected.
+        'body-leading-blank': [2, 'always'],
+        'footer-leading-blank': [2, 'always'],
+    },
 };
