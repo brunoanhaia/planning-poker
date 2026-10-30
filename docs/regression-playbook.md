@@ -5,7 +5,8 @@ experiments that prove the transport and deployment survive faults, and the expl
 charters that cover what no assertion owns. Run it before a release and after any change to
 the real-time surface.
 
-- **Last executed:** 2026-10-27 on `d6bb70c` (branch `test/pre-regression`)
+- **Last executed:** 2026-10-30 on `test/launch-regression` (started from `d6bb70c`,
+  every gate rerun after the review fixes)
 - **Status legend:** PASS (observed) · FAIL (fixed at root cause, gate rerun) · BLOCKED
   (cannot run on this host, never reported as green)
 
@@ -32,29 +33,46 @@ the real-time surface.
 
 Run in this order; each command's observable is the pass condition.
 
-| #   | Command                                                                                                     | Expected                                                                            |
-| --- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 1   | `git rev-parse HEAD && git status --porcelain`                                                              | known commit, clean tree                                                            |
-| 2   | `npm run build:shared && npm run build`                                                                     | exit 0                                                                              |
-| 3   | `npm run lint`                                                                                              | exit 0                                                                              |
-| 4   | `npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"`                                                   | `All matched files use Prettier code style!`                                        |
-| 5   | `npm audit --omit=dev --audit-level=high`                                                                   | `found 0 vulnerabilities`                                                           |
-| 6   | `npm run test:server`                                                                                       | 14 files / 225 tests passed                                                         |
-| 7   | `npm run test:client`                                                                                       | 16 files / 98 tests passed                                                          |
-| 8   | `npm --workspace=@planitpoker/e2e run test`                                                                 | 32 passed (dev servers started by Playwright)                                       |
-| 9   | `PORT=5000 ALLOWED_ORIGINS=http://localhost:5173 node apps/server/dist/index.js` + curl                     | health `{"status":"ok"}`, five security headers, handshake `101`, evil origin `403` |
-| 10  | `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:5000 --ws ws://localhost:5000/ws`                 | `5 passed, 0 failed`                                                                |
-| 11  | `CLIENT_PORT=8080 SERVER_PORT=5000 ALLOWED_ORIGINS=http://localhost:8080 podman-compose up -d --build`      | both containers up, healthcheck passing                                             |
-| 12  | `E2E_BASE_URL=http://localhost:8080 npm --workspace=@planitpoker/e2e run test`                              | 32 passed against the containers (same-origin `/ws`)                                |
-| 13  | `cd apps/e2e && E2E_BASE_URL=http://localhost:8080 npx playwright test --config=playwright.chaos.config.ts` | 2 container-chaos tests passed                                                      |
-| 14  | `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:8080 --ws ws://localhost:8080/ws`                 | `5 passed, 0 failed` through Nginx                                                  |
-| 15  | `podman-compose down -v && podman rmi planitpoker-client:local planitpoker-server:local`                    | `podman ps -a` shows no leftovers                                                   |
+| #   | Command                                                                                                             | Expected                                                                            |
+| --- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 1   | `git rev-parse HEAD && git status --porcelain`                                                                      | known commit, clean tree                                                            |
+| 2   | `npm run build:shared && npm run build`                                                                             | exit 0                                                                              |
+| 3   | `npm run lint`                                                                                                      | exit 0                                                                              |
+| 4   | `npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"`                                                           | `All matched files use Prettier code style!`                                        |
+| 5   | `npm audit --omit=dev --audit-level=high`                                                                           | `found 0 vulnerabilities`                                                           |
+| 6   | `npm run test:server`                                                                                               | 14 files / 225 tests passed                                                         |
+| 7   | `npm run test:client`                                                                                               | 16 files / 98 tests passed                                                          |
+| 8   | `npm --workspace=@planitpoker/e2e run test`                                                                         | 32 passed (dev servers started by Playwright)                                       |
+| 9   | `PORT=5000 ALLOWED_ORIGINS=http://localhost:5173 node apps/server/dist/index.js`, then the three `curl` calls below | health `{"status":"ok"}`, five security headers, handshake `101`, evil origin `403` |
+| 10  | `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:5000 --ws ws://localhost:5000/ws`                         | `5 passed, 0 failed`                                                                |
+| 11  | `CLIENT_PORT=8080 SERVER_PORT=5000 ALLOWED_ORIGINS=http://localhost:8080 podman-compose up -d --build`              | both containers up, healthcheck passing                                             |
+| 12  | `E2E_BASE_URL=http://localhost:8080 npm --workspace=@planitpoker/e2e run test`                                      | 32 passed against the containers (same-origin `/ws`)                                |
+| 13  | `cd apps/e2e && E2E_BASE_URL=http://localhost:8080 npx playwright test --config=playwright.chaos.config.ts`         | 2 container-chaos tests passed                                                      |
+| 14  | `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:8080 --ws ws://localhost:8080/ws`                         | `5 passed, 0 failed` through Nginx                                                  |
+| 15  | `podman-compose down -v && podman rmi planitpoker-client:local planitpoker-server:local`                            | `podman ps -a` shows no leftovers                                                   |
 
 Gate 9 details: the health response must carry `X-Content-Type-Options: nosniff`,
 `X-Frame-Options: DENY`, `Referrer-Policy`, `Content-Security-Policy` and
-`Set-Cookie: pip_client=...; HttpOnly; SameSite=Strict`, and no `X-Powered-By`.
+`Set-Cookie: pip_client=...; HttpOnly; SameSite=Strict`, and no `X-Powered-By`. The three
+requests, run while that server is up:
 
-Observed on the last run (all gates PASS): server 225/225, client 98/98, e2e 32/32 on
+```bash
+curl -sS http://localhost:5000/api/health
+curl -sS -D - -o /dev/null http://localhost:5000/api/health \
+    | grep -iE 'x-content-type-options|x-frame-options|referrer-policy|content-security-policy|set-cookie|x-powered-by'
+curl -sS -o /dev/null -w '%{http_code}\n' --http1.1 \
+    -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
+    -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Origin: http://localhost:5173' \
+    http://localhost:5000/ws
+curl -sS -o /dev/null -w '%{http_code}\n' --http1.1 \
+    -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
+    -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Origin: http://evil.example' \
+    http://localhost:5000/ws
+```
+
+The last two print `101` and `403`; the second one prints nothing for `X-Powered-By`.
+
+Observed on the last run (all gates PASS): server 225/225, client 100/100, e2e 32/32 on
 the dev servers, `ws-chaos` 5/5 bare-metal and 5/5 through Nginx, e2e 32/32 and
 container-chaos 2/2 against the compose stack, server container healthy, `5000` bound to
 `127.0.0.1` only, containers running as `node`/`nginx`. Two defects were found and fixed
@@ -82,24 +100,24 @@ Charter results from the same run, measured against the compose stack:
 
 ## 4. Automated inventory
 
-| Suite                | File                                            | Test                                                                                                                                      | Requirement                | Locks                                                       |
-| -------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
-| server unit (14/225) | `apps/server/tests/*.test.ts`                   | validation, securityHardening, httpHardening, abuseControls, kickBanFlow, roomManager, auditLogger, clientIdentity, cloudflare, wsUpgrade | FR12–FR22, NFR11–NFR21     | limits, bans, rate limits, origin policy, session closure   |
-| client unit (16/98)  | `apps/client/src/**/*.test.tsx`                 | story-backlog, socket-provider, i18n, results-panel, roster, theme tokens                                                                 | FR7, FR14, FR21–FR23, NFR3 | bulk-import cap, reconnect rejoin, translations, statistics |
-| e2e base (32)        | `apps/e2e/tests/room-creation.spec.ts`          | create/join room                                                                                                                          | FR2                        | room codes and entry flows                                  |
-| e2e base             | `apps/e2e/tests/voting-flow.spec.ts`            | vote + reveal                                                                                                                             | FR1, FR4                   | real-time broadcast                                         |
-| e2e base             | `apps/e2e/tests/admin-management.spec.ts`       | settings, title, deck                                                                                                                     | FR5                        | admin-only controls                                         |
-| e2e base             | `apps/e2e/tests/rounds-summary.spec.ts`         | rounds, summary, CSV                                                                                                                      | FR23–FR25, FR14            | append-only rounds and export                               |
-| e2e base             | `apps/e2e/tests/i18n.spec.ts`                   | language switch, error translation                                                                                                        | FR20, FR26                 | catalogs and notices                                        |
-| e2e base             | `apps/e2e/tests/overlap-axe.spec.ts`            | 4 viewports × 2 schemes × 3 states                                                                                                        | FR9, FR10                  | zero axe wcag2a/aa violations, zero overlap                 |
-| e2e base             | `apps/e2e/tests/timer.spec.ts`                  | timer start/pause/reset                                                                                                                   | FR8                        | shared countdown                                            |
-| e2e base             | `apps/e2e/tests/participant-management.spec.ts` | kick, co-admin, spectator                                                                                                                 | FR3, FR6                   | role controls and roster                                    |
-| e2e base             | `apps/e2e/tests/backlog-import.spec.ts`         | bulk import + unusable paste                                                                                                              | FR7                        | parser, capacity notice                                     |
-| e2e base             | `apps/e2e/tests/session-closure.spec.ts`        | ended session refuses new join; inside member rejoins                                                                                     | FR11, NFR20                | closure semantics                                           |
-| e2e base             | `apps/e2e/tests/content-stress.spec.ts`         | 320 px × en-US/pt-BR with 50/120/2000-char content                                                                                        | FR9                        | no horizontal scroll, dialog fits                           |
-| e2e base             | `apps/e2e/tests/chaos-network.spec.ts`          | drop, rejected reconnect, duplicate, delay, dropped vote                                                                                  | FR4, FR11, NFR3            | auto-rejoin, idempotence, convergence                       |
-| e2e chaos config (2) | `apps/e2e/tests/chaos-container.spec.ts`        | web-tier restart; server restart                                                                                                          | NFR3, NFR10                | session survives proxy restart; stale room resets           |
-| chaos script (5)     | `apps/e2e/chaos/ws-chaos.mjs`                   | oversized frame, flood, malformed, repeated create, storm                                                                                 | FR12, FR13, FR15, NFR3     | process survival, rate limit, error codes                   |
+| Suite                | File                                            | Test                                                                                                                                       | Requirement                | Locks                                                                       |
+| -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | --------------------------------------------------------------------------- |
+| server unit (14/225) | `apps/server/tests/*.test.ts`                   | validation, securityHardening, httpHardening, abuseControls, kickBanFlow, roomManager, auditLogger, clientIdentity, cloudflare, wsUpgrade  | FR12–FR22, NFR11–NFR21     | limits, bans, rate limits, origin policy, session closure                   |
+| client unit (16/100) | `apps/client/src/**/*.test.{ts,tsx}`            | story-backlog, its utils, socket-provider, socket-url, results-panel + hooks, participants-panel, i18n, bulk-import, estimation-stats, app | FR7, FR14, FR21–FR23, NFR3 | bulk-import cap, reconnect rejoin, URL resolution, translations, statistics |
+| e2e base (32)        | `apps/e2e/tests/room-creation.spec.ts`          | create/join room                                                                                                                           | FR2                        | room codes and entry flows                                                  |
+| e2e base             | `apps/e2e/tests/voting-flow.spec.ts`            | vote + reveal                                                                                                                              | FR1, FR4                   | real-time broadcast                                                         |
+| e2e base             | `apps/e2e/tests/admin-management.spec.ts`       | settings, title, deck                                                                                                                      | FR5                        | admin-only controls                                                         |
+| e2e base             | `apps/e2e/tests/rounds-summary.spec.ts`         | rounds, summary, CSV                                                                                                                       | FR23–FR25, FR14            | append-only rounds and export                                               |
+| e2e base             | `apps/e2e/tests/i18n.spec.ts`                   | language switch, error translation                                                                                                         | FR20, FR26                 | catalogs and notices                                                        |
+| e2e base             | `apps/e2e/tests/overlap-axe.spec.ts`            | 4 viewports × 2 schemes × 3 states                                                                                                         | FR9, FR10                  | zero axe wcag2a/aa violations, zero overlap                                 |
+| e2e base             | `apps/e2e/tests/timer.spec.ts`                  | timer start/pause/reset                                                                                                                    | FR8                        | shared countdown                                                            |
+| e2e base             | `apps/e2e/tests/participant-management.spec.ts` | kick, co-admin, spectator                                                                                                                  | FR3, FR6                   | role controls and roster                                                    |
+| e2e base             | `apps/e2e/tests/backlog-import.spec.ts`         | bulk import + unusable paste                                                                                                               | FR7                        | parser, capacity notice                                                     |
+| e2e base             | `apps/e2e/tests/session-closure.spec.ts`        | ended session refuses new join; inside member rejoins                                                                                      | FR11, NFR20                | closure semantics                                                           |
+| e2e base             | `apps/e2e/tests/content-stress.spec.ts`         | 320 px × en-US/pt-BR with 50/120/2000-char content                                                                                         | FR9                        | no horizontal scroll, dialog fits                                           |
+| e2e base             | `apps/e2e/tests/chaos-network.spec.ts`          | drop, rejected reconnect, duplicate, delay, dropped vote                                                                                   | FR4, FR11, NFR3            | auto-rejoin, idempotence, convergence                                       |
+| e2e chaos config (2) | `apps/e2e/tests/chaos-container.spec.ts`        | web-tier restart; server restart                                                                                                           | NFR3, NFR10                | session survives proxy restart; stale room resets                           |
+| chaos script (5)     | `apps/e2e/chaos/ws-chaos.mjs`                   | oversized frame, flood, malformed, repeated create, storm                                                                                  | FR12, FR13, FR15, NFR3     | process survival, rate limit, error codes                                   |
 
 ## 5. Chaos catalog
 
@@ -128,15 +146,15 @@ retry.
 
 ## 6. Exploratory charters
 
-| ID  | Charter               | Tool                      | Steps                                                                                                  | Evidence                                        | Blocker rule                              |
-| --- | --------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- | ----------------------------------------- |
-| F1  | Performance           | Chrome DevTools MCP trace | create → vote → reveal → end; repeat; time click→badge five times                                      | LCP/INP/CLS, long tasks, min/median/max latency | >200 ms click→badge is a finding          |
-| F2  | Memory                | `take_heapsnapshot`       | snapshot, create+end five rooms, snapshot                                                              | retained delta, top retainers                   | growth proportional to rooms is a finding |
-| F3  | Lighthouse            | `lighthouse_audit`        | lobby and live room                                                                                    | scores + failing nodes                          | any accessibility violation blocks        |
-| F4  | Keyboard and zoom     | Browser + Axe             | Tab/Shift+Tab/Enter/Space/Escape through lobby → room → settings; 200 % zoom at 320 px; dark and light | focus order, dialogs, scrollWidth               | trap, lost focus or scroll blocks         |
-| F5  | Review                | `cr` (CodeRabbit)         | review the branch diff                                                                                 | findings triaged against code                   | unauthenticated → BLOCKED, use `reviewer` |
-| F6  | GitHub-side scans     | Actions                   | CodeQL and dependency-review run on PRs only                                                           | check names and conclusions                     | no PR → not run, never "passed"           |
-| F7  | Frontend static audit | Grep + role/state matrix  | deprecated antd APIs, theme leaks, literal copy, role matrix, double-click/Escape/clipboard denial     | file:line findings, screenshots                 | any requirement or layout break blocks    |
+| ID  | Charter               | Tool                                                                            | Steps                                                                                                  | Evidence                                        | Blocker rule                              |
+| --- | --------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- | ----------------------------------------- |
+| F1  | Performance           | Playwright + CDP trace                                                          | create → vote → reveal → end; repeat; time click→badge five times                                      | LCP/INP/CLS, long tasks, min/median/max latency | >200 ms click→badge is a finding          |
+| F2  | Memory                | CDP `HeapProfiler`                                                              | snapshot, create+end five rooms, snapshot                                                              | retained delta per room, top retainers          | growth proportional to rooms is a finding |
+| F3  | Lighthouse            | `lighthouse_audit` (needs Chrome stable; substitute axe on the deployed bundle) | lobby and live room                                                                                    | scores + failing nodes                          | any accessibility violation blocks        |
+| F4  | Keyboard and zoom     | Browser + Axe                                                                   | Tab/Shift+Tab/Enter/Space/Escape through lobby → room → settings; 200 % zoom at 320 px; dark and light | focus order, dialogs, scrollWidth               | trap, lost focus or scroll blocks         |
+| F5  | Review                | `cr` (CodeRabbit)                                                               | review the branch diff                                                                                 | findings triaged against code                   | unauthenticated → BLOCKED, use `reviewer` |
+| F6  | GitHub-side scans     | Actions                                                                         | CodeQL and dependency-review run on PRs only                                                           | check names and conclusions                     | no PR → not run, never "passed"           |
+| F7  | Frontend static audit | Grep + role/state matrix                                                        | deprecated antd APIs, theme leaks, literal copy, role matrix, double-click/Escape/clipboard denial     | file:line findings, screenshots                 | any requirement or layout break blocks    |
 
 F7 role matrix: host, co-admin, voter and spectator × lobby, voting, revealed, ended and
 reconnecting. A control that does not match the role, or a stale value after a transition,
@@ -145,8 +163,9 @@ is a finding.
 ## 7. Known findings and watchlist
 
 - `leaveRoom` clears only client state; the server keeps the participant until the
-  heartbeat sweep. Fixing it needs a `LEAVE_ROOM` message (protocol change, not in the 1.0
-  pass).
+  heartbeat sweep. The session token is deliberately kept, so re-joining the same room
+  rebinds that participant instead of minting a duplicate; telling the server needs a
+  `LEAVE_ROOM` message (protocol change, not in the 1.0 pass).
 - Navbar `ROOM_TITLE_MAX_LENGTH = 80` while `MAX_TITLE_LENGTH` on the server is 120: a
   title accepted by the API can be longer than the rename field allows.
 - `browserContext.setOffline(true)` does **not** close an existing WebSocket in Chromium
@@ -157,11 +176,12 @@ is a finding.
   first-session client is not yet nameable by the ban. The revoked-token refusal is the
   enforced part.
 - 200 % zoom on a 320 px viewport leaves 160 CSS px of layout and the room overflows
-  horizontally (`scrollWidth` 270 vs `clientWidth` 160). The documented support floor is
+  horizontally (`scrollWidth` 290 vs `clientWidth` 160). The documented support floor is
   320 CSS px, which `content-stress` covers with no overflow; the zoomed case is outside
   that floor and is recorded, not fixed.
-- Lighthouse SEO scores 82: the SPA ships no `meta description` and no `robots.txt`.
-  Informational for an internal estimation tool; accessibility and best practices are 100.
+- Lighthouse SEO scored 82 on the earlier run that had Chrome available (the SPA ships
+  no `meta description` and no `robots.txt`); accessibility and best practices were 100.
+  The current host cannot run Lighthouse, so F3 is BLOCKED here and axe is the substitute.
 - Entering an ended room opens the session summary once (guarded by `endedAt`). A test
   that rejoins an ended session must dismiss that dialog before asserting the ended banner;
   waiting for it to stay closed is a race, because the room state arrives after the reload.
