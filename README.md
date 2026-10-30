@@ -12,6 +12,7 @@ The application uses a client-server model communicating over WebSockets for rea
 - **`apps/server`**: The backend server. Built with Node.js, Express, and native WebSocket (`ws`). It manages the state of all active rooms and handles WebSocket connections.
 - **`packages/shared`**: A shared library containing TypeScript interfaces, enums, and constants used by both the client and server.
 - **`docs/security-review.md`**: the penetration test of the HTTP and WebSocket surface, its findings and the abuse controls that answered them.
+- **`docs/regression-playbook.md`**: the release regression gate — automated inventory, chaos experiments and exploratory charters.
 
 ### Security Model
 
