@@ -29,6 +29,7 @@ import React, { useState } from 'react';
 import { useSocket } from '../../context/socket-context/use-socket';
 import { useTranslation } from '../../i18n/use-translation';
 import { ColorMode } from '../../theme/app-theme';
+import { copyText } from '../../utils/clipboard';
 import { LanguageSwitcher } from '../language-switcher/language-switcher';
 
 /** Horizontal rhythm between the header content, in pixels. */
@@ -84,24 +85,14 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
 
     const currentUser = roomState?.participants.find((p) => p.id === currentUserId);
 
-    const handleCopyLink = () => {
+    const handleCopyLink = async (): Promise<void> => {
         if (!roomState) {
             return;
         }
-        // An insecure context or a browser without the Clipboard API throws on the
-        // property access itself, which would bypass the rejection handler below.
-        if (!navigator.clipboard) {
-            void message.error(t('nav.copy.error'));
-            return;
-        }
-        navigator.clipboard
-            .writeText(buildInviteLink(roomState.id))
-            .then(() => {
-                void message.success(t('nav.copy.success'));
-            })
-            .catch(() => {
-                void message.error(t('nav.copy.error'));
-            });
+        const copied = await copyText(buildInviteLink(roomState.id));
+        await (copied
+            ? message.success(t('nav.copy.success'))
+            : message.error(t('nav.copy.error')));
     };
 
     const openRename = () => {
@@ -182,12 +173,12 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                 role="button"
                                 style={{ cursor: 'pointer' }}
                                 tabIndex={0}
-                                onKeyDown={(event) => {
+                                onKeyDown={async (event) => {
                                     if (event.key !== 'Enter' && event.key !== ' ') {
                                         return;
                                     }
                                     event.preventDefault();
-                                    handleCopyLink();
+                                    await handleCopyLink();
                                 }}
                             >
                                 {t('nav.room', { code: roomState.id })}

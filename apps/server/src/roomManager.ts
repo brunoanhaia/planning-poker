@@ -532,6 +532,9 @@ export class RoomManager {
     /**
      * Resets all participant votes and hides cards for a new estimation round.
      *
+     * When the active story was already finalized, resetting reopens it: re-voting discards the
+     * accepted score but not the round history, which stays append-only.
+     *
      * @param roomId - The room identifier.
      * @param userId - ID of the admin or co-host.
      * @returns Updated RoomState or null if unauthorized.
@@ -543,6 +546,13 @@ export class RoomManager {
         }
 
         this.resetRoomVotes(room);
+
+        const story = room.stories[room.currentStoryIndex];
+        if (story && (story.finalEstimate ?? null) !== null) {
+            story.finalEstimate = null;
+            story.status = 'estimating';
+        }
+
         return room;
     }
 

@@ -18,7 +18,7 @@ class FakeWebSocket {
     readonly url: string;
     readyState = FakeWebSocket.CONNECTING;
     sent: string[] = [];
-    onclose: (() => void) | null = null;
+    onclose: ((event: { code: number }) => void) | null = null;
     onerror: ((error: unknown) => void) | null = null;
     onmessage: ((event: { data: string }) => void) | null = null;
     onopen: (() => void) | null = null;
@@ -34,8 +34,13 @@ class FakeWebSocket {
 
     /** Simulates the transport dropping: the browser fires `close`. */
     drop(): void {
+        this.dropWithCode(1006);
+    }
+
+    /** Simulates the server closing the socket with a specific close code. */
+    dropWithCode(code: number): void {
         this.readyState = FakeWebSocket.CLOSED;
-        this.onclose?.();
+        this.onclose?.({ code });
     }
 
     /** Simulates the server accepting the connection. */
@@ -134,6 +139,7 @@ describe('SocketProvider reconnection', () => {
         FakeWebSocket.instances = [];
         vi.stubGlobal('WebSocket', FakeWebSocket);
         sessionStorage.clear();
+        localStorage.clear();
     });
 
     afterEach(() => {
@@ -178,6 +184,88 @@ describe('SocketProvider reconnection', () => {
             },
             type: 'JOIN_ROOM',
         });
+    });
+
+    it('reuses the stored room token from a fresh tab', () => {
+        // A second tab of the same browser has an empty session storage but the
+        // room token local storage kept, so it must rebind the same participant.
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+
+        act(() => {
+            screen.getByRole('button', { name: 'join' }).click();
+        });
+
+        expect(JSON.parse(socket.sent[0])).toEqual({
+            payload: {
+                avatar: 'avatar-1',
+                color: '#1890ff',
+                name: 'Ana',
+                roomId: 'ROOM01',
+                sessionToken: 'tok-room',
+                userId: null,
+            },
+            type: 'JOIN_ROOM',
+        });
+    });
+
+    it('persists the token under the room key once the room is entered', () => {
+        renderProbe();
+        enterRoom();
+
+        expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok');
+    });
+
+    it('stops reconnecting and shows a notice when another tab takes over', () => {
+        renderProbe();
+        const first = enterRoom();
+
+        act(() => {
+            first.dropWithCode(4001);
+        });
+        act(() => {
+            vi.advanceTimersByTime(5000);
+        });
+
+        expect(FakeWebSocket.instances).toHaveLength(1);
+        expect(screen.getByText('lobby')).toBeInTheDocument();
+        expect(
+            screen.getByText('This room was opened in another tab. This tab stopped updating.')
+        ).toBeInTheDocument();
+        // The surviving tab owns the token, so this tab must not delete it.
+        expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok');
+    });
+
+    it('clears both storages when the user is kicked', () => {
+        renderProbe();
+        const socket = enterRoom();
+
+        act(() => {
+            socket.receive({ payload: {}, type: 'KICKED' });
+        });
+
+        expect(screen.getByText('lobby')).toBeInTheDocument();
+        expect(sessionStorage.getItem('planit_session_token')).toBeNull();
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBeNull();
+    });
+
+    it('keeps the room token in both storages when the user leaves', () => {
+        renderProbe();
+        enterRoom();
+
+        act(() => {
+            screen.getByRole('button', { name: 'leave' }).click();
+        });
+
+        expect(screen.getByText('lobby')).toBeInTheDocument();
+        expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok');
     });
 
     it('resets a session the server rejects and shows the translated notice', () => {
