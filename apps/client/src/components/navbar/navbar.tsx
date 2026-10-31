@@ -85,15 +85,14 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
 
     const currentUser = roomState?.participants.find((p) => p.id === currentUserId);
 
-    const handleCopyLink = () => {
+    const handleCopyLink = async (): Promise<void> => {
         if (!roomState) {
             return;
         }
-        void copyText(buildInviteLink(roomState.id)).then((copied) => {
-            void (copied
-                ? message.success(t('nav.copy.success'))
-                : message.error(t('nav.copy.error')));
-        });
+        const copied = await copyText(buildInviteLink(roomState.id));
+        await (copied
+            ? message.success(t('nav.copy.success'))
+            : message.error(t('nav.copy.error')));
     };
 
     const openRename = () => {
@@ -174,12 +173,12 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                 role="button"
                                 style={{ cursor: 'pointer' }}
                                 tabIndex={0}
-                                onKeyDown={(event) => {
+                                onKeyDown={async (event) => {
                                     if (event.key !== 'Enter' && event.key !== ' ') {
                                         return;
                                     }
                                     event.preventDefault();
-                                    handleCopyLink();
+                                    await handleCopyLink();
                                 }}
                             >
                                 {t('nav.room', { code: roomState.id })}
