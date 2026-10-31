@@ -23,7 +23,7 @@ const restartContainer = (name: string): void => {
 
 test.describe('Deployment chaos', () => {
     test('restarting the web tier resumes the session', async ({ browser }) => {
-        test.setTimeout(90_000);
+        test.setTimeout(180_000);
         const { adminContext, adminPage, roomCode } = await createRoom(
             browser,
             'Admin',
@@ -70,7 +70,8 @@ test.describe('Deployment chaos', () => {
     });
 
     test('restarting the server loses the room and the client says so', async ({ browser }) => {
-        test.setTimeout(90_000);
+        // Two restarts of up to 60 s each, so 90 s could cut a slow stack short.
+        test.setTimeout(180_000);
         const { adminContext, roomCode } = await createRoom(browser, 'Admin', 'Server tier');
         let voterContext: BrowserContext | undefined;
 
