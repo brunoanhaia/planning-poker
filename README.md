@@ -133,6 +133,8 @@ npm install
 npm run build:shared
 ```
 
+Type-checking is the one exception: `apps/client/tsconfig.json` maps `@planitpoker/shared` to `packages/shared/src/index.ts` through `paths`, so `tsc --noEmit` and type-aware tooling resolve the source without a build. Runtime and bundling still load `dist/` through the package `exports` map, so `build:shared` remains mandatory before running the apps.
+
 ### Development
 
 There is no root `npm run dev` script. Start both sides separately from the root directory:

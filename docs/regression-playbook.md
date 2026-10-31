@@ -125,20 +125,20 @@ Every experiment states its steady state, injects exactly one fault, asserts the
 and leaves the host clean. Faults are injected with Playwright `routeWebSocket`, a real
 `ws` client, or a container restart — never by editing application code.
 
-| ID  | Hypothesis (steady state)                  | Injection                                           | Assertion                                                                 | Cleanup              |
-| --- | ------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------- | -------------------- |
-| C1  | A room session survives one socket drop    | `WebSocketRoute.close()` on the voter page          | retrying notice appears then clears; vote after reconnect counts          | close contexts       |
-| C2  | A stale client cannot re-enter a gone room | reconnect answered with `ROOM_NOT_FOUND`            | lobby heading + translated notice, no stale room                          | close contexts       |
-| C3  | Actions are idempotent                     | duplicate every page→server frame                   | one roster row, `Voters = 1`                                              | close contexts       |
-| C4  | Latency does not reorder state             | 800 ms delay each direction                         | results converge within 15 s with one vote                                | close contexts       |
-| C5  | A lost vote is recoverable                 | drop first `VOTE` frame                             | no badge until resend; reveal shows the value                             | close contexts       |
-| M1  | One huge frame cannot kill the server      | 40 KiB frame                                        | close code `1009`, health 200                                             | reconnect            |
-| M2  | A message flood is throttled               | 31 frames in 1 s                                    | one `RATE_LIMITED`, close `1008`, health 200                              | reconnect            |
-| M3  | Malformed input is rejected, not fatal     | `not-json`, `42`, `constructor`, then `CREATE_ROOM` | `INVALID_MESSAGE`, `INVALID_MESSAGE`, `UNKNOWN_ACTION`, then room created | none                 |
-| M4  | Repeated create does not crash             | `CREATE_ROOM` twice on one socket                   | socket open, health 200                                                   | none                 |
-| M5  | A connection storm is bounded              | 50 connect/close cycles                             | health 200, no unhandled error                                            | wait 5 s             |
-| D1  | Restarting the web tier keeps the room     | `podman restart planitpoker-client`                 | rejoin, vote, reveal, one row per user                                    | restart already done |
-| D2  | Restarting the server ends the room        | `podman restart planitpoker-server` then `-client`  | lobby + `ROOM_NOT_FOUND`; a new room can be created                       | restart already done |
+| ID  | Hypothesis (steady state)                  | Injection                                                                   | Assertion                                                                 | Cleanup              |
+| --- | ------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------- |
+| C1  | A room session survives one socket drop    | `WebSocketRoute.close()` on the voter page                                  | retrying notice appears then clears; vote after reconnect counts          | close contexts       |
+| C2  | A stale client cannot re-enter a gone room | reconnect answered with `ROOM_NOT_FOUND`                                    | lobby heading + translated notice, no stale room                          | close contexts       |
+| C3  | Actions are idempotent                     | duplicate every page→server frame                                           | one roster row, `Voters = 1`                                              | close contexts       |
+| C4  | Latency does not reorder state             | 800 ms delay each direction                                                 | results converge within 15 s with one vote                                | close contexts       |
+| C5  | A lost vote is recoverable                 | drop first `VOTE` frame                                                     | no badge until resend; reveal shows the value                             | close contexts       |
+| M1  | One huge frame cannot kill the server      | 40 KiB frame                                                                | close code `1009`, health 200                                             | reconnect            |
+| M2  | A message flood is throttled               | 31 frames in 1 s                                                            | one `RATE_LIMITED`, close `1008`, health 200                              | reconnect            |
+| M3  | Malformed input is rejected, not fatal     | `not-json`, `42`, `constructor`, then `CREATE_ROOM`                         | `INVALID_MESSAGE`, `INVALID_MESSAGE`, `UNKNOWN_ACTION`, then room created | none                 |
+| M4  | Repeated create does not crash             | `CREATE_ROOM` twice on one socket                                           | socket open, health 200                                                   | none                 |
+| M5  | A connection storm is bounded              | 50 connect/close cycles                                                     | health 200, no unhandled error                                            | wait 5 s             |
+| D1  | Restarting the web tier keeps the room     | `podman restart planitpoker-client` (`CHAOS_RUNTIME=docker` with Docker)    | rejoin, vote, reveal, one row per user                                    | restart already done |
+| D2  | Restarting the server ends the room        | `podman restart planitpoker-server` then `-client` (`CHAOS_RUNTIME=docker`) | lobby + `ROOM_NOT_FOUND`; a new room can be created                       | restart already done |
 
 Abort any experiment whose target stays unhealthy for more than 60 s: capture the
 server/container log, report FAIL with that log, and fix the cause. Never mask it with a

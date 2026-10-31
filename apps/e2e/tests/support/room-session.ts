@@ -23,6 +23,11 @@ export interface VoterSession {
     voterPage: Page;
 }
 
+export interface OpenSession {
+    context?: BrowserContext;
+    page?: Page;
+}
+
 /**
  * Creates a new planning poker room as admin and extracts the generated room code.
  */
@@ -139,4 +144,14 @@ export const readDownloadContent = async (download: Download): Promise<string> =
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     return Buffer.concat(chunks).toString('utf-8');
+};
+
+/** Unroutes every intercepted socket, then closes the contexts it was given. */
+export const closeSessions = async (
+    sessions: readonly (OpenSession | undefined)[]
+): Promise<void> => {
+    for (const session of sessions) {
+        await session?.page?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+        await session?.context?.close().catch(() => {});
+    }
 };

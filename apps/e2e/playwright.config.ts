@@ -1,7 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// An empty CI variable must mean "unset", so `||` rather than `??`.
-const externalBaseUrl = process.env.E2E_BASE_URL || undefined;
+// An empty CI variable must mean "unset": `baseURL: ''` is invalid and `??`
+// would keep the empty string, so the empty case is mapped explicitly.
+const baseUrlEnv = process.env.E2E_BASE_URL;
+const externalBaseUrl = baseUrlEnv === '' ? undefined : baseUrlEnv;
 
 export default defineConfig({
     testDir: './tests',

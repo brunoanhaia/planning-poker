@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-// An empty variable must mean "unset", as in the base config.
-const externalBaseUrl = process.env.E2E_BASE_URL || undefined;
+// An empty value fails the guard below.
+const externalBaseUrl = process.env.E2E_BASE_URL;
 
 if (!externalBaseUrl) {
     throw new Error(

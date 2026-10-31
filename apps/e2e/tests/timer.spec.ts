@@ -28,20 +28,30 @@ test.describe('Timer', () => {
             await expect(voterTimer).toBeVisible();
 
             const initialVoterText = await voterTimer.innerText();
-            await voterPage.waitForTimeout(2000);
-            await expect(voterTimer).not.toHaveText(initialVoterText);
+            await expect(voterTimer).not.toHaveText(initialVoterText, { timeout: 5000 });
+            await expect(adminPage.getByRole('button', { name: 'Toggle timer' })).toHaveAttribute(
+                'aria-pressed',
+                'true'
+            );
 
             await adminPage.getByRole('button', { name: 'Toggle timer' }).click();
-            await adminPage.waitForTimeout(1500);
-            const pausedAdminText = await adminTimer.innerText();
-            const pausedVoterText = await voterTimer.innerText();
+            await expect(adminPage.getByRole('button', { name: 'Toggle timer' })).toHaveAttribute(
+                'aria-pressed',
+                'false'
+            );
+            const pausedText = await adminTimer.innerText();
+            await expect(voterTimer).toHaveText(pausedText);
+
+            // Freezing is the one property that needs real elapsed time: a tick
+            // would have fired inside the window if the pause had not landed.
             await adminPage.waitForTimeout(1600);
-            await expect(adminTimer).toHaveText(pausedAdminText);
-            await expect(voterTimer).toHaveText(pausedVoterText);
+            await expect(adminTimer).toHaveText(pausedText);
+            await expect(voterTimer).toHaveText(pausedText);
 
             await adminPage.getByRole('button', { name: 'Reset Timer' }).click();
             await expect(adminTimer).toHaveText('0:30');
             await expect(voterTimer).toHaveText('0:30');
+            // Same window after the reset, proving it did not restart the countdown.
             await adminPage.waitForTimeout(1600);
             await expect(adminTimer).toHaveText('0:30');
             await expect(voterTimer).toHaveText('0:30');

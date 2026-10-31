@@ -6,17 +6,19 @@ import { createRoom, joinRoom } from './support/room-session';
 
 const serverContainer = process.env.CHAOS_SERVER_CONTAINER ?? 'planitpoker-server';
 const clientContainer = process.env.CHAOS_CLIENT_CONTAINER ?? 'planitpoker-client';
+const containerRuntime = process.env.CHAOS_RUNTIME ?? 'podman';
 
 test.use({ locale: 'en-US' });
 
 /**
- * Restarts a compose container through podman.
+ * Restarts a compose container through the container runtime selected by
+ * `CHAOS_RUNTIME` (`podman` by default).
  *
  * `execFileSync` blocks the event loop, so the test timeout cannot fire while a
  * stuck `podman stop` is running: the call carries its own bound instead.
  */
 const restartContainer = (name: string): void => {
-    execFileSync('podman', ['restart', name], { stdio: 'pipe', timeout: 60_000 });
+    execFileSync(containerRuntime, ['restart', name], { stdio: 'pipe', timeout: 60_000 });
 };
 
 test.describe('Deployment chaos', () => {

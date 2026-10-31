@@ -6,7 +6,7 @@ import {
     type WebSocketRoute,
 } from '@playwright/test';
 
-import { castVote, createRoom, joinRoom } from './support/room-session';
+import { castVote, closeSessions, createRoom, joinRoom } from './support/room-session';
 
 test.use({ locale: 'en-US' });
 
@@ -64,9 +64,10 @@ test.describe('Chaos Network & WebSocket Interception', () => {
 
             await expect(adminPage.locator('.results-panel').getByText('5').first()).toBeVisible();
         } finally {
-            await voterPage?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-            await voterContext?.close();
-            await adminContext?.close();
+            await closeSessions([
+                { context: adminContext },
+                { context: voterContext, page: voterPage },
+            ]);
         }
     });
 
@@ -131,9 +132,10 @@ test.describe('Chaos Network & WebSocket Interception', () => {
                 voterPage.getByText('Room not found. Please check the room code.')
             ).toBeVisible();
         } finally {
-            await voterPage?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-            await voterContext?.close();
-            await adminContext?.close();
+            await closeSessions([
+                { context: adminContext },
+                { context: voterContext, page: voterPage },
+            ]);
         }
     });
 
@@ -210,10 +212,10 @@ test.describe('Chaos Network & WebSocket Interception', () => {
             await expect(rejection).toBeHidden();
             await expect(votersStat.getByText('1')).toBeVisible();
         } finally {
-            await adminPage?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-            await voterPage?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-            await voterContext?.close();
-            await adminContext?.close();
+            await closeSessions([
+                { context: adminContext, page: adminPage },
+                { context: voterContext, page: voterPage },
+            ]);
         }
     });
 
@@ -274,10 +276,10 @@ test.describe('Chaos Network & WebSocket Interception', () => {
             const votersStat = resultsPanel.locator('.ant-statistic').filter({ hasText: 'Voters' });
             await expect(votersStat.getByText('1')).toBeVisible({ timeout: 15000 });
         } finally {
-            await adminPage?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-            await voterPage?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-            await voterContext?.close();
-            await adminContext?.close();
+            await closeSessions([
+                { context: adminContext, page: adminPage },
+                { context: voterContext, page: voterPage },
+            ]);
         }
     });
 
@@ -339,9 +341,10 @@ test.describe('Chaos Network & WebSocket Interception', () => {
 
             await expect(adminPage.locator('.results-panel').getByText('5').first()).toBeVisible();
         } finally {
-            await voterPage?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-            await voterContext?.close();
-            await adminContext?.close();
+            await closeSessions([
+                { context: adminContext },
+                { context: voterContext, page: voterPage },
+            ]);
         }
     });
 });

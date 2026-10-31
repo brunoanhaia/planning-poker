@@ -110,14 +110,18 @@ const renderProbe = () =>
 /** Opens the first socket and puts the client inside a room with a token. */
 const enterRoom = (): FakeWebSocket => {
     const socket = FakeWebSocket.instances[0];
-    act(() => socket.open());
-    act(() => socket.receive({ payload: { sessionToken: 'tok', userId: 'u1' }, type: 'SESSION' }));
-    act(() =>
+    act(() => {
+        socket.open();
+    });
+    act(() => {
+        socket.receive({ payload: { sessionToken: 'tok', userId: 'u1' }, type: 'SESSION' });
+    });
+    act(() => {
         socket.receive({
             payload: { currentUserId: 'u1', roomState: room },
             type: 'ROOM_STATE',
-        })
-    );
+        });
+    });
     return socket;
 };
 
@@ -137,7 +141,9 @@ describe('SocketProvider reconnection', () => {
     it('sends nothing on a first connection, before a room exists', () => {
         renderProbe();
 
-        act(() => FakeWebSocket.instances[0].open());
+        act(() => {
+            FakeWebSocket.instances[0].open();
+        });
 
         expect(FakeWebSocket.instances[0].sent).toEqual([]);
     });
@@ -146,11 +152,17 @@ describe('SocketProvider reconnection', () => {
         renderProbe();
         const first = enterRoom();
 
-        act(() => first.drop());
-        act(() => vi.advanceTimersByTime(2000));
+        act(() => {
+            first.drop();
+        });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
 
         const second = FakeWebSocket.instances[1];
-        act(() => second.open());
+        act(() => {
+            second.open();
+        });
 
         expect(JSON.parse(second.sent[0])).toEqual({
             payload: {
@@ -169,40 +181,69 @@ describe('SocketProvider reconnection', () => {
         renderProbe();
         const first = enterRoom();
 
-        act(() => first.drop());
-        act(() => vi.advanceTimersByTime(2000));
+        act(() => {
+            first.drop();
+        });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
 
         const second = FakeWebSocket.instances[1];
-        act(() => second.open());
+        act(() => {
+            second.open();
+        });
         expect(screen.getByText('room')).toBeInTheDocument();
 
-        act(() =>
+        act(() => {
             second.receive({
                 payload: { code: 'ROOM_NOT_FOUND', message: 'Room not found.' },
                 type: 'ERROR',
-            })
-        );
+            });
+        });
 
         expect(screen.getByText('lobby')).toBeInTheDocument();
         expect(screen.getByText('Room not found. Please check the room code.')).toBeInTheDocument();
         expect(sessionStorage.getItem('planit_session_token')).toBeNull();
     });
 
+    it.each(['BANNED', 'NO_SESSION'] as const)(
+        'clears the stored session when the server answers %s',
+        (code) => {
+            renderProbe();
+            const socket = enterRoom();
+
+            act(() => {
+                socket.receive({ payload: { code, message: 'rejected' }, type: 'ERROR' });
+            });
+
+            expect(screen.getByText('lobby')).toBeInTheDocument();
+            expect(sessionStorage.getItem('planit_session_token')).toBeNull();
+        }
+    );
+
     it('keeps the credential when the user leaves, so nothing rejoins on its own', () => {
         renderProbe();
         const first = enterRoom();
 
-        act(() => screen.getByRole('button', { name: 'leave' }).click());
+        act(() => {
+            screen.getByRole('button', { name: 'leave' }).click();
+        });
         expect(screen.getByText('lobby')).toBeInTheDocument();
         // The server keeps the participant and only this token can rebind it, so
         // dropping it here would mint a duplicate on the next manual join.
         expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
 
-        act(() => first.drop());
-        act(() => vi.advanceTimersByTime(2000));
+        act(() => {
+            first.drop();
+        });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
 
         const second = FakeWebSocket.instances[1];
-        act(() => second.open());
+        act(() => {
+            second.open();
+        });
 
         expect(second.sent).toEqual([]);
     });
@@ -210,22 +251,24 @@ describe('SocketProvider reconnection', () => {
     it('drops a notice raised on the lobby once the room is entered', () => {
         renderProbe();
         const socket = FakeWebSocket.instances[0];
-        act(() => socket.open());
+        act(() => {
+            socket.open();
+        });
 
-        act(() =>
+        act(() => {
             socket.receive({
                 payload: { code: 'ROOM_NOT_FOUND', message: 'Room not found.' },
                 type: 'ERROR',
-            })
-        );
+            });
+        });
         expect(screen.getByText('Room not found. Please check the room code.')).toBeInTheDocument();
 
-        act(() =>
+        act(() => {
             socket.receive({
                 payload: { currentUserId: 'u1', roomState: room },
                 type: 'ROOM_STATE',
-            })
-        );
+            });
+        });
 
         expect(screen.getByText('room')).toBeInTheDocument();
         expect(screen.queryByText('Room not found. Please check the room code.')).toBeNull();

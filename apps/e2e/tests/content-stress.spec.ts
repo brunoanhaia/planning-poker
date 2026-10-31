@@ -76,14 +76,16 @@ test.describe('Content Stress', () => {
 
                 const box = await settingsDialog.boundingBox();
                 expect(box).not.toBeNull();
-                expect(box!.width).toBeLessThanOrEqual(320);
+                if (box) {
+                    expect(box.width).toBeLessThanOrEqual(320);
+                }
 
                 await adminPage.keyboard.press('Escape');
                 await expect(settingsDialog).toBeHidden();
 
-                await adminPage.screenshot({
-                    fullPage: true,
-                    path: `test-results/content-stress-${locale}.png`,
+                await test.info().attach(`content-stress-${locale}`, {
+                    body: await adminPage.screenshot({ fullPage: true }),
+                    contentType: 'image/png',
                 });
             } finally {
                 await adminContext.close();
