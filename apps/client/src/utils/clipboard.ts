@@ -10,4 +10,4 @@ import copy from 'copy-to-clipboard';
  * @param text - The text to copy.
  * @returns `true` when the text reached the clipboard, `false` when it did not.
  */
-export const copyText = async (text: string): Promise<boolean> => copy(text);
+export const copyText = (text: string): Promise<boolean> => copy(text);

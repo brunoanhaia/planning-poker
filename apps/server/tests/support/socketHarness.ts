@@ -38,6 +38,8 @@ export class SocketDouble {
     public readonly closeCodes: number[] = [];
     /** Close frames the handler asked the socket to use, code and reason included. */
     public readonly closes: { code?: number; reason?: string }[] = [];
+    /** Keepalive probes the handler sent. */
+    public pingCount = 0;
     private readonly listeners = new Map<string, ((...args: unknown[]) => void)[]>();
 
     public on(event: string, listener: (...args: unknown[]) => void): this {
@@ -53,7 +55,10 @@ export class SocketDouble {
         this.sent.push(JSON.parse(data) as SentMessage);
     }
 
-    public terminate(): void {}
+    /** Marks the socket CLOSED, as `ws` does when it drops a connection. */
+    public terminate(): void {
+        this.readyState = 3;
+    }
     public close(code?: number, reason?: string): void {
         // `ws` does nothing when close() arrives on a socket that is already
         // CLOSING or CLOSED, and leaves OPEN immediately otherwise.
@@ -66,8 +71,17 @@ export class SocketDouble {
         }
         this.readyState = 2;
     }
-    public ping(): void {}
-    public removeListener(): void {}
+    /** Counts the keepalive probes the handler sends. */
+    public ping(): void {
+        this.pingCount += 1;
+    }
+    /** Drops one listener, so a double cannot accumulate handlers across reconnects. */
+    public removeListener(event: string, listener: (...args: unknown[]) => void): void {
+        this.listeners.set(
+            event,
+            (this.listeners.get(event) ?? []).filter((it) => it !== listener)
+        );
+    }
 }
 
 /** Options a connection may be opened with. */
@@ -94,7 +108,7 @@ export const messagesOf = (socket: SocketDouble, type: string): SentMessage[] =>
 /** The last message of one type, if any. */
 export const lastMessage = (socket: SocketDouble, type: string): SentMessage | undefined => {
     const matching = messagesOf(socket, type);
-    return matching.length > 0 ? matching[matching.length - 1] : undefined;
+    return matching.at(-1);
 };
 
 /** The room id of the last `ROOM_STATE` a socket received. */
