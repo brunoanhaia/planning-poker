@@ -41,7 +41,7 @@ Run in this order; each command's observable is the pass condition.
 | 4   | `npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"`                                                           | `All matched files use Prettier code style!`                                        |
 | 5   | `npm audit --omit=dev --audit-level=high`                                                                           | `found 0 vulnerabilities`                                                           |
 | 6   | `npm run test:server`                                                                                               | 15 files / 229 tests passed                                                         |
-| 7   | `npm run test:client`                                                                                               | 17 files / 114 tests passed                                                         |
+| 7   | `npm run test:client`                                                                                               | 17 files / 113 tests passed                                                         |
 | 8   | `npm --workspace=@planitpoker/e2e run test`                                                                         | 32 passed (dev servers started by Playwright)                                       |
 | 9   | `PORT=5000 ALLOWED_ORIGINS=http://localhost:5173 node apps/server/dist/index.js`, then the three `curl` calls below | health `{"status":"ok"}`, five security headers, handshake `101`, evil origin `403` |
 | 10  | `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:5000 --ws ws://localhost:5000/ws`                         | `5 passed, 0 failed`                                                                |
@@ -72,7 +72,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' --http1.1 \
 
 The last two print `101` and `403`; the second one prints nothing for `X-Powered-By`.
 
-Observed on the last run (all gates PASS): server 229/229, client 114/114, e2e 34/34 on
+Observed on the last run (all gates PASS): server 229/229, client 113/113, e2e 34/34 on
 the dev servers, `ws-chaos` 5/5 bare-metal and 5/5 through Nginx, e2e 34/34 and
 container-chaos 2/2 against the compose stack, server container healthy, `5000` bound to
 `127.0.0.1` only, containers running as `node`/`nginx`. Two defects were found and fixed
@@ -103,7 +103,7 @@ Charter results from the same run, measured against the compose stack:
 | Suite                | File                                            | Test                                                                                                                                       | Requirement                | Locks                                                                       |
 | -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | --------------------------------------------------------------------------- |
 | server unit (15/229) | `apps/server/tests/*.test.ts`                   | validation, securityHardening, httpHardening, abuseControls, kickBanFlow, roomManager, auditLogger, clientIdentity, cloudflare, wsUpgrade  | FR12–FR22, NFR11–NFR21     | limits, bans, rate limits, origin policy, session closure                   |
-| client unit (17/114) | `apps/client/src/**/*.test.{ts,tsx}`            | story-backlog, its utils, socket-provider, socket-url, results-panel + hooks, participants-panel, i18n, bulk-import, estimation-stats, app | FR7, FR14, FR21–FR23, NFR3 | bulk-import cap, reconnect rejoin, URL resolution, translations, statistics |
+| client unit (17/113) | `apps/client/src/**/*.test.{ts,tsx}`            | story-backlog, its utils, socket-provider, socket-url, results-panel + hooks, participants-panel, i18n, bulk-import, estimation-stats, app | FR7, FR14, FR21–FR23, NFR3 | bulk-import cap, reconnect rejoin, URL resolution, translations, statistics |
 | e2e base (34)        | `apps/e2e/tests/room-creation.spec.ts`          | create/join room                                                                                                                           | FR2                        | room codes and entry flows                                                  |
 | e2e base             | `apps/e2e/tests/voting-flow.spec.ts`            | vote + reveal                                                                                                                              | FR1, FR4                   | real-time broadcast                                                         |
 | e2e base             | `apps/e2e/tests/admin-management.spec.ts`       | settings, title, deck                                                                                                                      | FR5                        | admin-only controls                                                         |
