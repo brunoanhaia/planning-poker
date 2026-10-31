@@ -1,5 +1,5 @@
 import { AVATAR_COLORS, AVATARS, DeckType } from '@planitpoker/shared';
-import { Alert, Card, Col, Flex, Row, Space, Tabs, Typography } from 'antd';
+import { Alert, Card, Col, Flex, Row, Space, Tabs, theme, Typography } from 'antd';
 import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
@@ -31,6 +31,7 @@ const readRoomCodeFromHash = (): string => {
 export const Home: React.FC = () => {
     const { createRoom, joinRoom, error, clearError } = useSocket();
     const { t } = useTranslation();
+    const { token } = theme.useToken();
 
     const roomCodeFromHash = readRoomCodeFromHash();
     const [activeTab, setActiveTab] = useState(roomCodeFromHash ? 'join' : 'create');
@@ -83,7 +84,19 @@ export const Home: React.FC = () => {
 
                     <Card>
                         <Flex gap={16} vertical>
-                            <Typography.Title level={5}>{t('home.profile')}</Typography.Title>
+                            {/* Level 2 keeps the outline descending under the page h1
+                                (Lighthouse heading-order); the size stays the compact
+                                heading-5 token so the step label is unchanged. */}
+                            <Typography.Title
+                                level={2}
+                                style={{
+                                    fontSize: token.fontSizeHeading5,
+                                    lineHeight: token.lineHeightHeading5,
+                                    marginBlock: 0,
+                                }}
+                            >
+                                {t('home.profile')}
+                            </Typography.Title>
 
                             <ParticipantProfile
                                 avatar={avatar}

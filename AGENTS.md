@@ -36,6 +36,9 @@ npm run build:shared
 npm run build          # builds shared + all apps with a build script
 ```
 
+- Type-checking resolves the package from source: the client `tsconfig.json` maps `@planitpoker/shared` to `packages/shared/src/index.ts` through `paths`. `tsc --noEmit` therefore works without a prior build.
+- Run `build:shared` before starting the apps: they load `dist/` through the package `exports` map.
+
 ## Test
 
 ```bash
@@ -189,6 +192,6 @@ Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. On
 ## Gotchas
 
 - `useSocket` uses the React 19 `use(Context)` hook, not `useContext`.
-- Client WebSocket URL resolution: `VITE_WS_URL` → dev fallback `ws://localhost:5000` → prod fallback uses `window.location.host`.
+- Client WebSocket URL resolution: `VITE_WS_URL` → dev fallback `ws://localhost:5000` → prod fallback dials `window.location.host` at the `/ws` path, the only route Nginx proxies (the bare host would answer with the SPA and the handshake would fail).
 - Server default CORS only allows `http://localhost:5173`; set `ALLOWED_ORIGINS` for other frontends.
 - `packages/shared` must be rebuilt after type changes before dependent apps see them in dev/build.

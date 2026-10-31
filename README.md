@@ -12,6 +12,7 @@ The application uses a client-server model communicating over WebSockets for rea
 - **`apps/server`**: The backend server. Built with Node.js, Express, and native WebSocket (`ws`). It manages the state of all active rooms and handles WebSocket connections.
 - **`packages/shared`**: A shared library containing TypeScript interfaces, enums, and constants used by both the client and server.
 - **`docs/security-review.md`**: the penetration test of the HTTP and WebSocket surface, its findings and the abuse controls that answered them.
+- **`docs/regression-playbook.md`**: the release regression gate — automated inventory, chaos experiments and exploratory charters.
 
 ### Security Model
 
@@ -132,6 +133,9 @@ npm install
 npm run build:shared
 ```
 
+- Type-checking resolves the package from source: the client `tsconfig.json` maps `@planitpoker/shared` to `packages/shared/src/index.ts` through `paths`. `tsc --noEmit` therefore works without a build.
+- Run `build:shared` before starting the apps: they load `dist/` through the package `exports` map.
+
 ### Development
 
 There is no root `npm run dev` script. Start both sides separately from the root directory:
@@ -219,7 +223,7 @@ docker compose up --build
 - Client: `http://localhost` (Nginx serves the SPA, proxies `/api/*` and `/ws` to `server`).
 - Server: `http://localhost:5000` (health at `GET /api/health`).
 - Same-origin by default: leave `VITE_WS_URL` empty and the browser uses
-  `window.location.host` through the Nginx `/ws` proxy (no CORS setup needed).
+  `window.location.host` **at `/ws`** through the Nginx proxy (no CORS setup needed); the path is mandatory, because `/` serves the SPA.
 - External backend: `VITE_WS_URL=wss://api.exemplo.com docker compose up --build`
   bakes the URL into the client bundle so the browser dials it directly.
 - Behind TLS: set `CLIENT_ID_COOKIE_SECURE=true` on the server so the

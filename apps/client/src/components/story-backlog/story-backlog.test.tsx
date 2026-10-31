@@ -8,6 +8,13 @@ import * as SocketContextModule from '../../context/socket-context/use-socket';
 import { createMockSocketValue } from '../../tests/socket-context.mock';
 import { StoryBacklog } from './story-backlog';
 
+// The capacity tests only need the boundary, not 200 rendered Ant Design rows.
+// The real ceiling stays enforced and tested on the server.
+vi.mock('@planitpoker/shared', async (importOriginal) => {
+    const actual = await importOriginal<Record<string, unknown>>();
+    return { ...actual, MAX_STORIES_PER_ROOM: 4 };
+});
+
 /** A room whose backlog already holds `storyCount` stories. */
 const roomWithStories = (storyCount: number): RoomState => {
     const stories: Story[] = Array.from({ length: storyCount }, (_, index) => ({
@@ -66,7 +73,7 @@ describe('StoryBacklog bulk import', () => {
         ]);
     });
 
-    it('caps the paste at the capacity the room still has', { timeout: 30_000 }, () => {
+    it('caps the paste at the capacity the room still has', () => {
         const bulkAddStories = vi.fn();
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
             createMockSocketValue({
@@ -85,7 +92,7 @@ describe('StoryBacklog bulk import', () => {
         expect(bulkAddStories).toHaveBeenCalledWith([{ title: 'One' }, { title: 'Two' }]);
     });
 
-    it('explains itself instead of closing when the backlog is full', { timeout: 30_000 }, () => {
+    it('explains itself instead of closing when the backlog is full', () => {
         const bulkAddStories = vi.fn();
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
             createMockSocketValue({

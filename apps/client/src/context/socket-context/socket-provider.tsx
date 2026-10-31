@@ -5,6 +5,7 @@ import { ERROR_KEYS, TranslationKey } from '../../i18n/dictionary';
 import { Translate } from '../../i18n/i18n-context';
 import { useTranslation } from '../../i18n/use-translation';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
+import { resolveSocketUrl } from '../../utils/socket-url';
 import { SocketContext, SocketContextValue } from './socket-context';
 
 /** Reconnection delay applied whenever the socket drops. */
@@ -12,6 +13,13 @@ const RECONNECT_DELAY_MS = 2000;
 
 /** Session storage key holding the token that survives a page reload. */
 const SESSION_TOKEN_STORAGE_KEY = 'planit_session_token';
+
+/** Errors that mean the room or session the client holds is gone, not merely unreachable. */
+const SESSION_LOST_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
+    'BANNED',
+    'NO_SESSION',
+    'ROOM_NOT_FOUND',
+]);
 
 /**
  * A server notice as received, kept untranslated.
@@ -53,9 +61,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [isKicked, setIsKicked] = useState(false);
     const socketRef = useRef<null | WebSocket>(null);
     const sessionTokenRef = useRef<null | string>(null);
+    const roomStateRef = useRef<null | RoomState>(null);
+    const currentUserIdRef = useRef<null | string>(null);
 
     useEffect(() => {
         sessionTokenRef.current = sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+    }, []);
+
+    const forgetSession = useCallback(() => {
+        roomStateRef.current = null;
+        currentUserIdRef.current = null;
+        sessionTokenRef.current = null;
+        sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+        setRoomState(null);
+        setCurrentUserId(null);
+    }, []);
+
+    const send = useCallback((type: WSMessageType, payload: unknown) => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ payload, type }));
+        } else {
+            setErrorNotice({ key: 'error.offline' });
+        }
     }, []);
 
     useEffect(() => {
@@ -71,12 +98,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 return;
             }
 
-            const defaultProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const defaultProdUrl = `${defaultProtocol}//${window.location.host}`;
-            const fallbackUrl = import.meta.env.DEV ? 'ws://localhost:5000' : defaultProdUrl;
-            const wsUrl = import.meta.env.VITE_WS_URL || fallbackUrl;
+            const wsUrl = resolveSocketUrl({
+                configuredUrl: import.meta.env.VITE_WS_URL,
+                isDev: import.meta.env.DEV,
+                location: window.location,
+            });
 
             const ws = new WebSocket(wsUrl);
+            socketRef.current = ws;
 
             ws.onopen = () => {
                 if (!isMounted) {
@@ -84,6 +113,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
                 setIsConnected(true);
                 setErrorNotice(null);
+
+                const room = roomStateRef.current;
+                const userId = currentUserIdRef.current;
+                const token = sessionTokenRef.current;
+                const self = room?.participants.find((participant) => participant.id === userId);
+                if (room && token && userId && self) {
+                    send('JOIN_ROOM', {
+                        avatar: self.avatar,
+                        color: self.color,
+                        name: self.name,
+                        roomId: room.id,
+                        sessionToken: token,
+                        userId,
+                    });
+                }
             };
 
             ws.onmessage = (event) => {
@@ -93,20 +137,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 try {
                     const { payload, type } = JSON.parse(event.data);
                     if (type === 'ROOM_STATE') {
+                        const isEnteringRoom = roomStateRef.current === null;
+                        roomStateRef.current = payload.roomState;
                         setRoomState(payload.roomState);
+                        if (isEnteringRoom) {
+                            // A notice raised on the lobby (a stale room code, a
+                            // rate limit) must not follow the user into the room
+                            // they just entered; notices raised inside a room stay.
+                            setErrorNotice(null);
+                        }
                         if (payload.currentUserId) {
+                            currentUserIdRef.current = payload.currentUserId;
                             setCurrentUserId(payload.currentUserId);
                         }
                     } else if (type === 'SESSION') {
                         sessionTokenRef.current = payload.sessionToken;
                         sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, payload.sessionToken);
                         if (payload.userId) {
+                            currentUserIdRef.current = payload.userId;
                             setCurrentUserId(payload.userId);
                         }
                     } else if (type === 'KICKED') {
-                        setRoomState(null);
-                        sessionTokenRef.current = null;
-                        sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+                        forgetSession();
                         setIsKicked(true);
                     } else if (type === 'ERROR') {
                         const errorPayload = payload as ErrorPayload;
@@ -114,6 +166,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             code: errorPayload.code,
                             message: errorPayload.message,
                         });
+                        const { code } = errorPayload;
+                        // `ROOM_NOT_FOUND` only means the session is gone when the client still holds
+                        // that room: a mistyped lobby code must not drop the token of the room the
+                        // user left. `BANNED` and `NO_SESSION` always end the session.
+                        const isSessionLost =
+                            code !== undefined &&
+                            SESSION_LOST_CODES.has(code) &&
+                            (code !== 'ROOM_NOT_FOUND' || roomStateRef.current !== null);
+                        if (isSessionLost) {
+                            forgetSession();
+                        }
                     }
                 } catch (err) {
                     console.error('Failed to parse WS payload:', err);
@@ -138,8 +201,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setIsConnected(false);
                 }
             };
-
-            socketRef.current = ws;
         };
 
         connect();
@@ -153,15 +214,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 socketRef.current.close();
             }
         };
-    }, []);
-
-    const send = useCallback((type: WSMessageType, payload: unknown) => {
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ payload, type }));
-        } else {
-            setErrorNotice({ key: 'error.offline' });
-        }
-    }, []);
+    }, [forgetSession, send]);
 
     const createRoom = useCallback(
         (
@@ -319,7 +372,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, [send]);
 
     const leaveRoom = useCallback(() => {
+        // Leaving is client-side only: no LEAVE message exists, so the server
+        // keeps this participant bound to the socket and only the session token
+        // can rebind it. The token therefore survives, while the room refs are
+        // cleared so `onopen` cannot re-enter the room on its own.
+        roomStateRef.current = null;
+        currentUserIdRef.current = null;
         setRoomState(null);
+        setCurrentUserId(null);
         window.location.hash = '';
     }, []);
 

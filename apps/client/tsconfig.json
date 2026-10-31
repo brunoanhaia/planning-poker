@@ -13,6 +13,10 @@
         "noEmit": true,
         "jsx": "react-jsx",
 
+        "paths": {
+            "@planitpoker/shared": ["../../packages/shared/src/index.ts"]
+        },
+
         "strict": true,
         "noUnusedLocals": false,
         "noUnusedParameters": false,

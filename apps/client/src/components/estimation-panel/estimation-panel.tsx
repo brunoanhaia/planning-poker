@@ -137,6 +137,7 @@ const renderTimerControls = ({
             <Tooltip title={isRunning ? t('estimation.pause') : t('estimation.start')}>
                 <Button
                     aria-label={t('estimation.toggle')}
+                    aria-pressed={isRunning}
                     icon={isRunning ? <PauseOutlined /> : <PlayCircleOutlined />}
                     onClick={isRunning ? onPause : () => onStart(timer.duration)}
                 />
