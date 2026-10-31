@@ -322,22 +322,22 @@ async function main() {
 
     // Sequential on purpose: the cases share the server's per-address rate
     // limits and connection budget, so running them together would make the
-    // gate depend on scheduling. The chain keeps that order without a loop.
-    const results = await cases.reduce(
-        (chain, testCase) =>
-            chain.then(async (outcomes) => {
-                try {
-                    await runWithTimeout(testCase.fn, 5000);
-                    console.log(`PASS ${testCase.name}`);
-                    return [...outcomes, true];
-                } catch (err) {
-                    const detail = err instanceof Error ? err.message : String(err);
-                    console.log(`FAIL ${testCase.name}: ${detail}`);
-                    return [...outcomes, false];
-                }
-            }),
-        Promise.resolve([])
-    );
+    // gate depend on scheduling. Each link waits for the previous one.
+    let chain = Promise.resolve([]);
+    for (const testCase of cases) {
+        chain = chain.then(async (outcomes) => {
+            try {
+                await runWithTimeout(testCase.fn, 5000);
+                console.log(`PASS ${testCase.name}`);
+                return [...outcomes, true];
+            } catch (err) {
+                const detail = err instanceof Error ? err.message : String(err);
+                console.log(`FAIL ${testCase.name}: ${detail}`);
+                return [...outcomes, false];
+            }
+        });
+    }
+    const results = await chain;
 
     const passedCount = results.filter(Boolean).length;
     const failedCount = results.length - passedCount;
