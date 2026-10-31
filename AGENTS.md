@@ -37,8 +37,7 @@ npm run build          # builds shared + all apps with a build script
 ```
 
 - Type-checking resolves the package from source: the client `tsconfig.json` maps `@planitpoker/shared` to `packages/shared/src/index.ts` through `paths`. `tsc --noEmit` therefore works without a prior build.
-- Runtime and bundling still load `dist/` through the package `exports` map.
-- `build:shared` stays mandatory before `npm run dev` or `npm run build`.
+- Run `build:shared` before starting the apps: they load `dist/` through the package `exports` map.
 
 ## Test
 
