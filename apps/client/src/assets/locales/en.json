@@ -194,6 +194,7 @@
     "results.votes_one": "{{count}} vote",
     "results.votes_other": "{{count}} votes",
     "results.share.aria": "Share of votes for {{vote}}",
+    "session.replaced": "This room was opened in another tab. This tab stopped updating.",
     "settings.apply": "Apply Settings",
     "settings.autoReveal": "Auto-Reveal Votes",
     "settings.autoReveal.hint": "Automatically flip cards when everyone has voted",

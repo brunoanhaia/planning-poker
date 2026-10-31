@@ -194,6 +194,7 @@
     "results.votes_one": "{{count}} voto",
     "results.votes_other": "{{count}} votos",
     "results.share.aria": "Parcela de votos para {{vote}}",
+    "session.replaced": "Esta sala foi aberta em outra aba. Esta aba parou de atualizar.",
     "settings.apply": "Aplicar Configurações",
     "settings.autoReveal": "Revelar Votos Automaticamente",
     "settings.autoReveal.hint": "Vira as cartas quando todos votarem",

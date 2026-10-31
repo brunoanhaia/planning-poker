@@ -16,7 +16,7 @@ The application uses a client-server model communicating over WebSockets for rea
 
 ### Security Model
 
-- **Session tokens**: On create/join the server issues an opaque token (`apps/server/src/sessionService.ts`) bound to the room participant. Reconnection is only honored when the token proves ownership of the `userId`; a client-supplied `userId` alone is never trusted. Tokens are revoked on kick.
+- **Session tokens**: On create/join the server issues an opaque token (`apps/server/src/sessionService.ts`) bound to the room participant. Reconnection is only honored when the token proves ownership of the `userId`; a client-supplied `userId` alone is never trusted. Tokens are revoked on kick. The token is kept per browser per room (`localStorage` key `planit_room_token:<ROOM>`), so a returning browser rejoins its participant instead of minting a duplicate. A second tab takes the participant over, and the older tab is closed with code 4001 and stops with a notice.
 - **Payload validation**: Every inbound WebSocket message is validated against a `zod` schema (`apps/server/src/validation.ts`) before reaching domain logic. Invalid payloads receive an `ERROR` and are never broadcast.
 - **Input limits**: Names (≤50), room titles (≤120), story titles (≤120), descriptions (≤2000), bulk imports (≤50), custom decks (2–30 unique cards), and timer durations (5–3600 s) are enforced server-side. Limits are shared constants in `packages/shared`.
 - **Safe export**: CSV export neutralizes spreadsheet formula injection and sanitizes the download filename (`apps/client/src/components/story-backlog/story-backlog.utils.ts`).

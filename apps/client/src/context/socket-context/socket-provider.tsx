@@ -1,4 +1,11 @@
-import { DeckType, ErrorCode, ErrorPayload, RoomState, WSMessageType } from '@planitpoker/shared';
+import {
+    DeckType,
+    ErrorCode,
+    ErrorPayload,
+    RoomState,
+    SESSION_REPLACED_CLOSE_CODE,
+    WSMessageType,
+} from '@planitpoker/shared';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ERROR_KEYS, TranslationKey } from '../../i18n/dictionary';
@@ -13,6 +20,35 @@ const RECONNECT_DELAY_MS = 2000;
 
 /** Session storage key holding the token that survives a page reload. */
 const SESSION_TOKEN_STORAGE_KEY = 'planit_session_token';
+
+/** Prefix of the local storage keys binding a browser to a room's participant. */
+const ROOM_TOKEN_STORAGE_PREFIX = 'planit_room_token:';
+
+/**
+ * Local storage key holding the participant token for one room.
+ *
+ * Unlike session storage, this survives a new tab and a re-opened invite link,
+ * so the same browser rejoins its existing participant instead of minting one.
+ */
+const roomTokenKey = (roomId: string): string => `${ROOM_TOKEN_STORAGE_PREFIX}${roomId}`;
+
+/**
+ * Stores the token for a room in both storages.
+ *
+ * @param roomId Room the token belongs to.
+ * @param token Participant token to persist.
+ */
+const persistRoomToken = (roomId: string, token: string): void => {
+    if (sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY) !== token) {
+        sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+    }
+    const key = roomTokenKey(roomId);
+    // Room state broadcasts on every vote and timer tick, so the write only
+    // happens when the stored value is actually stale.
+    if (localStorage.getItem(key) !== token) {
+        localStorage.setItem(key, token);
+    }
+};
 
 /** Errors that mean the room or session the client holds is gone, not merely unreachable. */
 const SESSION_LOST_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
@@ -69,10 +105,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
     const forgetSession = useCallback(() => {
+        const roomId = roomStateRef.current?.id;
         roomStateRef.current = null;
         currentUserIdRef.current = null;
         sessionTokenRef.current = null;
         sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+        if (roomId) {
+            localStorage.removeItem(roomTokenKey(roomId));
+        }
         setRoomState(null);
         setCurrentUserId(null);
     }, []);
@@ -140,6 +180,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         const isEnteringRoom = roomStateRef.current === null;
                         roomStateRef.current = payload.roomState;
                         setRoomState(payload.roomState);
+                        if (sessionTokenRef.current) {
+                            persistRoomToken(payload.roomState.id, sessionTokenRef.current);
+                        }
                         if (isEnteringRoom) {
                             // A notice raised on the lobby (a stale room code, a
                             // rate limit) must not follow the user into the room
@@ -153,6 +196,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     } else if (type === 'SESSION') {
                         sessionTokenRef.current = payload.sessionToken;
                         sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, payload.sessionToken);
+                        if (roomStateRef.current) {
+                            persistRoomToken(roomStateRef.current.id, payload.sessionToken);
+                        }
                         if (payload.userId) {
                             currentUserIdRef.current = payload.userId;
                             setCurrentUserId(payload.userId);
@@ -183,11 +229,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 }
             };
 
-            ws.onclose = () => {
+            ws.onclose = (event) => {
                 if (!isMounted) {
                     return;
                 }
                 setIsConnected(false);
+                if (event.code === SESSION_REPLACED_CLOSE_CODE) {
+                    // Another tab of this browser took the participant over. Hand
+                    // the room over, keep the stored token for the tab that owns
+                    // it, and stay put instead of fighting for the socket.
+                    roomStateRef.current = null;
+                    setRoomState(null);
+                    setErrorNotice({ key: 'session.replaced' });
+                    return;
+                }
                 reconnectTimeout = setTimeout(() => {
                     if (isMounted) {
                         connect();
@@ -237,7 +292,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 color,
                 name,
                 roomId,
-                sessionToken: sessionTokenRef.current,
+                sessionToken: sessionTokenRef.current ?? localStorage.getItem(roomTokenKey(roomId)),
                 userId: currentUserId,
             });
         },
