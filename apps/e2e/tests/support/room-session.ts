@@ -150,8 +150,10 @@ export const readDownloadContent = async (download: Download): Promise<string> =
 export const closeSessions = async (
     sessions: readonly (OpenSession | undefined)[]
 ): Promise<void> => {
-    for (const session of sessions) {
-        await session?.page?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
-        await session?.context?.close().catch(() => {});
-    }
+    await Promise.all(
+        sessions.map(async (session) => {
+            await session?.page?.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+            await session?.context?.close().catch(() => {});
+        })
+    );
 };

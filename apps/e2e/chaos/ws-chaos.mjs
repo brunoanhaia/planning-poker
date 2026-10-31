@@ -31,7 +31,10 @@ function parseArgs() {
  * @param {string} httpUrl - Base HTTP URL of the server.
  */
 async function checkHealth(httpUrl) {
-    const baseUrl = httpUrl.replace(/\/+$/, '');
+    let baseUrl = httpUrl;
+    while (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.slice(0, -1);
+    }
     const res = await fetch(`${baseUrl}/api/health`);
     if (res.status !== 200) {
         throw new Error(`Health check returned status ${res.status}`);
@@ -317,20 +320,22 @@ async function main() {
         { fn: () => testConnectionStorm(wsUrl, httpUrl), name: 'Connection storm' },
     ];
 
-    let passedCount = 0;
-    let failedCount = 0;
-
-    for (const testCase of cases) {
+    const results = await cases.reduce(async (previous, testCase) => {
+        const outcomes = await previous;
         try {
             await runWithTimeout(testCase.fn, 5000);
             console.log(`PASS ${testCase.name}`);
-            passedCount++;
+            outcomes.push(true);
         } catch (err) {
             const detail = err instanceof Error ? err.message : String(err);
             console.log(`FAIL ${testCase.name}: ${detail}`);
-            failedCount++;
+            outcomes.push(false);
         }
-    }
+        return outcomes;
+    }, Promise.resolve([]));
+
+    const passedCount = results.filter(Boolean).length;
+    const failedCount = results.length - passedCount;
 
     console.log(
         `\nChaos summary: ${passedCount} passed, ${failedCount} failed (${cases.length} total)`
@@ -344,7 +349,9 @@ async function main() {
     process.exit(process.exitCode);
 }
 
-main().catch((err) => {
+try {
+    await main();
+} catch (err) {
     console.error('Unexpected chaos runner error:', err);
     process.exitCode = 1;
-});
+}
