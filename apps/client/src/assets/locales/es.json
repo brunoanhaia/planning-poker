@@ -179,6 +179,7 @@
     "results.custom.title": "Definir Puntuación Personalizada",
     "results.customScore": "Puntuación Personalizada",
     "results.distribution": "Distribución de los Votos",
+    "results.finalScore": "Estimación final: {{value}}",
     "results.median": "Mediana",
     "results.noVotes": "Todavía no se ha votado esta historia.",
     "results.outliers": "Valores atípicos",

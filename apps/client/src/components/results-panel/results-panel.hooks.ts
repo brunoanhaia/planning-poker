@@ -48,9 +48,14 @@ export const useEstimationStats = (roomState: null | RoomState): EstimationStats
         if (!roomState) {
             return [];
         }
-        return roomState.participants.filter(
-            (p) => !p.isSpectator && p.vote !== null && p.vote !== undefined
-        );
+        return roomState.participants.filter((p) => {
+            if (p.vote === null || p.vote === undefined) {
+                return false;
+            }
+            // A revealed round is frozen: a voter who switches to spectator afterwards
+            // keeps the card they showed, so the role only filters the cards still being cast.
+            return roomState.votesRevealed || !p.isSpectator;
+        });
     }, [roomState]);
 
     const stats = useMemo(

@@ -179,6 +179,7 @@
     "results.custom.title": "Set Custom Story Score",
     "results.customScore": "Custom Score",
     "results.distribution": "Vote Distribution Breakdown",
+    "results.finalScore": "Final estimate: {{value}}",
     "results.median": "Median",
     "results.noVotes": "No votes were cast for this story yet.",
     "results.outliers": "Outliers",

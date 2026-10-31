@@ -66,17 +66,35 @@ describe('useEstimationStats', () => {
         expect(result.current.consensusPercentage).toBe(67);
     });
 
-    it('ignores spectators and empty cards', () => {
+    it('ignores spectators and empty cards before the reveal', () => {
         const spectator: Participant = {
             ...buildVoter('user_2', 8),
             isSpectator: true,
         };
-        const { result } = renderHook(() =>
-            useEstimationStats(buildRoom([buildVoter('user_1', 3), spectator]))
-        );
+        const room = buildRoom([buildVoter('user_1', 3), spectator]);
+        const { result } = renderHook(() => useEstimationStats({ ...room, votesRevealed: false }));
 
         expect(result.current.totalVotes).toBe(1);
         expect(result.current.votedParticipants).toHaveLength(1);
+    });
+
+    it('keeps a spectator card that was cast before the reveal', () => {
+        const spectator: Participant = {
+            ...buildVoter('user_3', 5),
+            isSpectator: true,
+        };
+        const revealedRoom = buildRoom([
+            buildVoter('user_1', 3),
+            buildVoter('user_2', 5),
+            spectator,
+        ]);
+        const hiddenRoom = { ...revealedRoom, votesRevealed: false };
+        const revealed = renderHook(() => useEstimationStats(revealedRoom));
+        const hidden = renderHook(() => useEstimationStats(hiddenRoom));
+
+        expect(revealed.result.current.totalVotes).toBe(3);
+        expect(revealed.result.current.averageText).toBe('4.3');
+        expect(hidden.result.current.totalVotes).toBe(2);
     });
 
     it('reports unanimity only when every voter chose the same card', () => {
