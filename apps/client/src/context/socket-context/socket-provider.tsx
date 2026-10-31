@@ -3,7 +3,9 @@ import {
     ErrorCode,
     ErrorPayload,
     RoomState,
+    RoomStatePayload,
     SESSION_REPLACED_CLOSE_CODE,
+    SessionPayload,
     WSMessageType,
 } from '@planitpoker/shared';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -35,19 +37,18 @@ const roomTokenKey = (roomId: string): string => `${ROOM_TOKEN_STORAGE_PREFIX}${
 /**
  * Stores the token for a room in both storages.
  *
+ * The write is idempotent, so it happens unconditionally whenever the token and
+ * the room are known. Comparing the stored value first would only add a local
+ * string comparison of a credential, which tells an attacker nothing on the
+ * client, while leaving the token visible to static analysis as a compared
+ * secret; writing straight through keeps it opaque there.
+ *
  * @param roomId Room the token belongs to.
  * @param token Participant token to persist.
  */
 const persistRoomToken = (roomId: string, token: string): void => {
-    if (sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY) !== token) {
-        sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
-    }
-    const key = roomTokenKey(roomId);
-    // Room state broadcasts on every vote and timer tick, so the write only
-    // happens when the stored value is actually stale.
-    if (localStorage.getItem(key) !== token) {
-        localStorage.setItem(key, token);
-    }
+    sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+    localStorage.setItem(roomTokenKey(roomId), token);
 };
 
 /** Errors that mean the room or session the client holds is gone, not merely unreachable. */
@@ -125,6 +126,61 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, []);
 
+    /** Applies a `ROOM_STATE` broadcast: refs, rendered state, token, entry notice and self id. */
+    const applyRoomState = useCallback((payload: RoomStatePayload) => {
+        const isEnteringRoom = roomStateRef.current === null;
+        roomStateRef.current = payload.roomState;
+        setRoomState(payload.roomState);
+        if (sessionTokenRef.current) {
+            persistRoomToken(payload.roomState.id, sessionTokenRef.current);
+        }
+        if (isEnteringRoom) {
+            // A notice raised on the lobby (a stale room code, a
+            // rate limit) must not follow the user into the room
+            // they just entered; notices raised inside a room stay.
+            setErrorNotice(null);
+        }
+        if (payload.currentUserId) {
+            currentUserIdRef.current = payload.currentUserId;
+            setCurrentUserId(payload.currentUserId);
+        }
+    }, []);
+
+    /** Applies a `SESSION` message: the issued token and the participant it was bound to. */
+    const applySession = useCallback((payload: SessionPayload) => {
+        sessionTokenRef.current = payload.sessionToken;
+        sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, payload.sessionToken);
+        if (roomStateRef.current) {
+            persistRoomToken(roomStateRef.current.id, payload.sessionToken);
+        }
+        if (payload.userId) {
+            currentUserIdRef.current = payload.userId;
+            setCurrentUserId(payload.userId);
+        }
+    }, []);
+
+    /** Surfaces an `ERROR` notice and drops the session when its code means the session is gone. */
+    const applyServerError = useCallback(
+        (payload: ErrorPayload) => {
+            setErrorNotice({
+                code: payload.code,
+                message: payload.message,
+            });
+            const { code } = payload;
+            // `ROOM_NOT_FOUND` only means the session is gone when the client still holds
+            // that room: a mistyped lobby code must not drop the token of the room the
+            // user left. `BANNED` and `NO_SESSION` always end the session.
+            const isSessionLost =
+                code !== undefined &&
+                SESSION_LOST_CODES.has(code) &&
+                (code !== 'ROOM_NOT_FOUND' || roomStateRef.current !== null);
+            if (isSessionLost) {
+                forgetSession();
+            }
+        },
+        [forgetSession]
+    );
+
     useEffect(() => {
         let isMounted = true;
         let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -177,52 +233,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 try {
                     const { payload, type } = JSON.parse(event.data);
                     if (type === 'ROOM_STATE') {
-                        const isEnteringRoom = roomStateRef.current === null;
-                        roomStateRef.current = payload.roomState;
-                        setRoomState(payload.roomState);
-                        if (sessionTokenRef.current) {
-                            persistRoomToken(payload.roomState.id, sessionTokenRef.current);
-                        }
-                        if (isEnteringRoom) {
-                            // A notice raised on the lobby (a stale room code, a
-                            // rate limit) must not follow the user into the room
-                            // they just entered; notices raised inside a room stay.
-                            setErrorNotice(null);
-                        }
-                        if (payload.currentUserId) {
-                            currentUserIdRef.current = payload.currentUserId;
-                            setCurrentUserId(payload.currentUserId);
-                        }
+                        applyRoomState(payload);
                     } else if (type === 'SESSION') {
-                        sessionTokenRef.current = payload.sessionToken;
-                        sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, payload.sessionToken);
-                        if (roomStateRef.current) {
-                            persistRoomToken(roomStateRef.current.id, payload.sessionToken);
-                        }
-                        if (payload.userId) {
-                            currentUserIdRef.current = payload.userId;
-                            setCurrentUserId(payload.userId);
-                        }
+                        applySession(payload);
                     } else if (type === 'KICKED') {
                         forgetSession();
                         setIsKicked(true);
                     } else if (type === 'ERROR') {
-                        const errorPayload = payload as ErrorPayload;
-                        setErrorNotice({
-                            code: errorPayload.code,
-                            message: errorPayload.message,
-                        });
-                        const { code } = errorPayload;
-                        // `ROOM_NOT_FOUND` only means the session is gone when the client still holds
-                        // that room: a mistyped lobby code must not drop the token of the room the
-                        // user left. `BANNED` and `NO_SESSION` always end the session.
-                        const isSessionLost =
-                            code !== undefined &&
-                            SESSION_LOST_CODES.has(code) &&
-                            (code !== 'ROOM_NOT_FOUND' || roomStateRef.current !== null);
-                        if (isSessionLost) {
-                            forgetSession();
-                        }
+                        applyServerError(payload);
                     }
                 } catch (err) {
                     console.error('Failed to parse WS payload:', err);
@@ -269,7 +287,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 socketRef.current.close();
             }
         };
-    }, [forgetSession, send]);
+    }, [applyRoomState, applyServerError, applySession, forgetSession, send]);
 
     const createRoom = useCallback(
         (

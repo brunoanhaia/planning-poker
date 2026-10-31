@@ -548,7 +548,7 @@ export class RoomManager {
         this.resetRoomVotes(room);
 
         const story = room.stories[room.currentStoryIndex];
-        if (story && story.finalEstimate !== undefined && story.finalEstimate !== null) {
+        if (story && (story.finalEstimate ?? null) !== null) {
             story.finalEstimate = null;
             story.status = 'estimating';
         }
