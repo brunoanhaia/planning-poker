@@ -86,13 +86,16 @@ const room: RoomState = {
 
 /** Renders the connection state the provider exposes. */
 const Probe = () => {
-    const { error, leaveRoom, roomState } = useSocket();
+    const { error, joinRoom, leaveRoom, roomState } = useSocket();
     return (
         <>
             <span>{roomState ? 'room' : 'lobby'}</span>
             <span>{error ?? ''}</span>
             <button onClick={leaveRoom} type="button">
                 leave
+            </button>
+            <button onClick={() => joinRoom('ROOM01', 'Ana', 'avatar-1', '#1890ff')} type="button">
+                join
             </button>
         </>
     );
@@ -221,6 +224,27 @@ describe('SocketProvider reconnection', () => {
         }
     );
 
+    it('keeps the stored session when a lobby join is rejected as not found', () => {
+        // The user left a room but kept its token; a mistyped code on the lobby
+        // must not cost them the participant that only that token can rebind.
+        sessionStorage.setItem('planit_session_token', 'tok');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+
+        act(() => {
+            socket.receive({
+                payload: { code: 'ROOM_NOT_FOUND', message: 'Room not found.' },
+                type: 'ERROR',
+            });
+        });
+
+        expect(screen.getByText('lobby')).toBeInTheDocument();
+        expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
+    });
+
     it('keeps the credential when the user leaves, so nothing rejoins on its own', () => {
         renderProbe();
         const first = enterRoom();
@@ -246,6 +270,30 @@ describe('SocketProvider reconnection', () => {
         });
 
         expect(second.sent).toEqual([]);
+    });
+
+    it('rejoins with the kept token and no user id after leaving', () => {
+        renderProbe();
+        const socket = enterRoom();
+
+        act(() => {
+            screen.getByRole('button', { name: 'leave' }).click();
+        });
+        act(() => {
+            screen.getByRole('button', { name: 'join' }).click();
+        });
+
+        expect(socket.sent).toHaveLength(1);
+        const frame = JSON.parse(socket.sent[0]);
+        expect(frame.type).toBe('JOIN_ROOM');
+        expect(frame.payload).toEqual({
+            avatar: 'avatar-1',
+            color: '#1890ff',
+            name: 'Ana',
+            roomId: 'ROOM01',
+            sessionToken: 'tok',
+            userId: null,
+        });
     });
 
     it('drops a notice raised on the lobby once the room is entered', () => {

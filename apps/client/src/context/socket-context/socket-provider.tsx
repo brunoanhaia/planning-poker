@@ -166,7 +166,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                             code: errorPayload.code,
                             message: errorPayload.message,
                         });
-                        if (errorPayload.code && SESSION_LOST_CODES.has(errorPayload.code)) {
+                        const { code } = errorPayload;
+                        // `ROOM_NOT_FOUND` only means the session is gone when the client still holds
+                        // that room: a mistyped lobby code must not drop the token of the room the
+                        // user left. `BANNED` and `NO_SESSION` always end the session.
+                        const isSessionLost =
+                            code !== undefined &&
+                            SESSION_LOST_CODES.has(code) &&
+                            (code !== 'ROOM_NOT_FOUND' || roomStateRef.current !== null);
+                        if (isSessionLost) {
                             forgetSession();
                         }
                     }
