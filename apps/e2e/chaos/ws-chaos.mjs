@@ -320,19 +320,24 @@ async function main() {
         { fn: () => testConnectionStorm(wsUrl, httpUrl), name: 'Connection storm' },
     ];
 
-    const results = await cases.reduce(async (previous, testCase) => {
-        const outcomes = await previous;
-        try {
-            await runWithTimeout(testCase.fn, 5000);
-            console.log(`PASS ${testCase.name}`);
-            outcomes.push(true);
-        } catch (err) {
-            const detail = err instanceof Error ? err.message : String(err);
-            console.log(`FAIL ${testCase.name}: ${detail}`);
-            outcomes.push(false);
-        }
-        return outcomes;
-    }, Promise.resolve([]));
+    // Sequential on purpose: the cases share the server's per-address rate
+    // limits and connection budget, so running them together would make the
+    // gate depend on scheduling. The chain keeps that order without a loop.
+    const results = await cases.reduce(
+        (chain, testCase) =>
+            chain.then(async (outcomes) => {
+                try {
+                    await runWithTimeout(testCase.fn, 5000);
+                    console.log(`PASS ${testCase.name}`);
+                    return [...outcomes, true];
+                } catch (err) {
+                    const detail = err instanceof Error ? err.message : String(err);
+                    console.log(`FAIL ${testCase.name}: ${detail}`);
+                    return [...outcomes, false];
+                }
+            }),
+        Promise.resolve([])
+    );
 
     const passedCount = results.filter(Boolean).length;
     const failedCount = results.length - passedCount;
