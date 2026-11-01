@@ -90,9 +90,13 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
             return;
         }
         const copied = await copyText(buildInviteLink(roomState.id));
-        await (copied
-            ? message.success(t('nav.copy.success'))
-            : message.error(t('nav.copy.error')));
+
+        if (copied) {
+            message.success(t('nav.copy.success'));
+            return;
+        }
+
+        message.error(t('nav.copy.error'));
     };
 
     const openRename = () => {
