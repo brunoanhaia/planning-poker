@@ -195,12 +195,13 @@ npm --workspace=@planitpoker/e2e run test tests/overlap-axe.spec.ts
 (`.github/workflows/release.yml`). The Conventional Commit messages decide the next version, which
 is applied to `CHANGELOG.md` and the root `package.json`, tagged `v<version>` and published as a
 GitHub release. `feat`, `fix`, `perf` and `revert` produce a release; `chore`, `docs`, `style`,
-`refactor`, `test`, `build` and `ci` do not, so a maintenance merge does not mint a version.
+`refactor`, `test`, `build` and `ci` do not, so a maintenance merge does not mint a version. The
+exception is a breaking change: any type carrying `!` (or a `BREAKING CHANGE:` footer) releases a
+major, including `refactor!: …`.
 
 `semantic-release` pushes the changelog commit straight to `develop`, so that branch must accept a
 push from the workflow token: leave it without a "require pull request" rule, or add GitHub Actions to
-the bypass list. The workflow runs `git push --dry-run` first, so a rule that would block the release
-fails the job before anything is tagged.
+the bypass list. A rule that blocks that push fails the release job, and nothing is tagged.
 
 Messages are checked twice: the `commit-msg` hook locally, and
 `.github/workflows/conventional-commits.yml` in CI — every commit in a pull request plus the pull

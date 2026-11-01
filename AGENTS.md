@@ -79,6 +79,7 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - Nothing is published to npm: the workspace is private.
     - `feat`, `fix`, `perf` and `revert` produce a release.
     - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.
+    - A breaking change releases a major whatever the type, so `refactor!: …` is a major.
     - `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.

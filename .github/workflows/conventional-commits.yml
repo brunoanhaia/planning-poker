@@ -41,4 +41,4 @@ jobs:
             - name: Pull request title
               env:
                   TITLE: ${{ github.event.pull_request.title }}
-              run: printf '%s\n' "$TITLE" | ./node_modules/.bin/commitlint --verbose
+              run: printf '%s\n' "$TITLE" | ./node_modules/.bin/commitlint --config .github/commitlint-title.config.mjs --verbose

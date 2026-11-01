@@ -23,9 +23,15 @@ export default {
             '@semantic-release/commit-analyzer',
             {
                 preset: 'conventionalcommits',
-                // commitlint accepts a plain `revert:` header, which the default
-                // rule only releases when the body carries the reverted hash.
-                releaseRules: [{ type: 'revert', release: 'patch' }],
+                // A custom rule list replaces the defaults, so the breaking rule
+                // is restated first: `refactor!:` or `revert!:` is a major, even
+                // for a type that would otherwise release nothing.
+                releaseRules: [
+                    { breaking: true, release: 'major' },
+                    // commitlint accepts a plain `revert:` header, which the
+                    // default rule only releases when the body carries the hash.
+                    { type: 'revert', release: 'patch' },
+                ],
             },
         ],
         [

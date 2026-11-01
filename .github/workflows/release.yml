@@ -45,13 +45,6 @@ jobs:
             - name: Client suite
               run: npm run test:client
 
-            # `@semantic-release/git` pushes the changelog and version commit
-            # before tagging. A branch rule that requires pull requests, or that
-            # does not let this token bypass it, would fail the release here; the
-            # dry-run makes that visible before anything is published.
-            - name: Verify the release commit can be pushed
-              run: git push --dry-run origin HEAD:develop
-
             - name: Release
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
