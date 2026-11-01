@@ -22,10 +22,14 @@
  *   wrong code once or twice; a brute-forcer generates thousands of *different*
  *   ones. Counting distinct codes collapses a whole office of typos into one
  *   entry, so a shared address cannot be barred by its own users.
- * - **The budget only ever gates a miss.** A caller that arrives with a code
- *   that exists is legitimate by definition, so the room is looked up first and
- *   the budget is consulted only when nothing matched. A barred address can
- *   still join the room it actually belongs to.
+ * - **The budget gates the room lookup itself**, so a barred address is answered
+ *   `RATE_LIMITED` for every join until its window frees, existing codes
+ *   included. That is deliberate: gating only the miss let a barred address keep
+ *   probing at message rate, and still join a code it guessed correctly, which
+ *   is exactly what the bar exists to prevent. The accepted cost is that a busy
+ *   NAT can be locked out of its own room for the cool-down — a shared address
+ *   has to spend a whole budget of *distinct* wrong codes to get there, so the
+ *   innocent case needs thousands of different typos rather than the usual one.
  *
  * The state it keeps is bounded by {@link JOIN_FAILURE_MAX_TRACKED_ADDRESSES}: a
  * client cycling through distinct addresses leaves one record each, and the
@@ -59,11 +63,12 @@ export class JoinFailureLimiter {
     ) {}
 
     /**
-     * Reports whether an address may still probe a room code that does not exist.
+     * Reports whether an address may still have a room looked up at all.
      *
-     * Only misses are answered with this. A code that matches a room is always
-     * allowed through, so a bar never locks a legitimate participant out of the
-     * room it is joining.
+     * Consulted before the room lookup, so a barred address is answered
+     * `RATE_LIMITED` for every join — a code that exists included. The bar is
+     * deliberate: the previous arrangement only slowed misses, which let a
+     * barred address keep probing and join a code it happened to hit.
      *
      * @param address - The normalized peer address.
      * @param now - Current timestamp, in milliseconds.

@@ -33,6 +33,8 @@ export interface SentMessage {
 /** A socket double that records what the handler sends it. */
 export class SocketDouble {
     public static readonly OPEN = 1;
+    /** Bytes the double is pretending the client has not read yet. */
+    public bufferedAmount = 0;
     public readyState = 1;
     public isAlive = true;
     public hasOrigin = true;

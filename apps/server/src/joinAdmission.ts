@@ -70,9 +70,9 @@ export interface JoinAdmissionOptions {
  * Decides which joins get past the door, and answers the ones that do not.
  *
  * Every bar here stands in front of the room rather than inside it: the kick
- * bans, the requirement that a non-browser client proves who it is, and the ban
- * that survives a discarded token. A join that reaches the room is past all of
- * them.
+ * bans, the requirement that a non-browser client proves who it is, the ban
+ * that survives a discarded token, and the budget of failed room lookups one
+ * address may spend. A join that reaches the room is past all of them.
  */
 export class JoinAdmission {
     private readonly bans: BanService;
@@ -140,6 +140,19 @@ export class JoinAdmission {
             return true;
         }
 
+        // The failed-join budget is consulted before the room is looked up, so a
+        // barred address cannot tell a code that exists from one that does not:
+        // every join it sends is answered the same way until the window frees.
+        if (!this.joinFailures.allows(attempt.address, now)) {
+            auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
+            this.sendError(
+                ws,
+                'Too many wrong room codes from this network. Try again in a minute.',
+                'RATE_LIMITED'
+            );
+            return true;
+        }
+
         return false;
     }
 
@@ -147,24 +160,14 @@ export class JoinAdmission {
      * Reports a room code that matched no room.
      *
      * A code that matches no room is a guess, and it is the one signal a
-     * brute-force attempt cannot avoid producing. The room was looked up first,
-     * so a code that exists never consults this budget: the bar is for guessing,
-     * not for joining, and a NAT'd team cannot be locked out of the room it is
-     * actually entering.
+     * brute-force attempt cannot avoid producing. The budget that bars the
+     * address afterwards is consulted in {@link refuse}, before the room is
+     * looked up, so this only records the miss and answers it.
      *
      * @param ws - The sender's WebSocket connection.
      * @param attempt - The join that matched no room.
      */
     public reportUnknownRoom(ws: ExtendedWebSocket, attempt: JoinAttempt): void {
-        if (!this.joinFailures.allows(attempt.address, attempt.now)) {
-            auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
-            this.sendError(
-                ws,
-                'Too many wrong room codes from this network. Try again in a minute.',
-                'RATE_LIMITED'
-            );
-            return;
-        }
         this.joinFailures.recordFailure(attempt.address, attempt.normalizedRoomId, attempt.now);
         auditLog({
             action: 'join.rejected.room-not-found',

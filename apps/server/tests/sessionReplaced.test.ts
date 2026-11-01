@@ -140,3 +140,93 @@ describe('Room switching', () => {
         expect(room?.participants[0]).toMatchObject({ id: joinerId, isAdmin: true, isHost: true });
     });
 });
+
+/** A room the mover leaves, an observer inside it, and the room it moves to. */
+interface SwitchSetup {
+    connect: ReturnType<typeof boot>['connect'];
+    leftParticipantId: string;
+    leftRoomId: string;
+    mover: ReturnType<ReturnType<typeof boot>['connect']>;
+    nextRoomId: string;
+    observer: ReturnType<ReturnType<typeof boot>['connect']>;
+}
+
+/** Boots two rooms and an observer, so a switch can be asserted from both sides. */
+const setupSwitch = (): SwitchSetup => {
+    const { connect } = boot();
+
+    const mover = connect({ clientId: '88888888-8888-4888-8888-888888888888' });
+    send(mover, 'CREATE_ROOM', { name: 'Alice' });
+    const leftRoomId = roomIdOf(mover);
+    const leftParticipantId = participantIdOf(mover);
+
+    // A second window keeps a view of the room the mover leaves.
+    const observer = connect({ clientId: '99999999-9999-4999-8999-999999999999' });
+    send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
+
+    const otherHost = connect({ clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+    send(otherHost, 'CREATE_ROOM', { name: 'Carol' });
+    const nextRoomId = roomIdOf(otherHost);
+
+    return { connect, leftParticipantId, leftRoomId, mover, nextRoomId, observer };
+};
+
+describe('Room switching without a token', () => {
+    it('marks the seat offline when the socket creates another room', () => {
+        const { leftParticipantId, leftRoomId, mover, observer } = setupSwitch();
+
+        // The same socket opens a second room without proving the first one,
+        // which is what a client-only Leave leaves behind.
+        send(mover, 'CREATE_ROOM', { name: 'Alice' });
+
+        const leftRoom = lastMessage(observer, 'ROOM_STATE')?.payload.roomState;
+        expect(leftRoom?.id).toBe(leftRoomId);
+        // The seat is offline, not a ghost the idle sweep would have to trust.
+        expect(leftRoom?.participants.find((it) => it.id === leftParticipantId)).toMatchObject({
+            id: leftParticipantId,
+            isOnline: false,
+        });
+    });
+
+    it('releases the room a socket created when it joins another one', () => {
+        const { leftParticipantId, leftRoomId, mover, nextRoomId, observer } = setupSwitch();
+
+        send(mover, 'JOIN_ROOM', { name: 'Alice', roomId: nextRoomId });
+
+        const leftRoom = lastMessage(observer, 'ROOM_STATE')?.payload.roomState;
+        expect(leftRoom?.id).toBe(leftRoomId);
+        expect(leftRoom?.participants.find((it) => it.id === leftParticipantId)?.isOnline).toBe(
+            false
+        );
+
+        // The socket is bound to the room it joined and still acts there.
+        const joinedParticipantId = participantIdOf(mover);
+        expect(roomIdOf(mover)).toBe(nextRoomId);
+        send(mover, 'TOGGLE_SPECTATOR', {});
+        const joinedRoom = lastMessage(mover, 'ROOM_STATE')?.payload.roomState;
+        expect(joinedRoom?.id).toBe(nextRoomId);
+        const joinedParticipant = joinedRoom?.participants.find(
+            (it) => it.id === joinedParticipantId
+        );
+        expect(joinedParticipant).toMatchObject({ id: joinedParticipantId, isSpectator: true });
+    });
+
+    it('switches the socket itself when it proves the room it leaves with a token', () => {
+        const { leftParticipantId, leftRoomId, mover, nextRoomId, observer } = setupSwitch();
+
+        // Same socket, old-room token: the seat is removed by the token path,
+        // so the moving socket must survive and the room must hear of it once.
+        send(mover, 'JOIN_ROOM', {
+            name: 'Alice',
+            previousRoomToken: tokenOf(mover),
+            roomId: nextRoomId,
+        });
+
+        expect(mover.closes).toEqual([]);
+        expect(roomIdOf(mover)).toBe(nextRoomId);
+        expect(observer.sent.filter((it) => it.type === 'ROOM_STATE')).toHaveLength(2);
+        const leftRoom = lastMessage(observer, 'ROOM_STATE')?.payload.roomState;
+        expect(leftRoom?.id).toBe(leftRoomId);
+        expect(leftRoom?.participants.map((it) => it.id)).not.toContain(leftParticipantId);
+    });
+});
