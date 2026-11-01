@@ -7,6 +7,7 @@ import {
     ErrorCode,
     JoinRoomPayload,
     KICK_BAN_DURATION_MS,
+    ROOM_SWITCHED_CLOSE_CODE,
     SESSION_REPLACED_CLOSE_CODE,
     SetCurrentStoryPayload,
     StartTimerPayload,
@@ -486,6 +487,50 @@ export class WebSocketHandler {
     }
 
     /**
+     * Ends the room session a browser still holds when it opens a different room.
+     *
+     * The client proves ownership with the token it already has, so the server
+     * never trusts a client-supplied identity. The participant leaves the old
+     * room (its row disappears, host included) and the socket that held it is
+     * closed with `ROOM_SWITCHED_CLOSE_CODE`, which that tab turns into a notice
+     * instead of a reconnect.
+     *
+     * @param previousRoomToken - Token of the room the browser is leaving.
+     * @param current - Room and participant of the session just opened.
+     */
+    private endPreviousRoom(
+        previousRoomToken: string | null,
+        current: { roomId: string; userId: string }
+    ): void {
+        if (!previousRoomToken) {
+            return;
+        }
+        const binding = sessionService.resolve(previousRoomToken);
+        if (!binding) {
+            return;
+        }
+        if (binding.roomId === current.roomId && binding.userId === current.userId) {
+            return;
+        }
+
+        const previousKey = socketKey(binding.roomId, binding.userId);
+        const previousSocket = this.activeSockets.get(previousKey);
+        if (previousSocket) {
+            previousSocket.roomId = undefined;
+            previousSocket.userId = undefined;
+            this.activeSockets.delete(previousKey);
+            previousSocket.close(ROOM_SWITCHED_CLOSE_CODE, 'session moved');
+        }
+
+        // Revoked, so the token cannot rebind the participant the switch removed.
+        sessionService.revoke(previousRoomToken);
+        const updatedRoom = roomManager.removeParticipant(binding.roomId, binding.userId);
+        if (updatedRoom) {
+            this.broadcastRoomState(binding.roomId);
+        }
+    }
+
+    /**
      * Broadcasts the room state when an operation succeeds, otherwise notifies the sender.
      *
      * @param ws - The sender's WebSocket connection.
@@ -534,6 +579,7 @@ export class WebSocketHandler {
         ws.roomId = roomId;
         ws.userId = hostId;
         this.bindActiveSocket(ws, roomId, hostId);
+        this.endPreviousRoom(payload.previousRoomToken ?? null, { roomId, userId: hostId });
 
         const sessionToken = sessionService.issue(roomId, hostId);
         this.send(ws, 'SESSION', { sessionToken, userId: hostId });
@@ -643,7 +689,7 @@ export class WebSocketHandler {
      * discarded session token.
      */
     private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
-        const { avatar, color, name, roomId, sessionToken, userId } = payload;
+        const { avatar, color, name, previousRoomToken, roomId, sessionToken, userId } = payload;
 
         const address = ws.remoteAddress ?? 'unknown';
         const now = Date.now();
@@ -719,6 +765,10 @@ export class WebSocketHandler {
         ws.roomId = roomState.id;
         ws.userId = participant.id;
         this.bindActiveSocket(ws, roomState.id, participant.id);
+        this.endPreviousRoom(previousRoomToken ?? null, {
+            roomId: roomState.id,
+            userId: participant.id,
+        });
 
         const issuedToken = sessionService.issue(roomState.id, participant.id);
         this.send(ws, 'SESSION', { sessionToken: issuedToken, userId: participant.id });

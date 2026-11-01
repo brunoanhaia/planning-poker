@@ -123,6 +123,27 @@ export const leaveParticipant = (room: RoomState, userId: string): RoomState => 
 };
 
 /**
+ * Removes a participant who moved to another room in the same browser.
+ *
+ * Handing the host role over first keeps the room administrable, then the row
+ * disappears instead of lingering as an offline ghost.
+ *
+ * @param room - The active room state.
+ * @param userId - The identifier of the participant to remove.
+ * @returns The updated RoomState.
+ */
+export const removeParticipant = (room: RoomState, userId: string): RoomState => {
+    leaveParticipant(room, userId);
+    room.participants = room.participants.filter((participant) => participant.id !== userId);
+    // An emptied room must not keep pointing at a host who is no longer in it;
+    // the next joiner is made host by `joinParticipant`.
+    if (room.participants.length === 0) {
+        room.hostId = '';
+    }
+    return room;
+};
+
+/**
  * Submits an estimation vote for a participant and handles auto-reveal triggers.
  *
  * @param room - The active room state.

@@ -26,6 +26,7 @@ import {
     kickParticipant,
     leaveParticipant,
     promoteParticipantCoAdmin,
+    removeParticipant,
     sanitizeRoomStateForUser,
     submitVoteForParticipant,
     toggleParticipantSpectator,
@@ -301,6 +302,22 @@ export class RoomManager {
             return null;
         }
         return leaveParticipant(room, userId);
+    }
+
+    /**
+     * Removes a participant who moved to another room in the same browser,
+     * dropping the roster row instead of leaving an offline ghost.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - The identifier of the participant to remove.
+     * @returns Updated RoomState or null if room not found.
+     */
+    public removeParticipant(roomId: string, userId: string): RoomState | null {
+        const room = this.getRoom(roomId);
+        if (!room) {
+            return null;
+        }
+        return removeParticipant(room, userId);
     }
 
     /**

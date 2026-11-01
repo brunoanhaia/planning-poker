@@ -4,9 +4,11 @@ import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
 import { useTranslation } from '../../i18n/use-translation';
+import { readActiveRoom } from '../../utils/active-room';
 import { CreateSessionForm } from '../create-session-form/create-session-form';
 import { JoinSessionForm } from '../join-session-form/join-session-form';
 import { ParticipantProfile } from '../participant-profile/participant-profile';
+import { SessionSwitchModal } from '../session-switch-modal/session-switch-modal';
 
 /** Keys used to remember the participant profile between visits. */
 const NAME_STORAGE_KEY = 'planit_name';
@@ -45,6 +47,11 @@ export const Home: React.FC = () => {
         () => localStorage.getItem(COLOR_STORAGE_KEY) || AVATAR_COLORS[0]
     );
 
+    const [pendingSwitch, setPendingSwitch] = useState<null | {
+        activeRoomId: string;
+        run: () => void;
+    }>(null);
+
     const hasDisplayName = displayName.trim().length > 0;
 
     const persistProfile = () => {
@@ -53,12 +60,31 @@ export const Home: React.FC = () => {
         localStorage.setItem(COLOR_STORAGE_KEY, color);
     };
 
+    /**
+     * Runs the requested action unless this browser is already in a different
+     * room, in which case the switch confirmation is opened first. The stored
+     * room is read here rather than during render so a session opened in
+     * another tab is seen at the moment of the click.
+     */
+    const guard = (targetRoomId: string, run: () => void) => {
+        const activeRoomId = readActiveRoom();
+
+        if (!activeRoomId || activeRoomId === targetRoomId) {
+            run();
+            return;
+        }
+
+        setPendingSwitch({ activeRoomId, run });
+    };
+
     const handleCreate = (title: string, deckType: DeckType, customDeck?: (number | string)[]) => {
         if (!hasDisplayName) {
             return;
         }
         persistProfile();
-        createRoom(displayName.trim(), avatar, color, title || undefined, deckType, customDeck);
+        guard('', () => {
+            createRoom(displayName.trim(), avatar, color, title || undefined, deckType, customDeck);
+        });
     };
 
     const handleJoin = (roomCode: string) => {
@@ -66,7 +92,21 @@ export const Home: React.FC = () => {
             return;
         }
         persistProfile();
-        joinRoom(roomCode, displayName.trim(), avatar, color);
+        guard(roomCode, () => joinRoom(roomCode, displayName.trim(), avatar, color));
+    };
+
+    /** Continues with the action that was pending when the modal opened. */
+    const handleProceed = () => {
+        pendingSwitch?.run();
+        setPendingSwitch(null);
+    };
+
+    /** Opens the room this browser is still bound to, instead of the requested one. */
+    const handleRejoin = () => {
+        if (pendingSwitch) {
+            joinRoom(pendingSwitch.activeRoomId, displayName.trim(), avatar, color);
+        }
+        setPendingSwitch(null);
     };
 
     return (
@@ -137,6 +177,15 @@ export const Home: React.FC = () => {
                     </Card>
                 </Space>
             </Col>
+            <SessionSwitchModal
+                activeRoomId={pendingSwitch?.activeRoomId ?? ''}
+                onDismiss={() => {
+                    setPendingSwitch(null);
+                }}
+                onProceed={handleProceed}
+                onRejoin={handleRejoin}
+                open={pendingSwitch !== null}
+            />
         </Row>
     );
 };

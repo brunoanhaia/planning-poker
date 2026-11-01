@@ -56,4 +56,50 @@ test.describe('Session Identity', () => {
             await adminContext.close();
         }
     });
+
+    test('opening another room ends the session this browser left behind', async ({ browser }) => {
+        const roomA = await createRoom(browser);
+        const roomB = await createRoom(browser);
+        const userContext = await browser.newContext({ locale: 'en-US' });
+
+        try {
+            const tabA = await userContext.newPage();
+            await joinInTab(tabA, roomA.roomCode, 'dddd');
+            await expect(roomA.adminPage.getByText('Participants (2)')).toBeVisible();
+
+            // The same browser opening a second room is a switch, so the second
+            // tab asks before the session the first tab holds is ended.
+            const tabB = await userContext.newPage();
+            await tabB.goto(`/#${roomB.roomCode}`);
+            await tabB.locator('#profile-display-name').fill('dddd');
+            await tabB.getByRole('button', { name: 'Join Room Now' }).click();
+
+            const switchDialog = tabB.getByRole('dialog');
+            await expect(switchDialog).toContainText('Another session is open');
+            await expect(switchDialog).toContainText(roomA.roomCode);
+
+            await tabB.getByRole('button', { name: 'End it and continue' }).click();
+            await expect(
+                tabB.getByRole('button', { name: 'Select estimate 5', exact: true })
+            ).toBeVisible();
+
+            // The superseded tab returns to the lobby with the reason stated.
+            await expect(
+                tabA.getByText(
+                    'This session ended because the room was opened somewhere else in this browser.'
+                )
+            ).toBeVisible();
+            await expect(tabA.locator('#join-session-room-code')).toBeVisible();
+
+            // Room A lost the participant and room B has it exactly once.
+            await expect(roomA.adminPage.getByText('Participants (1)')).toBeVisible();
+            await expect(roomA.adminPage.locator('li').filter({ hasText: 'dddd' })).toHaveCount(0);
+            await expect(roomB.adminPage.getByText('Participants (2)')).toBeVisible();
+            await expect(roomB.adminPage.locator('li').filter({ hasText: 'dddd' })).toHaveCount(1);
+        } finally {
+            await userContext.close();
+            await roomB.adminContext.close();
+            await roomA.adminContext.close();
+        }
+    });
 });

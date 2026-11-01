@@ -40,13 +40,13 @@ Run in this order; each command's observable is the pass condition.
 | 3   | `npm run lint`                                                                                                      | exit 0                                                                              |
 | 4   | `npx prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"`                                                           | `All matched files use Prettier code style!`                                        |
 | 5   | `npm audit --omit=dev --audit-level=high`                                                                           | `found 0 vulnerabilities`                                                           |
-| 6   | `npm run test:server`                                                                                               | 15 files / 229 tests passed                                                         |
-| 7   | `npm run test:client`                                                                                               | 17 files / 113 tests passed                                                         |
-| 8   | `npm --workspace=@planitpoker/e2e run test`                                                                         | 32 passed (dev servers started by Playwright)                                       |
+| 6   | `npm run test:server`                                                                                               | 15 files / 231 tests passed                                                         |
+| 7   | `npm run test:client`                                                                                               | 18 files / 122 tests passed                                                         |
+| 8   | `npm --workspace=@planitpoker/e2e run test`                                                                         | 35 passed (dev servers started by Playwright)                                       |
 | 9   | `PORT=5000 ALLOWED_ORIGINS=http://localhost:5173 node apps/server/dist/index.js`, then the three `curl` calls below | health `{"status":"ok"}`, five security headers, handshake `101`, evil origin `403` |
 | 10  | `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:5000 --ws ws://localhost:5000/ws`                         | `5 passed, 0 failed`                                                                |
 | 11  | `CLIENT_PORT=8080 SERVER_PORT=5000 ALLOWED_ORIGINS=http://localhost:8080 podman-compose up -d --build`              | both containers up, healthcheck passing                                             |
-| 12  | `E2E_BASE_URL=http://localhost:8080 npm --workspace=@planitpoker/e2e run test`                                      | 32 passed against the containers (same-origin `/ws`)                                |
+| 12  | `E2E_BASE_URL=http://localhost:8080 npm --workspace=@planitpoker/e2e run test`                                      | 35 passed against the containers (same-origin `/ws`)                                |
 | 13  | `cd apps/e2e && E2E_BASE_URL=http://localhost:8080 npx playwright test --config=playwright.chaos.config.ts`         | 2 container-chaos tests passed                                                      |
 | 14  | `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:8080 --ws ws://localhost:8080/ws`                         | `5 passed, 0 failed` through Nginx                                                  |
 | 15  | `podman-compose down -v && podman rmi planitpoker-client:local planitpoker-server:local`                            | `podman ps -a` shows no leftovers                                                   |
@@ -72,8 +72,8 @@ curl -sS -o /dev/null -w '%{http_code}\n' --http1.1 \
 
 The last two print `101` and `403`; the second one prints nothing for `X-Powered-By`.
 
-Observed on the last run (all gates PASS): server 229/229, client 113/113, e2e 34/34 on
-the dev servers, `ws-chaos` 5/5 bare-metal and 5/5 through Nginx, e2e 34/34 and
+Observed on the last run (all gates PASS): server 231/231, client 122/122, e2e 35/35 on
+the dev servers, `ws-chaos` 5/5 bare-metal and 5/5 through Nginx, e2e 35/35 and
 container-chaos 2/2 against the compose stack, server container healthy, `5000` bound to
 `127.0.0.1` only, containers running as `node`/`nginx`. Two defects were found and fixed
 at root cause during the run: a high `body-parser` advisory (patched to 2.4.0) and a
@@ -102,9 +102,9 @@ Charter results from the same run, measured against the compose stack:
 
 | Suite                | File                                            | Test                                                                                                                                       | Requirement                | Locks                                                                       |
 | -------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | --------------------------------------------------------------------------- |
-| server unit (15/229) | `apps/server/tests/*.test.ts`                   | validation, securityHardening, httpHardening, abuseControls, kickBanFlow, roomManager, auditLogger, clientIdentity, cloudflare, wsUpgrade  | FR12–FR22, NFR11–NFR21     | limits, bans, rate limits, origin policy, session closure                   |
-| client unit (17/113) | `apps/client/src/**/*.test.{ts,tsx}`            | story-backlog, its utils, socket-provider, socket-url, results-panel + hooks, participants-panel, i18n, bulk-import, estimation-stats, app | FR7, FR14, FR21–FR23, NFR3 | bulk-import cap, reconnect rejoin, URL resolution, translations, statistics |
-| e2e base (34)        | `apps/e2e/tests/room-creation.spec.ts`          | create/join room                                                                                                                           | FR2                        | room codes and entry flows                                                  |
+| server unit (15/231) | `apps/server/tests/*.test.ts`                   | validation, securityHardening, httpHardening, abuseControls, kickBanFlow, roomManager, auditLogger, clientIdentity, cloudflare, wsUpgrade  | FR12–FR22, NFR11–NFR21     | limits, bans, rate limits, origin policy, session closure                   |
+| client unit (18/122) | `apps/client/src/**/*.test.{ts,tsx}`            | story-backlog, its utils, socket-provider, socket-url, results-panel + hooks, participants-panel, i18n, bulk-import, estimation-stats, app | FR7, FR14, FR21–FR23, NFR3 | bulk-import cap, reconnect rejoin, URL resolution, translations, statistics |
+| e2e base (35)        | `apps/e2e/tests/room-creation.spec.ts`          | create/join room                                                                                                                           | FR2                        | room codes and entry flows                                                  |
 | e2e base             | `apps/e2e/tests/voting-flow.spec.ts`            | vote + reveal                                                                                                                              | FR1, FR4                   | real-time broadcast                                                         |
 | e2e base             | `apps/e2e/tests/admin-management.spec.ts`       | settings, title, deck                                                                                                                      | FR5                        | admin-only controls                                                         |
 | e2e base             | `apps/e2e/tests/rounds-summary.spec.ts`         | rounds, summary, CSV                                                                                                                       | FR23–FR25, FR14            | append-only rounds and export                                               |

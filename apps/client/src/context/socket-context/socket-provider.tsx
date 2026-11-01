@@ -4,6 +4,7 @@ import {
     ErrorPayload,
     RoomState,
     RoomStatePayload,
+    ROOM_SWITCHED_CLOSE_CODE,
     SESSION_REPLACED_CLOSE_CODE,
     SessionPayload,
     WSMessageType,
@@ -13,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ERROR_KEYS, TranslationKey } from '../../i18n/dictionary';
 import { Translate } from '../../i18n/i18n-context';
 import { useTranslation } from '../../i18n/use-translation';
+import { forgetActiveRoom, readActiveRoom, rememberActiveRoom } from '../../utils/active-room';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
 import { resolveSocketUrl } from '../../utils/socket-url';
 import { SocketContext, SocketContextValue } from './socket-context';
@@ -49,6 +51,22 @@ const roomTokenKey = (roomId: string): string => `${ROOM_TOKEN_STORAGE_PREFIX}${
 const persistRoomToken = (roomId: string, token: string): void => {
     sessionStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
     localStorage.setItem(roomTokenKey(roomId), token);
+};
+
+/**
+ * Token of the room this browser still holds, used to end that session when a
+ * different room opens. The server verifies it, so switching never relies on a
+ * client-supplied identity.
+ *
+ * @param targetRoomId - Room being opened, excluded because it is not a switch.
+ * @returns The stored token of another room, or `null` when there is none.
+ */
+const previousRoomTokenFor = (targetRoomId: string): string | null => {
+    const activeRoom = readActiveRoom();
+    if (!activeRoom || activeRoom === targetRoomId) {
+        return null;
+    }
+    return localStorage.getItem(roomTokenKey(activeRoom));
 };
 
 /** Errors that mean the room or session the client holds is gone, not merely unreachable. */
@@ -105,18 +123,41 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         sessionTokenRef.current = sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
     }, []);
 
-    const forgetSession = useCallback(() => {
-        const roomId = roomStateRef.current?.id;
+    /**
+     * Drops the room binding from memory so no reconnect can re-enter it.
+     *
+     * Storage is left to the caller: whether a token survives depends on why
+     * the room is being released.
+     */
+    const releaseRoom = useCallback(() => {
         roomStateRef.current = null;
         currentUserIdRef.current = null;
+        setRoomState(null);
+        setCurrentUserId(null);
+    }, []);
+
+    /**
+     * Drops the token this tab holds for the room it is in, in both storages.
+     *
+     * Reads the room from the ref, so it must run before `releaseRoom`.
+     */
+    const forgetStoredToken = useCallback(() => {
+        const roomId = roomStateRef.current?.id;
         sessionTokenRef.current = null;
         sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
         if (roomId) {
             localStorage.removeItem(roomTokenKey(roomId));
         }
-        setRoomState(null);
-        setCurrentUserId(null);
     }, []);
+
+    const forgetSession = useCallback(() => {
+        const roomId = roomStateRef.current?.id;
+        forgetStoredToken();
+        releaseRoom();
+        if (roomId) {
+            forgetActiveRoom(roomId);
+        }
+    }, [forgetStoredToken, releaseRoom]);
 
     const send = useCallback((type: WSMessageType, payload: unknown) => {
         if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -134,6 +175,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (sessionTokenRef.current) {
             persistRoomToken(payload.roomState.id, sessionTokenRef.current);
         }
+        rememberActiveRoom(payload.roomState.id);
         if (isEnteringRoom) {
             // A notice raised on the lobby (a stale room code, a
             // rate limit) must not follow the user into the room
@@ -256,9 +298,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // Another tab of this browser took the participant over. Hand
                     // the room over, keep the stored token for the tab that owns
                     // it, and stay put instead of fighting for the socket.
-                    roomStateRef.current = null;
-                    setRoomState(null);
+                    releaseRoom();
                     setErrorNotice({ key: 'session.replaced' });
+                    return;
+                }
+                if (event.code === ROOM_SWITCHED_CLOSE_CODE) {
+                    // The same browser confirmed a switch to another room, so the
+                    // server removed this participant: the token this tab holds is
+                    // dead and must not be replayed. The room that took over owns
+                    // `planit_active_room`, so that record stays untouched.
+                    forgetStoredToken();
+                    releaseRoom();
+                    setErrorNotice({ key: 'session.moved' });
                     return;
                 }
                 reconnectTimeout = setTimeout(() => {
@@ -287,7 +338,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 socketRef.current.close();
             }
         };
-    }, [applyRoomState, applyServerError, applySession, forgetSession, send]);
+    }, [
+        applyRoomState,
+        applyServerError,
+        applySession,
+        forgetSession,
+        forgetStoredToken,
+        releaseRoom,
+        send,
+    ]);
 
     const createRoom = useCallback(
         (
@@ -298,7 +357,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             deckType: DeckType = 'fibonacci',
             customDeck?: (number | string)[]
         ) => {
-            send('CREATE_ROOM', { avatar, color, customDeck, deckType, name, title });
+            send('CREATE_ROOM', {
+                avatar,
+                color,
+                customDeck,
+                deckType,
+                name,
+                previousRoomToken: previousRoomTokenFor(''),
+                title,
+            });
         },
         [send]
     );
@@ -309,6 +376,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 avatar,
                 color,
                 name,
+                previousRoomToken: previousRoomTokenFor(roomId.toUpperCase()),
                 roomId,
                 sessionToken: sessionTokenRef.current ?? localStorage.getItem(roomTokenKey(roomId)),
                 userId: currentUserId,
@@ -448,13 +516,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Leaving is client-side only: no LEAVE message exists, so the server
         // keeps this participant bound to the socket and only the session token
         // can rebind it. The token therefore survives, while the room refs are
-        // cleared so `onopen` cannot re-enter the room on its own.
-        roomStateRef.current = null;
-        currentUserIdRef.current = null;
-        setRoomState(null);
-        setCurrentUserId(null);
+        // cleared so `onopen` cannot re-enter the room on its own. The browser
+        // itself is free again, so the active-room record is dropped.
+        const roomId = roomStateRef.current?.id;
+        if (roomId) {
+            forgetActiveRoom(roomId);
+        }
+        releaseRoom();
         window.location.hash = '';
-    }, []);
+    }, [releaseRoom]);
 
     const clearError = useCallback(() => setErrorNotice(null), []);
     const clearKickedMessage = useCallback(() => setIsKicked(false), []);

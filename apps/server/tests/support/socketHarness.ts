@@ -15,7 +15,14 @@ export interface SentMessage {
         roomState?: {
             hostId: string;
             id: string;
-            participants: { id: string; isSpectator: boolean; name: string }[];
+            participants: {
+                id: string;
+                isAdmin: boolean;
+                isHost: boolean;
+                isOnline: boolean;
+                isSpectator: boolean;
+                name: string;
+            }[];
         };
         sessionToken?: string;
         userId?: string;
