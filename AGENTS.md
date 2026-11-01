@@ -229,4 +229,6 @@ Verify style conventions against executable config when in doubt.
 - `useSocket` uses the React 19 `use(Context)` hook, not `useContext`.
 - Client WebSocket URL resolution: `VITE_WS_URL` → dev fallback `ws://localhost:5000` → prod fallback dials `window.location.host` at the `/ws` path, the only route Nginx proxies (the bare host would answer with the SPA and the handshake would fail).
 - Server default CORS only allows `http://localhost:5173`; set `ALLOWED_ORIGINS` for other frontends.
-- `packages/shared` must be rebuilt after type changes before dependent apps see them in dev/build. Type-checking reads the source through `paths`, but the unit suites read `dist/`, so a stale build shows up there as a failing import or an outdated constant.
+- Rebuild `packages/shared` after type changes, unless you only run `tsc --noEmit`.
+- The dependent apps consume `dist/`. Type-checking reads the source through `paths`.
+- The unit suites read `dist/` as well. A stale build fails their imports or serves an outdated constant.
