@@ -12,13 +12,13 @@
     "dependencies": {
         "@ant-design/icons": "^6.3.4",
         "@planitpoker/shared": "*",
-        "antd": "^6.6.7",
+        "antd": "^6.6.8",
         "canvas-confetti": "^1.9.4",
         "copy-to-clipboard": "^4.0.2",
-        "i18next": "^26.5.10",
+        "i18next": "^26.6.0",
         "react": "^19.3.1",
         "react-dom": "^19.3.1",
-        "react-i18next": "^17.1.8"
+        "react-i18next": "^17.1.9"
     },
     "devDependencies": {
         "@testing-library/dom": "^10.4.2",
