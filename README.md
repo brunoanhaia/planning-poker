@@ -79,10 +79,10 @@ The application supports multiple users connecting to a single room to vote on t
 
 ### User Roles
 
-1.  **Administrator**: The creator of the room. Possesses full control over the room settings and participants.
-2.  **Co-host**: Appointed by the Administrator. Possesses the same management permissions as the Administrator, except for transferring the primary Administrator role.
-3.  **Voter**: A standard participant who can submit votes on active tasks.
-4.  **Spectator**: A participant who can observe the room activity but cannot submit votes.
+1. **Administrator**: The creator of the room. Possesses full control over the room settings and participants.
+2. **Co-host**: Appointed by the Administrator. Possesses the same management permissions as the Administrator, except for transferring the primary Administrator role.
+3. **Voter**: A standard participant who can submit votes on active tasks.
+4. **Spectator**: A participant who can observe the room activity but cannot submit votes.
 
 ### Functionalities
 
@@ -119,19 +119,19 @@ The application supports multiple users connecting to a single room to vote on t
 
 ### Installation
 
-1.  Clone the repository.
-2.  Navigate to the project root directory.
-3.  Install dependencies for all workspaces:
+1. Clone the repository.
+2. Navigate to the project root directory.
+3. Install dependencies for all workspaces:
 
-```bash
-npm install
-```
+    ```bash
+    npm install
+    ```
 
-4.  Build the shared package (consumed from `dist/` by the apps):
+4. Build the shared package (consumed from `dist/` by the apps):
 
-```bash
-npm run build:shared
-```
+    ```bash
+    npm run build:shared
+    ```
 
 - Type-checking resolves the package from source: the client `tsconfig.json` maps `@planitpoker/shared` to `packages/shared/src/index.ts` through `paths`. `tsc --noEmit` therefore works without a build.
 - Run `build:shared` before starting the apps: they load `dist/` through the package `exports` map.

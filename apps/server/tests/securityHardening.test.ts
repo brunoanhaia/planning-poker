@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
+import { isActiveOwner, shouldCleanupOnClose, socketKey } from '../src/sessionRegistry.js';
 import { SessionService } from '../src/sessionService.js';
-import { isActiveOwner, shouldCleanupOnClose, socketKey } from '../src/webSocketHandler.js';
 
 describe('whitespace-only title handling', () => {
     let rm: RoomManager;

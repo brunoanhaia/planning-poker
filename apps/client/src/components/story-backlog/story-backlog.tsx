@@ -85,6 +85,137 @@ const downloadBacklogCsv = (room: RoomState): void => {
     link.remove();
 };
 
+/** Handlers the backlog row binds to its per-story controls. */
+interface StoryRowActions {
+    onBreakdown: (storyId: string) => void;
+    onDelete: (storyId: string) => void;
+    onEdit: (story: Story) => void;
+    onEstimate: (index: number) => void;
+}
+
+/** One backlog entry plus the state its controls depend on. */
+interface StoryRowProps {
+    actions: StoryRowActions;
+    index: number;
+    isActive: boolean;
+    isAdmin: boolean;
+    isFirst: boolean;
+    showDelete: boolean;
+    story: Story;
+    t: Translate;
+}
+
+/** Renders one story row: title, status badges and the actions bound to it. */
+const renderStoryRow = ({
+    actions,
+    index,
+    isActive,
+    isAdmin,
+    isFirst,
+    showDelete,
+    story,
+    t,
+}: StoryRowProps): React.ReactNode => {
+    const hasEstimate = story.finalEstimate !== undefined && story.finalEstimate !== null;
+
+    return (
+        <Fragment key={story.id}>
+            {!isFirst && <Divider style={{ margin: 0 }} />}
+            <Flex
+                align="center"
+                component="li"
+                gap={8}
+                justify="space-between"
+                style={{ padding: PANEL_PADDING }}
+                wrap
+            >
+                <Flex gap={4} style={{ flex: 1, minWidth: 0 }} vertical>
+                    <Space align="center" size={4} wrap>
+                        <Typography.Text
+                            ellipsis={{ tooltip: story.title }}
+                            strong
+                            style={{ maxWidth: STORY_TITLE_MAX_WIDTH }}
+                        >
+                            {`${index + 1}. ${story.title}`}
+                        </Typography.Text>
+                        {renderStoryStatus(story.status, t)}
+                        {hasEstimate && (
+                            <Tag>
+                                {t('backlog.score', {
+                                    value: String(story.finalEstimate),
+                                })}
+                            </Tag>
+                        )}
+                        {story.rounds.length > 0 && (
+                            <Tag>
+                                {t('backlog.rounds', {
+                                    count: story.rounds.length,
+                                })}
+                            </Tag>
+                        )}
+                    </Space>
+                    {story.description && (
+                        <Typography.Text type="secondary">{story.description}</Typography.Text>
+                    )}
+                </Flex>
+
+                <Space size={4}>
+                    <Tooltip title={t('backlog.breakdown')}>
+                        <Button
+                            aria-label={t('backlog.breakdown')}
+                            icon={<ProfileOutlined />}
+                            onClick={() => actions.onBreakdown(story.id)}
+                            size="small"
+                            type="text"
+                        />
+                    </Tooltip>
+
+                    {isAdmin && (
+                        <>
+                            <Tooltip title={t('backlog.edit.aria', { title: story.title })}>
+                                <Button
+                                    aria-label={t('backlog.edit.aria', { title: story.title })}
+                                    icon={<EditOutlined />}
+                                    onClick={() => actions.onEdit(story)}
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
+                            {!isActive && (
+                                <Tooltip title={t('backlog.estimate.aria', { title: story.title })}>
+                                    <Button
+                                        aria-label={t('backlog.estimate.aria', {
+                                            title: story.title,
+                                        })}
+                                        icon={<PlayCircleOutlined />}
+                                        onClick={() => actions.onEstimate(index)}
+                                        size="small"
+                                        type="text"
+                                    />
+                                </Tooltip>
+                            )}
+                            {showDelete && (
+                                <Tooltip title={t('backlog.delete.aria', { title: story.title })}>
+                                    <Button
+                                        aria-label={t('backlog.delete.aria', {
+                                            title: story.title,
+                                        })}
+                                        danger
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => actions.onDelete(story.id)}
+                                        size="small"
+                                        type="text"
+                                    />
+                                </Tooltip>
+                            )}
+                        </>
+                    )}
+                </Space>
+            </Flex>
+        </Fragment>
+    );
+};
+
 /**
  * The room's story list, plus the admin-only authoring and import actions.
  *
@@ -189,6 +320,13 @@ export const StoryBacklog: React.FC = () => {
         closeScoreDraft();
     };
 
+    const storyRowActions: StoryRowActions = {
+        onBreakdown: setBreakdownStoryId,
+        onDelete: deleteStory,
+        onEdit: openScoreDraft,
+        onEstimate: setPendingStoryIndex,
+    };
+
     return (
         <>
             <Card
@@ -275,134 +413,18 @@ export const StoryBacklog: React.FC = () => {
                     </Flex>
                 ) : (
                     <Flex component="ul" vertical>
-                        {roomState.stories.map((story, index) => {
-                            const isActive = index === roomState.currentStoryIndex;
-                            const hasEstimate =
-                                story.finalEstimate !== undefined && story.finalEstimate !== null;
-
-                            return (
-                                <Fragment key={story.id}>
-                                    {index > 0 && <Divider style={{ margin: 0 }} />}
-                                    <Flex
-                                        align="center"
-                                        component="li"
-                                        gap={8}
-                                        justify="space-between"
-                                        style={{ padding: PANEL_PADDING }}
-                                        wrap
-                                    >
-                                        <Flex gap={4} style={{ flex: 1, minWidth: 0 }} vertical>
-                                            <Space align="center" size={4} wrap>
-                                                <Typography.Text
-                                                    ellipsis={{ tooltip: story.title }}
-                                                    strong
-                                                    style={{ maxWidth: STORY_TITLE_MAX_WIDTH }}
-                                                >
-                                                    {`${index + 1}. ${story.title}`}
-                                                </Typography.Text>
-                                                {renderStoryStatus(story.status, t)}
-                                                {hasEstimate && (
-                                                    <Tag>
-                                                        {t('backlog.score', {
-                                                            value: String(story.finalEstimate),
-                                                        })}
-                                                    </Tag>
-                                                )}
-                                                {story.rounds.length > 0 && (
-                                                    <Tag>
-                                                        {t('backlog.rounds', {
-                                                            count: story.rounds.length,
-                                                        })}
-                                                    </Tag>
-                                                )}
-                                            </Space>
-                                            {story.description && (
-                                                <Typography.Text type="secondary">
-                                                    {story.description}
-                                                </Typography.Text>
-                                            )}
-                                        </Flex>
-
-                                        <Space size={4}>
-                                            <Tooltip title={t('backlog.breakdown')}>
-                                                <Button
-                                                    aria-label={t('backlog.breakdown')}
-                                                    icon={<ProfileOutlined />}
-                                                    onClick={() => setBreakdownStoryId(story.id)}
-                                                    size="small"
-                                                    type="text"
-                                                />
-                                            </Tooltip>
-
-                                            {isAdmin && (
-                                                <>
-                                                    <Tooltip
-                                                        title={t('backlog.edit.aria', {
-                                                            title: story.title,
-                                                        })}
-                                                    >
-                                                        <Button
-                                                            aria-label={t('backlog.edit.aria', {
-                                                                title: story.title,
-                                                            })}
-                                                            icon={<EditOutlined />}
-                                                            onClick={() => openScoreDraft(story)}
-                                                            size="small"
-                                                            type="text"
-                                                        />
-                                                    </Tooltip>
-                                                    {!isActive && (
-                                                        <Tooltip
-                                                            title={t('backlog.estimate.aria', {
-                                                                title: story.title,
-                                                            })}
-                                                        >
-                                                            <Button
-                                                                aria-label={t(
-                                                                    'backlog.estimate.aria',
-                                                                    {
-                                                                        title: story.title,
-                                                                    }
-                                                                )}
-                                                                icon={<PlayCircleOutlined />}
-                                                                onClick={() =>
-                                                                    setPendingStoryIndex(index)
-                                                                }
-                                                                size="small"
-                                                                type="text"
-                                                            />
-                                                        </Tooltip>
-                                                    )}
-                                                    {roomState.stories.length > 1 && (
-                                                        <Tooltip
-                                                            title={t('backlog.delete.aria', {
-                                                                title: story.title,
-                                                            })}
-                                                        >
-                                                            <Button
-                                                                aria-label={t(
-                                                                    'backlog.delete.aria',
-                                                                    {
-                                                                        title: story.title,
-                                                                    }
-                                                                )}
-                                                                danger
-                                                                icon={<DeleteOutlined />}
-                                                                onClick={() =>
-                                                                    deleteStory(story.id)
-                                                                }
-                                                                size="small"
-                                                                type="text"
-                                                            />
-                                                        </Tooltip>
-                                                    )}
-                                                </>
-                                            )}
-                                        </Space>
-                                    </Flex>
-                                </Fragment>
-                            );
-                        })}
+                        {roomState.stories.map((story, index) =>
+                            renderStoryRow({
+                                actions: storyRowActions,
+                                index,
+                                isActive: index === roomState.currentStoryIndex,
+                                isAdmin,
+                                isFirst: index === 0,
+                                showDelete: roomState.stories.length > 1,
+                                story,
+                                t,
+                            })
+                        )}
                     </Flex>
                 )}
             </Card>

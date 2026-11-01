@@ -16,6 +16,7 @@ the real-time surface.
 
 - Before cutting any release.
 - After any change to `packages/shared/src`, `apps/server/src/webSocketHandler.ts`,
+  `apps/server/src/sessionRegistry.ts`, `apps/server/src/joinAdmission.ts`,
   `apps/client/src/context/socket-context/`, or `apps/client/src/components/`.
 - After adding a language, a WebSocket message type or an `ErrorCode`.
 

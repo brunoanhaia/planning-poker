@@ -1,16 +1,11 @@
 import {
     CopyOutlined,
     EditOutlined,
-    EyeInvisibleOutlined,
-    EyeOutlined,
     LockOutlined,
     LogoutOutlined,
-    MoonOutlined,
     SettingOutlined,
-    SunOutlined,
 } from '@ant-design/icons';
 import {
-    App as AntApp,
     Avatar,
     Badge,
     Button,
@@ -24,13 +19,12 @@ import {
     Tooltip,
     Typography,
 } from 'antd';
-import React, { useState } from 'react';
+import React from 'react';
 
-import { useSocket } from '../../context/socket-context/use-socket';
 import { useTranslation } from '../../i18n/use-translation';
 import { ColorMode } from '../../theme/app-theme';
-import { copyText } from '../../utils/clipboard';
 import { LanguageSwitcher } from '../language-switcher/language-switcher';
+import { useNavbar } from './navbar.hooks';
 
 /** Horizontal rhythm between the header content, in pixels. */
 const HEADER_PADDING_INLINE = 16;
@@ -43,9 +37,6 @@ const ROOM_TITLE_MAX_LENGTH = 80;
 
 /** Width of the inline room title before it collapses to an ellipsis. */
 const ROOM_TITLE_MAX_WIDTH = '26ch';
-
-/** Builds the deep link another browser can use to join this room. */
-const buildInviteLink = (roomId: string): string => `${window.location.origin}/#${roomId}`;
 
 export interface NavbarProps {
     /** Currently rendered colour scheme. */
@@ -69,52 +60,25 @@ export interface NavbarProps {
  */
 export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onToggleColorMode }) => {
     const {
-        currentUserId,
+        closeRename,
+        colorModeToggle,
+        handleCopyLink,
+        handleInviteKeyDown,
         isAdmin,
         isConnected,
+        isEditingTitle,
+        isSpectator,
         leaveRoom,
+        newTitle,
+        openRename,
         roomState,
+        saveRename,
+        setNewTitle,
+        spectatorHint,
         toggleSpectator,
-        updateRoomTitle,
-    } = useSocket();
+    } = useNavbar(colorMode);
     const { t } = useTranslation();
-    const { message } = AntApp.useApp();
     const { token } = theme.useToken();
-    const [isEditingTitle, setIsEditingTitle] = useState(false);
-    const [newTitle, setNewTitle] = useState('');
-
-    const currentUser = roomState?.participants.find((p) => p.id === currentUserId);
-
-    const handleCopyLink = async (): Promise<void> => {
-        if (!roomState) {
-            return;
-        }
-        const copied = await copyText(buildInviteLink(roomState.id));
-
-        if (copied) {
-            message.success(t('nav.copy.success'));
-            return;
-        }
-
-        message.error(t('nav.copy.error'));
-    };
-
-    const openRename = () => {
-        if (!isAdmin || !roomState) {
-            return;
-        }
-        setNewTitle(roomState.title);
-        setIsEditingTitle(true);
-    };
-
-    const closeRename = () => setIsEditingTitle(false);
-
-    const saveRename = () => {
-        if (newTitle.trim()) {
-            updateRoomTitle(newTitle.trim());
-        }
-        closeRename();
-    };
 
     return (
         <>
@@ -177,33 +141,19 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                 role="button"
                                 style={{ cursor: 'pointer' }}
                                 tabIndex={0}
-                                onKeyDown={async (event) => {
-                                    if (event.key !== 'Enter' && event.key !== ' ') {
-                                        return;
-                                    }
-                                    event.preventDefault();
-                                    await handleCopyLink();
-                                }}
+                                onKeyDown={handleInviteKeyDown}
                             >
                                 {t('nav.room', { code: roomState.id })}
                             </Tag>
                         </Tooltip>
 
-                        {currentUser && (
-                            <Tooltip
-                                title={
-                                    currentUser.isSpectator ? t('nav.spectating') : t('nav.voting')
-                                }
-                            >
+                        {spectatorHint && (
+                            <Tooltip title={spectatorHint.label}>
                                 <Space size={4}>
-                                    {currentUser.isSpectator ? (
-                                        <EyeInvisibleOutlined />
-                                    ) : (
-                                        <EyeOutlined />
-                                    )}
+                                    {spectatorHint.icon}
                                     <Switch
                                         aria-label={t('nav.spectator')}
-                                        checked={currentUser.isSpectator}
+                                        checked={isSpectator}
                                         onChange={toggleSpectator}
                                         size="small"
                                     />
@@ -244,10 +194,10 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                 <Flex align="center" gap={4} wrap>
                     <LanguageSwitcher />
 
-                    <Tooltip title={colorMode === 'dark' ? t('nav.light') : t('nav.dark')}>
+                    <Tooltip title={colorModeToggle.label}>
                         <Button
-                            aria-label={colorMode === 'dark' ? t('nav.light') : t('nav.dark')}
-                            icon={colorMode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+                            aria-label={colorModeToggle.label}
+                            icon={colorModeToggle.icon}
                             onClick={onToggleColorMode}
                             type="text"
                         />
