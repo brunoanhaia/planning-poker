@@ -77,7 +77,8 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - Both files are committed as `chore(release): <version> [skip ci]`.
     - The tag `v<version>` and the GitHub release are published from that commit.
     - Nothing is published to npm: the workspace is private.
-    - `feat`, `fix`, `perf` and `revert` produce a release. `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` do not.
+    - `feat`, `fix`, `perf` and `revert` produce a release.
+    - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.
     - `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.
