@@ -27,15 +27,15 @@ jobs:
                   node-version: 24
                   cache: npm
 
-            - run: npm ci
+            - run: npm ci --ignore-scripts
 
             - name: Fetch the base branch
               run: git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
 
             - name: Commits in this pull request
-              run: npx commitlint --from origin/${{ github.base_ref }} --to ${{ github.event.pull_request.head.sha }} --verbose
+              run: ./node_modules/.bin/commitlint --from origin/${{ github.base_ref }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
             - name: Pull request title
               env:
                   TITLE: ${{ github.event.pull_request.title }}
-              run: printf '%s\n' "$TITLE" | npx commitlint --verbose
+              run: printf '%s\n' "$TITLE" | ./node_modules/.bin/commitlint --verbose
