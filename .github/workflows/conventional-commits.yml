@@ -9,6 +9,9 @@ name: Conventional commits
 on:
     pull_request:
         branches: [main, develop]
+        # `edited` re-runs the title check after a rename; without it a passing
+        # check survives an invalid title that the squash merge would use.
+        types: [opened, synchronize, reopened, edited]
 
 permissions:
     contents: read

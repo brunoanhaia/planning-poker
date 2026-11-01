@@ -197,6 +197,11 @@ is applied to `CHANGELOG.md` and the root `package.json`, tagged `v<version>` an
 GitHub release. `feat`, `fix`, `perf` and `revert` produce a release; `chore`, `docs`, `style`,
 `refactor`, `test`, `build` and `ci` do not, so a maintenance merge does not mint a version.
 
+`semantic-release` pushes the changelog commit straight to `develop`, so that branch must accept a
+push from the workflow token: leave it without a "require pull request" rule, or add GitHub Actions to
+the bypass list. The workflow runs `git push --dry-run` first, so a rule that would block the release
+fails the job before anything is tagged.
+
 Messages are checked twice: the `commit-msg` hook locally, and
 `.github/workflows/conventional-commits.yml` in CI — every commit in a pull request plus the pull
 request title, which is what a squash merge turns into the commit. To preview the next version
