@@ -141,22 +141,43 @@ describe('Room switching', () => {
     });
 });
 
+/** A room the mover leaves, an observer inside it, and the room it moves to. */
+interface SwitchSetup {
+    connect: ReturnType<typeof boot>['connect'];
+    leftParticipantId: string;
+    leftRoomId: string;
+    mover: ReturnType<ReturnType<typeof boot>['connect']>;
+    nextRoomId: string;
+    observer: ReturnType<ReturnType<typeof boot>['connect']>;
+}
+
+/** Boots two rooms and an observer, so a switch can be asserted from both sides. */
+const setupSwitch = (): SwitchSetup => {
+    const { connect } = boot();
+
+    const mover = connect({ clientId: '88888888-8888-4888-8888-888888888888' });
+    send(mover, 'CREATE_ROOM', { name: 'Alice' });
+    const leftRoomId = roomIdOf(mover);
+    const leftParticipantId = participantIdOf(mover);
+
+    // A second window keeps a view of the room the mover leaves.
+    const observer = connect({ clientId: '99999999-9999-4999-8999-999999999999' });
+    send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
+
+    const otherHost = connect({ clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+    send(otherHost, 'CREATE_ROOM', { name: 'Carol' });
+    const nextRoomId = roomIdOf(otherHost);
+
+    return { connect, leftParticipantId, leftRoomId, mover, nextRoomId, observer };
+};
+
 describe('Room switching without a token', () => {
-    it('releases the seat a socket left when it creates another room', () => {
-        const { connect } = boot();
-
-        const creator = connect({ clientId: '88888888-8888-4888-8888-888888888888' });
-        send(creator, 'CREATE_ROOM', { name: 'Alice' });
-        const leftRoomId = roomIdOf(creator);
-        const leftParticipantId = participantIdOf(creator);
-
-        // A second window keeps a view of the room the creator leaves.
-        const observer = connect({ clientId: '99999999-9999-4999-8999-999999999999' });
-        send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
+    it('marks the seat offline when the socket creates another room', () => {
+        const { leftParticipantId, leftRoomId, mover, observer } = setupSwitch();
 
         // The same socket opens a second room without proving the first one,
         // which is what a client-only Leave leaves behind.
-        send(creator, 'CREATE_ROOM', { name: 'Alice' });
+        send(mover, 'CREATE_ROOM', { name: 'Alice' });
 
         const leftRoom = lastMessage(observer, 'ROOM_STATE')?.payload.roomState;
         expect(leftRoom?.id).toBe(leftRoomId);
@@ -168,19 +189,7 @@ describe('Room switching without a token', () => {
     });
 
     it('releases the room a socket created when it joins another one', () => {
-        const { connect } = boot();
-
-        const mover = connect({ clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
-        send(mover, 'CREATE_ROOM', { name: 'Alice' });
-        const leftRoomId = roomIdOf(mover);
-        const leftParticipantId = participantIdOf(mover);
-
-        const observer = connect({ clientId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' });
-        send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
-
-        const otherHost = connect({ clientId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' });
-        send(otherHost, 'CREATE_ROOM', { name: 'Carol' });
-        const nextRoomId = roomIdOf(otherHost);
+        const { leftParticipantId, leftRoomId, mover, nextRoomId, observer } = setupSwitch();
 
         send(mover, 'JOIN_ROOM', { name: 'Alice', roomId: nextRoomId });
 
@@ -203,19 +212,7 @@ describe('Room switching without a token', () => {
     });
 
     it('switches the socket itself when it proves the room it leaves with a token', () => {
-        const { connect } = boot();
-
-        const mover = connect({ clientId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' });
-        send(mover, 'CREATE_ROOM', { name: 'Alice' });
-        const leftRoomId = roomIdOf(mover);
-        const leftParticipantId = participantIdOf(mover);
-
-        const observer = connect({ clientId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' });
-        send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
-
-        const otherHost = connect({ clientId: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
-        send(otherHost, 'CREATE_ROOM', { name: 'Carol' });
-        const nextRoomId = roomIdOf(otherHost);
+        const { leftParticipantId, leftRoomId, mover, nextRoomId, observer } = setupSwitch();
 
         // Same socket, old-room token: the seat is removed by the token path,
         // so the moving socket must survive and the room must hear of it once.

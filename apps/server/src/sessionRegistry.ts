@@ -174,10 +174,9 @@ export class SessionRegistry {
         if (previousRoomToken) {
             const binding = sessionService.resolve(previousRoomToken);
             if (
-                binding &&
                 released &&
-                binding.roomId === released.roomId &&
-                binding.userId === released.userId
+                binding?.roomId === released.roomId &&
+                binding?.userId === released.userId
             ) {
                 return null;
             }
