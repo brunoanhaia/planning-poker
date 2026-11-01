@@ -11,8 +11,8 @@ USER root
 # are still fetched during postCreateCommand so they always match the workspace's
 # @playwright/test version.
 COPY package-lock.json /tmp/package-lock.json
-RUN PLAYWRIGHT_VERSION=$(node -p "require('/tmp/package-lock.json').packages['node_modules/@playwright/test'].version") \
-    && npm install -g @playwright/test@${PLAYWRIGHT_VERSION} --ignore-scripts \
+RUN PLAYWRIGHT_VERSION="$(node -p "require('/tmp/package-lock.json').packages['node_modules/@playwright/test'].version")" \
+    && npm install -g "@playwright/test@${PLAYWRIGHT_VERSION}" --ignore-scripts \
     && playwright install-deps chromium \
     && npm uninstall -g @playwright/test \
     && rm /tmp/package-lock.json

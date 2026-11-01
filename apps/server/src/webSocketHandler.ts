@@ -7,8 +7,6 @@ import {
     ErrorCode,
     JoinRoomPayload,
     KICK_BAN_DURATION_MS,
-    ROOM_SWITCHED_CLOSE_CODE,
-    SESSION_REPLACED_CLOSE_CODE,
     SetCurrentStoryPayload,
     StartTimerPayload,
     TargetUserPayload,
@@ -40,62 +38,15 @@ import {
     ROOM_CLEANUP_INTERVAL_MS,
     TIMER_TICK_INTERVAL_MS,
 } from './constants.js';
+import { JoinAdmission, resolveJoinAttempt } from './joinAdmission.js';
 import { JoinFailureLimiter } from './joinFailureLimiter.js';
+import { JoinParticipantResult } from './participantService.js';
 import { roomManager } from './roomManager.js';
+import { ExtendedWebSocket, RoomSession, SessionRegistry } from './sessionRegistry.js';
 import { sessionService } from './sessionService.js';
 import { isBacklogFull } from './storyService.js';
 import { MessageThrottle } from './throttle.js';
 import { validatePayload } from './validation.js';
-
-interface ExtendedWebSocket extends WebSocket {
-    isAlive?: boolean;
-    roomId?: string;
-    userId?: string;
-    /** True when the handshake carried an `Origin` header (i.e. a browser client). */
-    hasOrigin?: boolean;
-    /** Stable identity of the browser profile, from its first-party cookie. */
-    clientId?: string;
-    /** Peer address of the connection, normalized for the abuse controls. */
-    remoteAddress?: string;
-}
-
-interface RoomSession {
-    roomId: string;
-    userId: string;
-}
-
-/**
- * Builds the lookup key used to track a participant's active socket.
- *
- * @param roomId - The room identifier.
- * @param userId - The participant identifier.
- * @returns A stable composite key.
- */
-export const socketKey = (roomId: string, userId: string): string => `${roomId}:${userId}`;
-
-/**
- * Decides whether a socket is the active owner of a participant connection.
- *
- * A socket that has been superseded by a newer connection for the same
- * participant is stale: it must not issue room-scoped commands, and its close
- * must not tear down the active session.
- *
- * @param activeSocket - The socket currently registered for the participant, if any.
- * @param candidate - The socket being checked.
- * @returns True when the candidate is the active owner (or none is registered).
- */
-export const isActiveOwner = (activeSocket: unknown, candidate: unknown): boolean =>
-    !activeSocket || activeSocket === candidate;
-
-/**
- * Decides whether a closing socket should tear down its participant session.
- *
- * @param activeSocket - The socket currently registered for the participant, if any.
- * @param closingSocket - The socket that is closing.
- * @returns True when the closing socket still owns the active connection.
- */
-export const shouldCleanupOnClose = (activeSocket: unknown, closingSocket: unknown): boolean =>
-    isActiveOwner(activeSocket, closingSocket);
 
 /** Dependencies the handler needs to account for the sockets it serves. */
 export interface WebSocketHandlerOptions {
@@ -154,15 +105,13 @@ export class WebSocketHandler {
     private readonly trustProxyHops: number;
     /** True when the deployment sits behind Cloudflare and asks for its client header. */
     private readonly cloudflareEnabled: boolean;
-    /** Tracks the live socket per `roomId:userId` so stale sockets cannot tear down a newer session. */
-    private readonly activeSockets: Map<string, ExtendedWebSocket> = new Map();
+    /** Tracks the live socket per participant and the browser profile behind it. */
+    private readonly sessions: SessionRegistry;
     /** Caps how many messages a single socket may send inside a window. */
     private readonly throttle = new MessageThrottle(
         WS_THROTTLE_MAX_MESSAGES,
         WS_THROTTLE_WINDOW_MS
     );
-    /** Identity of the browser profile behind each `roomId:userId`, for the kick ban. */
-    private readonly clientIdByUser = new Map<string, string>();
     /** Bars a kicked participant from re-entering the room immediately. */
     private readonly bans = new BanService();
     /** Budget of failed room joins granted to one address. */
@@ -172,6 +121,8 @@ export class WebSocketHandler {
         JOIN_FAILURE_COOLDOWN_MS,
         JOIN_FAILURE_MAX_TRACKED_ADDRESSES
     );
+    /** The bars a join has to pass before the room is even consulted. */
+    private readonly admission: JoinAdmission;
     private cleanupInterval: NodeJS.Timeout | null = null;
 
     /**
@@ -183,6 +134,16 @@ export class WebSocketHandler {
         this.connections = options.connections;
         this.trustProxyHops = options.trustProxyHops;
         this.cloudflareEnabled = options.cloudflareEnabled;
+        // The registry announces membership changes by broadcasting them, exactly
+        // as the rest of the handler does.
+        this.sessions = new SessionRegistry({
+            broadcastRoomState: (roomId) => this.broadcastRoomState(roomId),
+        });
+        this.admission = new JoinAdmission({
+            bans: this.bans,
+            joinFailures: this.joinFailures,
+            sendError: (ws, message, code) => this.sendError(ws, message, code),
+        });
         this.init();
         this.startTimerTicker();
         this.startCleanupTicker();
@@ -200,11 +161,7 @@ export class WebSocketHandler {
                 auditLog({ action: 'room.dropped.idle', outcome: 'allowed', roomId });
             });
             this.throttle.sweep(now);
-            this.clientIdByUser.forEach((_clientId, key) => {
-                if (!roomManager.hasRoom(key.slice(0, key.indexOf(':')))) {
-                    this.clientIdByUser.delete(key);
-                }
-            });
+            this.sessions.sweepClientIds();
         }, ROOM_CLEANUP_INTERVAL_MS);
     }
 
@@ -276,21 +233,16 @@ export class WebSocketHandler {
                 if (ws.remoteAddress) {
                     this.connections.release(ws.remoteAddress);
                 }
-                if (!ws.roomId || !ws.userId) {
-                    return;
-                }
-
                 // A stale socket (superseded by a newer connection for the same
                 // participant) must not tear down the active session.
-                const key = socketKey(ws.roomId, ws.userId);
-                if (!shouldCleanupOnClose(this.activeSockets.get(key), ws)) {
+                const released = this.sessions.release(ws);
+                if (!released) {
                     return;
                 }
-                this.activeSockets.delete(key);
 
-                const updatedRoom = roomManager.leaveRoom(ws.roomId, ws.userId);
+                const updatedRoom = roomManager.leaveRoom(released.roomId, released.userId);
                 if (updatedRoom) {
-                    this.broadcastRoomState(ws.roomId);
+                    this.broadcastRoomState(released.roomId);
                 }
             });
         });
@@ -436,7 +388,7 @@ export class WebSocketHandler {
      * @returns The room/user identifiers, or null when not in an active room session.
      */
     private requireSession(ws: ExtendedWebSocket): RoomSession | null {
-        const session = this.getSession(ws);
+        const session = this.sessions.sessionFor(ws);
         if (!session) {
             this.sendError(ws, 'No active room session. Join a room first.', 'NO_SESSION');
         }
@@ -444,90 +396,29 @@ export class WebSocketHandler {
     }
 
     /**
-     * Returns the room session bound to a connection, if any.
+     * Binds a connection to a participant slot and issues its session token.
      *
-     * A socket that has been superseded by a newer connection for the same
-     * participant is no longer the active owner and is treated as having no
-     * session, so it cannot issue room-scoped commands.
+     * The socket is registered as the participant's active connection first, so
+     * the session it is leaving is torn down without touching the new one, and
+     * the token that is issued last can no longer be confused with it.
      *
-     * @param ws - The sender's WebSocket connection.
-     * @returns The room/user identifiers, or null when not in an active room session.
-     */
-    private getSession(ws: ExtendedWebSocket): RoomSession | null {
-        if (!ws.roomId || !ws.userId) {
-            return null;
-        }
-        const activeSocket = this.activeSockets.get(socketKey(ws.roomId, ws.userId));
-        if (!isActiveOwner(activeSocket, ws)) {
-            return null;
-        }
-        return { roomId: ws.roomId, userId: ws.userId };
-    }
-
-    /**
-     * Registers a socket as the active connection for a participant, detaching any
-     * socket it replaces so the superseded connection can no longer act.
-     *
-     * @param ws - The newly active socket.
+     * @param ws - The connection entering the room.
      * @param roomId - The room identifier.
      * @param userId - The participant identifier.
+     * @param previousRoomToken - Token of the room the browser is leaving, if any.
+     * @returns The session token issued for the new session.
      */
-    private bindActiveSocket(ws: ExtendedWebSocket, roomId: string, userId: string): void {
-        const key = socketKey(roomId, userId);
-        const previous = this.activeSockets.get(key);
-        if (previous && !isActiveOwner(previous, ws)) {
-            previous.roomId = undefined;
-            previous.userId = undefined;
-            // The newer socket owns the participant: tell the old one why it is
-            // going away instead of letting it fight for the slot. Clearing the
-            // session first keeps the close handler from tearing it down.
-            previous.close(SESSION_REPLACED_CLOSE_CODE, 'session replaced');
-        }
-        this.activeSockets.set(key, ws);
-    }
-
-    /**
-     * Ends the room session a browser still holds when it opens a different room.
-     *
-     * The client proves ownership with the token it already has, so the server
-     * never trusts a client-supplied identity. The participant leaves the old
-     * room (its row disappears, host included) and the socket that held it is
-     * closed with `ROOM_SWITCHED_CLOSE_CODE`, which that tab turns into a notice
-     * instead of a reconnect.
-     *
-     * @param previousRoomToken - Token of the room the browser is leaving.
-     * @param current - Room and participant of the session just opened.
-     */
-    private endPreviousRoom(
-        previousRoomToken: string | null,
-        current: { roomId: string; userId: string }
-    ): void {
-        if (!previousRoomToken) {
-            return;
-        }
-        const binding = sessionService.resolve(previousRoomToken);
-        if (!binding) {
-            return;
-        }
-        if (binding.roomId === current.roomId && binding.userId === current.userId) {
-            return;
-        }
-
-        const previousKey = socketKey(binding.roomId, binding.userId);
-        const previousSocket = this.activeSockets.get(previousKey);
-        if (previousSocket) {
-            previousSocket.roomId = undefined;
-            previousSocket.userId = undefined;
-            this.activeSockets.delete(previousKey);
-            previousSocket.close(ROOM_SWITCHED_CLOSE_CODE, 'session moved');
-        }
-
-        // Revoked, so the token cannot rebind the participant the switch removed.
-        sessionService.revoke(previousRoomToken);
-        const updatedRoom = roomManager.removeParticipant(binding.roomId, binding.userId);
-        if (updatedRoom) {
-            this.broadcastRoomState(binding.roomId);
-        }
+    private enterRoom(
+        ws: ExtendedWebSocket,
+        roomId: string,
+        userId: string,
+        previousRoomToken: string | null
+    ): string {
+        ws.roomId = roomId;
+        ws.userId = userId;
+        this.sessions.bind(ws, roomId, userId);
+        this.sessions.endPreviousRoom(previousRoomToken, { roomId, userId });
+        return sessionService.issue(roomId, userId);
     }
 
     /**
@@ -576,12 +467,7 @@ export class WebSocketHandler {
         const { hostId, roomId, roomState } = created;
 
         auditLog({ action: 'room.created', outcome: 'allowed', roomId, userId: hostId });
-        ws.roomId = roomId;
-        ws.userId = hostId;
-        this.bindActiveSocket(ws, roomId, hostId);
-        this.endPreviousRoom(payload.previousRoomToken ?? null, { roomId, userId: hostId });
-
-        const sessionToken = sessionService.issue(roomId, hostId);
+        const sessionToken = this.enterRoom(ws, roomId, hostId, payload.previousRoomToken ?? null);
         this.send(ws, 'SESSION', { sessionToken, userId: hostId });
 
         this.send(ws, 'ROOM_STATE', {
@@ -591,158 +477,20 @@ export class WebSocketHandler {
     }
 
     /**
-     * Turns away a join that the room has not even been asked about yet.
-     *
-     * Every bar here stands in front of the door rather than inside the room:
-     * the kick bans, the requirement that a non-browser client proves who it is,
-     * and the challenge for a caller that cannot prove anything. A join that
-     * reaches the room is past all of them.
-     *
-     * @param ws - The sender's WebSocket connection.
-     * @param attempt - What the join presented, and where it came from.
-     * @returns True when the join was turned away and must go no further.
-     */
-    private refuseJoin(
-        ws: ExtendedWebSocket,
-        attempt: {
-            normalizedRoomId: string;
-            now: number;
-            provenUserId?: string;
-            sessionToken?: string | null;
-            turnstileToken?: string | null;
-        }
-    ): boolean {
-        const { normalizedRoomId, now, provenUserId, sessionToken } = attempt;
-
-        // A kick revokes the token the client is holding, so the bar has to be
-        // checked on the presented credential: without this the client would
-        // come back with a dead token, have no identity to match, and be
-        // handed a brand-new participant.
-        const tokenBan = sessionToken ? this.bans.tokenBanFor(sessionToken, now) : null;
-        if (tokenBan) {
-            this.rejectBanned(ws, tokenBan.roomId, tokenBan.userId);
-            return true;
-        }
-
-        // The bar that survives the revoked token: a browser that was just
-        // kicked can reconnect with a new tab, no token and a fresh name, and
-        // would otherwise be admitted as a brand-new participant.
-        if (ws.clientId && this.bans.isClientBanned(normalizedRoomId, ws.clientId, now)) {
-            this.rejectBanned(ws, normalizedRoomId);
-            return true;
-        }
-
-        // A browser with no identity cookie cannot be named by a kick ban —
-        // in development the page is served from the Vite origin while the
-        // socket reaches this server directly, so the cookie is not shared.
-        // Refusing the join would break that setup, and the ban is advisory
-        // anyway: the identity makes the bar hold, its absence makes it lapse.
-        // Non-browser clients (no Origin) must still prove identity with a
-        // valid session token bound to this room.
-        if (!ws.hasOrigin && !provenUserId) {
-            auditLog({ action: 'join.rejected.token-missing', outcome: 'denied' });
-            this.sendError(
-                ws,
-                'A valid session token is required to join from a non-browser client.',
-                'NO_SESSION'
-            );
-            return true;
-        }
-
-        // Same bar, reached when the join still proves its identity with a live
-        // token — for instance a ban issued without the token being revoked.
-        if (provenUserId && this.bans.isBanned(normalizedRoomId, provenUserId, now)) {
-            this.rejectBanned(ws, normalizedRoomId, provenUserId);
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Audits and answers a join from a participant a kick barred.
-     *
-     * @param ws - The sender's WebSocket connection.
-     * @param roomId - The room the bar was issued in.
-     * @param userId - The participant the bar names, when the join proved one.
-     */
-    private rejectBanned(ws: ExtendedWebSocket, roomId: string, userId?: string): void {
-        auditLog({
-            action: 'join.rejected.banned',
-            outcome: 'denied',
-            roomId,
-            userId,
-        });
-        this.sendError(
-            ws,
-            'You were removed from this session. Try again in a few minutes.',
-            'BANNED'
-        );
-    }
-
-    /**
      * Handles joining an existing room and binds the session to the connection.
      *
-     * Three bars are checked, and only two of them stand in front of the door:
-     * the kick bans come first, the failed-join budget is spent only on codes
-     * that match no room, and the browser-profile bar is what survives a
-     * discarded session token.
+     * The admission bars run before the room is even consulted, and the
+     * failed-join budget is spent only on codes that match no room.
      */
     private handleJoinRoom(ws: ExtendedWebSocket, payload: JoinRoomPayload): void {
-        const { avatar, color, name, previousRoomToken, roomId, sessionToken, userId } = payload;
-
-        const address = ws.remoteAddress ?? 'unknown';
-        const now = Date.now();
-        const normalizedRoomId = roomId.toUpperCase();
-        const binding = sessionService.resolve(sessionToken);
-        const isRoomBound = binding?.roomId === normalizedRoomId;
-        const isUserBound = !userId || binding?.userId === userId;
-        const provenUserId = isRoomBound && isUserBound ? binding?.userId : undefined;
-
-        const isBarred = this.refuseJoin(ws, {
-            normalizedRoomId,
-            now,
-            provenUserId,
-            sessionToken,
-        });
-        if (isBarred) {
+        const attempt = resolveJoinAttempt(payload, ws.remoteAddress);
+        if (this.admission.refuse(ws, attempt)) {
             return;
         }
 
-        const result = roomManager.joinRoom(
-            roomId,
-            name,
-            avatar || DEFAULT_AVATAR,
-            color || DEFAULT_PARTICIPANT_COLOR,
-            provenUserId
-        );
-
+        const result = this.seatParticipant(payload, attempt.provenUserId);
         if (!result) {
-            // A code that matches no room is a guess, and it is the one signal a
-            // brute-force attempt cannot avoid producing. The room was looked up
-            // first, so a code that exists never consults this budget: the bar is
-            // for guessing, not for joining, and a NAT'd team cannot be locked
-            // out of the room it is actually entering.
-            if (!this.joinFailures.allows(address, now)) {
-                auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
-                this.sendError(
-                    ws,
-                    'Too many wrong room codes from this network. Try again in a minute.',
-                    'RATE_LIMITED'
-                );
-                return;
-            }
-            this.joinFailures.recordFailure(address, normalizedRoomId, now);
-            auditLog({
-                action: 'join.rejected.room-not-found',
-                outcome: 'denied',
-                roomId: normalizedRoomId,
-            });
-            this.sendError(
-                ws,
-                `Room "${roomId}" not found. Please check room code.`,
-                'ROOM_NOT_FOUND'
-            );
+            this.admission.reportUnknownRoom(ws, attempt);
             return;
         }
         if (result.error) {
@@ -759,21 +507,39 @@ export class WebSocketHandler {
         // Remember which browser profile this participant is, so a kick can bar
         // it even when the participant comes back without its token.
         if (ws.clientId) {
-            this.clientIdByUser.set(socketKey(roomState.id, participant.id), ws.clientId);
+            this.sessions.rememberClientId(roomState.id, participant.id, ws.clientId);
         }
 
-        ws.roomId = roomState.id;
-        ws.userId = participant.id;
-        this.bindActiveSocket(ws, roomState.id, participant.id);
-        this.endPreviousRoom(previousRoomToken ?? null, {
-            roomId: roomState.id,
-            userId: participant.id,
-        });
-
-        const issuedToken = sessionService.issue(roomState.id, participant.id);
+        const issuedToken = this.enterRoom(
+            ws,
+            roomState.id,
+            participant.id,
+            payload.previousRoomToken ?? null
+        );
         this.send(ws, 'SESSION', { sessionToken: issuedToken, userId: participant.id });
 
         this.broadcastRoomState(roomState.id);
+    }
+
+    /**
+     * Asks the room manager to seat the join, applying the default look when the
+     * request leaves the avatar or the colour out.
+     *
+     * @param payload - The join request.
+     * @param provenUserId - The participant the join proved, if any.
+     * @returns The join result, or null when the room code matches no room.
+     */
+    private seatParticipant(
+        payload: JoinRoomPayload,
+        provenUserId?: string
+    ): JoinParticipantResult | null {
+        return roomManager.joinRoom(
+            payload.roomId,
+            payload.name,
+            payload.avatar || DEFAULT_AVATAR,
+            payload.color || DEFAULT_PARTICIPANT_COLOR,
+            provenUserId
+        );
     }
 
     /**
@@ -1019,11 +785,11 @@ export class WebSocketHandler {
 
         // The browser profile, when the kicked participant was ever seen with
         // one: this is the bar that a tab without a token cannot walk past.
-        const clientId = this.clientIdByUser.get(socketKey(session.roomId, payload.targetUserId));
+        const clientId = this.sessions.clientIdFor(session.roomId, payload.targetUserId);
         if (clientId) {
             this.bans.banClient(session.roomId, clientId, Date.now(), KICK_BAN_DURATION_MS);
         }
-        this.clientIdByUser.delete(socketKey(session.roomId, payload.targetUserId));
+        this.sessions.forgetClientId(session.roomId, payload.targetUserId);
         auditLog({
             action: 'user.kicked',
             outcome: 'allowed',

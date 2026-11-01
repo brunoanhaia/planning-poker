@@ -22,6 +22,90 @@ export interface JoinParticipantResult {
 }
 
 /**
+ * Returns why the room refuses a new participant, if it does.
+ *
+ * Ending the session is the host's way of closing the room for good. A
+ * reconnecting participant keeps its identity, but a room nobody may enter
+ * anymore must not take a new one in either. Locking and the participant cap
+ * are checked in the order a client experiences them.
+ *
+ * @param room - The active room state.
+ * @returns The refusal and its client-facing message, or null when the room admits.
+ */
+const findJoinRefusal = (room: RoomState): JoinParticipantResult | null => {
+    if (room.isEnded) {
+        return {
+            code: 'SESSION_ENDED',
+            error: 'This session has ended. Ask the host for a new room.',
+        };
+    }
+
+    if (room.isLocked) {
+        return { code: 'ROOM_LOCKED', error: 'Room is locked by the administrator.' };
+    }
+
+    if (room.participants.length >= MAX_PARTICIPANTS_PER_ROOM) {
+        return { code: 'ROOM_FULL', error: 'Room is full. Try again when somebody leaves.' };
+    }
+
+    return null;
+};
+
+/**
+ * Brings a returning participant back online and refreshes the profile it presents.
+ *
+ * @param participant - The participant the session token identified.
+ * @param profile - The name, avatar and colour the join presented.
+ * @returns The same participant, updated in place.
+ */
+const reconnectParticipant = (
+    participant: Participant,
+    profile: { avatar?: Avatar; color?: AvatarColor; name: string }
+): Participant => {
+    participant.isOnline = true;
+    participant.name = profile.name || participant.name;
+    participant.avatar = profile.avatar || participant.avatar;
+    participant.color = profile.color || participant.color;
+    return participant;
+};
+
+/**
+ * Adds a participant to the room, making the first one its host.
+ *
+ * @param room - The active room state.
+ * @param name - The display name of the participant.
+ * @param avatar - Optional avatar emoji.
+ * @param color - Optional avatar background color.
+ * @returns The participant that was added.
+ */
+const addParticipant = (
+    room: RoomState,
+    name: string,
+    avatar?: Avatar,
+    color?: AvatarColor
+): Participant => {
+    const participant: Participant = {
+        avatar: avatar || DEFAULT_AVATAR,
+        color: color || DEFAULT_PARTICIPANT_COLOR,
+        hasVoted: false,
+        id: generateUserId(),
+        isAdmin: room.participants.length === 0,
+        isHost: room.participants.length === 0,
+        isOnline: true,
+        isSpectator: false,
+        name,
+        vote: null,
+    };
+
+    room.participants.push(participant);
+    if (participant.isHost) {
+        room.hostId = participant.id;
+    }
+
+    return participant;
+};
+
+/**
  * Handles participant joining (or re-connecting) to a room.
  *
  * @param room - The active room state.
@@ -39,57 +123,26 @@ export const joinParticipant = (
     color?: AvatarColor,
     existingUserId?: string
 ): JoinParticipantResult => {
-    if (existingUserId) {
-        const existingParticipant = room.participants.find((p) => p.id === existingUserId);
-        if (existingParticipant) {
-            existingParticipant.isOnline = true;
-            existingParticipant.name = userName || existingParticipant.name;
-            existingParticipant.avatar = avatar || existingParticipant.avatar;
-            existingParticipant.color = color || existingParticipant.color;
-            return { participant: existingParticipant, roomState: room };
-        }
-    }
-
-    // Ending the session is the host's way of closing the room for good. A
-    // reconnecting participant keeps its identity, but a room nobody may enter
-    // anymore must not take a new one in either.
-    if (room.isEnded) {
+    const existingParticipant = existingUserId
+        ? room.participants.find((p) => p.id === existingUserId)
+        : undefined;
+    if (existingParticipant) {
         return {
-            code: 'SESSION_ENDED',
-            error: 'This session has ended. Ask the host for a new room.',
+            participant: reconnectParticipant(existingParticipant, {
+                avatar,
+                color,
+                name: userName,
+            }),
+            roomState: room,
         };
     }
 
-    if (room.isLocked) {
-        return { code: 'ROOM_LOCKED', error: 'Room is locked by the administrator.' };
+    const refused = findJoinRefusal(room);
+    if (refused) {
+        return refused;
     }
 
-    if (room.participants.length >= MAX_PARTICIPANTS_PER_ROOM) {
-        return { code: 'ROOM_FULL', error: 'Room is full. Try again when somebody leaves.' };
-    }
-
-    const newId = generateUserId();
-    const isFirstUser = room.participants.length === 0;
-
-    const participant: Participant = {
-        avatar: avatar || DEFAULT_AVATAR,
-        color: color || DEFAULT_PARTICIPANT_COLOR,
-        hasVoted: false,
-        id: newId,
-        isAdmin: isFirstUser,
-        isHost: isFirstUser,
-        isOnline: true,
-        isSpectator: false,
-        name: userName,
-        vote: null,
-    };
-
-    room.participants.push(participant);
-    if (isFirstUser) {
-        room.hostId = newId;
-    }
-
-    return { participant, roomState: room };
+    return { participant: addParticipant(room, userName, avatar, color), roomState: room };
 };
 
 /**

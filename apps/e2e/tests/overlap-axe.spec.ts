@@ -29,100 +29,147 @@ const COLOR_MODES = ['dark', 'light'] as const;
 /** Ant Design's form item wrapper, whose label is defined to sit with its control. */
 const FORM_ITEM_SELECTOR = '.ant-form-item';
 
-/**
- * Collects every pair of visible, text-bearing or interactive elements whose
- * bounding boxes intersect.
- *
- * Runs inside the page so it can use the real layout engine. Parent/child pairs
- * and label/control pairs are skipped because overlapping is their contract.
- *
- * @param formItemSelector - Wrapper class that pairs a field label with its control.
- * @returns The overlapping pairs, each with the intersection area in px².
- */
-const collectOverlapIssues = (formItemSelector: string): OverlapIssue[] => {
-    const issues: OverlapIssue[] = [];
+/** Whether the element paints a box: a hidden or empty element cannot overlap. */
+const isVisibleElement = (element: Element): boolean => {
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+        return false;
+    }
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+};
 
-    const isVisible = (element: Element): boolean => {
-        const style = window.getComputedStyle(element);
-        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-            return false;
-        }
-        const rect = element.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-    };
-
-    const hasDirectText = (element: Element): boolean =>
-        Array.from(element.childNodes).some(
-            (node) =>
-                node.nodeType === Node.TEXT_NODE &&
-                Boolean(node.textContent && node.textContent.trim().length > 0)
-        );
-
-    const isInteractive = (element: Element): boolean =>
-        ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName);
-
-    const describe = (element: Element): string => {
-        const classes = Array.from(element.classList).join('.');
-        return classes
-            ? `${element.tagName.toLowerCase()}.${classes}`
-            : element.tagName.toLowerCase();
-    };
-
-    const belongsToSameFormItem = (a: Element, b: Element): boolean => {
-        const itemA = a.closest(formItemSelector);
-        return Boolean(itemA) && itemA === b.closest(formItemSelector);
-    };
-
-    const candidates: HTMLElement[] = Array.from(
-        document.querySelectorAll<HTMLElement>('*')
-    ).filter(
-        (element) =>
-            isVisible(element) &&
-            !element.closest('[aria-hidden="true"]') &&
-            (hasDirectText(element) || isInteractive(element))
+/** Whether the element owns a non-blank text node of its own. */
+const hasDirectText = (element: Element): boolean =>
+    Array.from(element.childNodes).some(
+        (node) =>
+            node.nodeType === Node.TEXT_NODE &&
+            Boolean(node.textContent && node.textContent.trim().length > 0)
     );
 
+/** Whether the element is one a user can operate. */
+const isInteractive = (element: Element): boolean =>
+    ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName);
+
+/** Short, CSS-like label used in failure output. */
+const describeElement = (element: Element): string => {
+    const classes = Array.from(element.classList).join('.');
+    return classes ? `${element.tagName.toLowerCase()}.${classes}` : element.tagName.toLowerCase();
+};
+
+/** Whether both elements sit inside the same form item, whose label names its control. */
+const belongsToSameFormItem = (
+    elementA: Element,
+    elementB: Element,
+    formItemSelector: string
+): boolean => {
+    const item = elementA.closest(formItemSelector);
+    return Boolean(item) && item === elementB.closest(formItemSelector);
+};
+
+/** Text a user would read from the element, falling back to its accessible name. */
+const elementLabel = (element: Element): string =>
+    (element as HTMLElement).innerText || element.getAttribute('aria-label') || '';
+
+/** Whether the element is one the scan should compare with every other. */
+const isCandidate = (element: Element): boolean =>
+    isVisibleElement(element) &&
+    !element.closest('[aria-hidden="true"]') &&
+    (hasDirectText(element) || isInteractive(element));
+
+/** Every element worth comparing, in document order. */
+const collectCandidates = (): HTMLElement[] =>
+    Array.from(document.querySelectorAll<HTMLElement>('*')).filter(isCandidate);
+
+/** Whether the pair is nested or label/control, so overlapping is its contract. */
+const isRelatedPair = (elementA: Element, elementB: Element, formItemSelector: string): boolean =>
+    elementA.contains(elementB) ||
+    elementB.contains(elementA) ||
+    belongsToSameFormItem(elementA, elementB, formItemSelector);
+
+/** Area shared by the two boxes, in px². */
+const intersectionArea = (elementA: Element, elementB: Element): number => {
+    const rectA = elementA.getBoundingClientRect();
+    const rectB = elementB.getBoundingClientRect();
+    const width = Math.max(
+        0,
+        Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left)
+    );
+    const height = Math.max(
+        0,
+        Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top)
+    );
+    return width * height;
+};
+
+/** Describes the overlap of one pair, or `null` when the pair is related or disjoint. */
+const describeOverlap = (
+    elementA: Element,
+    elementB: Element,
+    formItemSelector: string
+): OverlapIssue | null => {
+    if (isRelatedPair(elementA, elementB, formItemSelector)) {
+        return null;
+    }
+    const overlapArea = intersectionArea(elementA, elementB);
+    if (overlapArea <= 0) {
+        return null;
+    }
+    return {
+        element1: describeElement(elementA),
+        element2: describeElement(elementB),
+        overlapArea,
+        text1: elementLabel(elementA),
+        text2: elementLabel(elementB),
+    };
+};
+
+/** Pairs every candidate with every later candidate and keeps the real overlaps. */
+const collectOverlapIssues = (formItemSelector: string): OverlapIssue[] => {
+    const candidates = collectCandidates();
+    const issues: OverlapIssue[] = [];
     for (let i = 0; i < candidates.length; i += 1) {
         for (let j = i + 1; j < candidates.length; j += 1) {
-            const elementA = candidates[i];
-            const elementB = candidates[j];
-
-            if (
-                elementA.contains(elementB) ||
-                elementB.contains(elementA) ||
-                belongsToSameFormItem(elementA, elementB)
-            ) {
-                continue;
+            const issue = describeOverlap(candidates[i], candidates[j], formItemSelector);
+            if (issue) {
+                issues.push(issue);
             }
-
-            const rectA = elementA.getBoundingClientRect();
-            const rectB = elementB.getBoundingClientRect();
-
-            const overlapWidth = Math.max(
-                0,
-                Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left)
-            );
-            const overlapHeight = Math.max(
-                0,
-                Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top)
-            );
-            const overlapArea = overlapWidth * overlapHeight;
-
-            if (overlapArea <= 0) {
-                continue;
-            }
-
-            issues.push({
-                element1: describe(elementA),
-                element2: describe(elementB),
-                overlapArea,
-                text1: elementA.innerText || elementA.getAttribute('aria-label') || '',
-                text2: elementB.innerText || elementB.getAttribute('aria-label') || '',
-            });
         }
     }
-
     return issues;
+};
+
+/** Every helper the page-side scan calls, kept addressable by name. */
+const PAGE_HELPERS = {
+    isVisibleElement,
+    hasDirectText,
+    isInteractive,
+    describeElement,
+    belongsToSameFormItem,
+    elementLabel,
+    isCandidate,
+    collectCandidates,
+    isRelatedPair,
+    intersectionArea,
+    describeOverlap,
+    collectOverlapIssues,
+} satisfies Record<string, (...args: never[]) => unknown>;
+
+/**
+ * `page.evaluate` only ships the function it is handed, so the scan travels as
+ * source with every helper it calls declared in the same scope.
+ */
+const OVERLAP_SCAN_SOURCE = Object.entries(PAGE_HELPERS)
+    .map(([name, helper]) => `const ${name} = ${helper.toString()};`)
+    .join('\n');
+
+/** Runs the overlap scan inside the page. */
+const findOverlapIssues = async (page: Page): Promise<OverlapIssue[]> => {
+    const script = `(() => {
+${OVERLAP_SCAN_SOURCE}
+return collectOverlapIssues(${JSON.stringify(FORM_ITEM_SELECTOR)});
+})()`;
+    return (await page.evaluate(script)) as OverlapIssue[];
 };
 
 /**
@@ -142,7 +189,7 @@ const expectCleanLayout = async (page: Page, viewportName: string, state: string
         `Accessibility violations in the ${state} state on ${viewportName}`
     ).toEqual([]);
 
-    const overlapIssues = await page.evaluate(collectOverlapIssues, FORM_ITEM_SELECTOR);
+    const overlapIssues = await findOverlapIssues(page);
 
     expect(
         overlapIssues,
