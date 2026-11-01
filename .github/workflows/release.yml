@@ -1,0 +1,51 @@
+# Release on every merge into `develop`.
+#
+# `semantic-release` turns the Conventional Commit messages since the last tag
+# into the next version: it rewrites `CHANGELOG.md`, bumps the root `package.json`,
+# commits both with `[skip ci]`, and publishes the tag plus the GitHub release.
+# Nothing is published to npm — the workspace is private.
+#
+# The suite runs first, so a red tree never produces a tag.
+name: Release
+
+on:
+    push:
+        branches: [develop]
+
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
+
+concurrency:
+    group: release-develop
+    cancel-in-progress: false
+
+jobs:
+    release:
+        name: Version and publish
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - run: npm ci
+
+            - run: npm run build:shared
+
+            - name: Server suite
+              run: npm run test:server
+
+            - name: Client suite
+              run: npm run test:client
+
+            - name: Release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: npx semantic-release

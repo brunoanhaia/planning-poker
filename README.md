@@ -189,6 +189,19 @@ To run the visual overlap exploratory validation specifically:
 npm --workspace=@planitpoker/e2e run test tests/overlap-axe.spec.ts
 ```
 
+### Releases
+
+`develop` is the integration branch: every push to it runs the suites and then `semantic-release`
+(`.github/workflows/release.yml`). The Conventional Commit messages decide the next version, which
+is applied to `CHANGELOG.md` and the root `package.json`, tagged `v<version>` and published as a
+GitHub release. `feat`, `fix`, `perf` and `revert` produce a release; `chore`, `docs`, `style`,
+`refactor`, `test`, `build` and `ci` do not, so a maintenance merge does not mint a version.
+
+Messages are checked twice: the `commit-msg` hook locally, and
+`.github/workflows/conventional-commits.yml` in CI — every commit in a pull request plus the pull
+request title, which is what a squash merge turns into the commit. To preview the next version
+without publishing anything, run `npm run release:dry` on `develop`.
+
 ### Code Formatting and Linting
 
 The project uses ESLint for code quality and Prettier for code formatting. The configurations are integrated so that Prettier handles all stylistic rules without conflicting with ESLint.

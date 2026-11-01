@@ -1,0 +1,41 @@
+# Conventional Commits gate.
+#
+# The `commit-msg` hook only runs on a machine where Husky was installed, so the
+# same rules are enforced where they cannot be bypassed: every commit in the pull
+# request, and the pull request title, which becomes the commit when the branch is
+# squash-merged.
+name: Conventional commits
+
+on:
+    pull_request:
+        branches: [main, develop]
+
+permissions:
+    contents: read
+
+jobs:
+    messages:
+        name: Validate messages
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v5
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - run: npm ci
+
+            - name: Fetch the base branch
+              run: git fetch origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
+
+            - name: Commits in this pull request
+              run: npx commitlint --from origin/${{ github.base_ref }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+            - name: Pull request title
+              env:
+                  TITLE: ${{ github.event.pull_request.title }}
+              run: printf '%s\n' "$TITLE" | npx commitlint --verbose

@@ -70,9 +70,10 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - the body is not preceded by a blank line
     - the header exceeds 100 characters
 - **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky arms itself through the `prepare` script, so a plain `npm install` installs the hook. Where post-install scripts are blocked, run `npx husky` once.
-- **Changelog**: `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
-    - The `conventionalcommits` preset shows `feat`, `fix`, `perf` and `revert`, plus breaking changes.
-    - The same preset hides `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci`.
+- **CI gate**: `.github/workflows/conventional-commits.yml` validates every commit in a pull request and the pull request title, which becomes the commit on a squash merge. A title without a type is rejected there too.
+- **Releases**: every push to `develop` runs `.github/workflows/release.yml`, which executes the suites and then `semantic-release`. It computes the next version from the commit messages, prepends the notes to `CHANGELOG.md`, bumps the root `package.json`, commits both with `[skip ci]`, and publishes the `v<version>` tag plus the GitHub release. Nothing goes to npm — the workspace is private.
+    - `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
+    - `feat`, `fix`, `perf` and `revert` produce a release; `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` do not.
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.
 
