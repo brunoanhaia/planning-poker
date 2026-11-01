@@ -71,6 +71,12 @@ export const WS_THROTTLE_WINDOW_MS = 10 * 1000;
  */
 export const SESSION_REPLACED_CLOSE_CODE = 4001;
 
+/**
+ * Close code sent when the same browser opens a different room: the newer room
+ * wins and the connection left behind ends with this code.
+ */
+export const ROOM_SWITCHED_CLOSE_CODE = 4002;
+
 /** How long a kicked participant is barred from rejoining, in milliseconds. */
 export const KICK_BAN_DURATION_MS = 5 * 60 * 1000;
 
@@ -250,6 +256,8 @@ export interface CreateRoomPayload {
     customDeck?: CardValue[];
     deckType?: DeckType;
     name: string;
+    /** Token of the room this browser still holds, ended when the new one opens. */
+    previousRoomToken?: string | null;
     title?: string;
 }
 
@@ -257,6 +265,8 @@ export interface JoinRoomPayload {
     avatar?: Avatar;
     color?: AvatarColor;
     name: string;
+    /** Token of the room this browser still holds, ended when the new one opens. */
+    previousRoomToken?: string | null;
     roomId: string;
     sessionToken?: string | null;
     userId?: string | null;

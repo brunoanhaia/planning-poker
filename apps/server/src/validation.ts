@@ -60,6 +60,7 @@ const createRoomSchema = withCustomDeckRequirement(
         customDeck: customDeckSchema.optional(),
         deckType: deckTypeSchema.optional(),
         name: nameSchema,
+        previousRoomToken: z.string().trim().min(1).max(64).optional().nullable(),
         title: titleSchema.optional(),
     })
 );
@@ -68,6 +69,7 @@ const joinRoomSchema = z.object({
     avatar: avatarSchema.optional(),
     color: colorSchema.optional(),
     name: nameSchema,
+    previousRoomToken: z.string().trim().min(1).max(64).optional().nullable(),
     roomId: z.string().trim().min(1).max(MAX_NAME_LENGTH),
     sessionToken: z.string().trim().min(1).optional().nullable(),
     userId: z.string().trim().min(1).optional().nullable(),

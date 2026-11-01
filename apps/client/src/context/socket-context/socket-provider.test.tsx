@@ -205,6 +205,7 @@ describe('SocketProvider reconnection', () => {
                 avatar: 'avatar-1',
                 color: '#1890ff',
                 name: 'Ana',
+                previousRoomToken: null,
                 roomId: 'ROOM01',
                 sessionToken: 'tok-room',
                 userId: null,
@@ -240,6 +241,60 @@ describe('SocketProvider reconnection', () => {
         // The surviving tab owns the token, so this tab must not delete it.
         expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
         expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok');
+    });
+
+    it('stops reconnecting and drops the room token when the browser switches rooms', () => {
+        renderProbe();
+        const first = enterRoom();
+
+        act(() => {
+            first.dropWithCode(4002);
+        });
+        act(() => {
+            vi.advanceTimersByTime(5000);
+        });
+
+        expect(FakeWebSocket.instances).toHaveLength(1);
+        expect(screen.getByText('lobby')).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'This session ended because the room was opened somewhere else in this browser.'
+            )
+        ).toBeInTheDocument();
+        // The server removed this participant, so the token cannot be replayed.
+        expect(sessionStorage.getItem('planit_session_token')).toBeNull();
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBeNull();
+        // The room that took over owns the record; this tab must not clear it.
+        expect(localStorage.getItem('planit_active_room')).toBe('ROOM01');
+    });
+
+    it('remembers the active room once the room is entered', () => {
+        renderProbe();
+        enterRoom();
+
+        expect(localStorage.getItem('planit_active_room')).toBe('ROOM01');
+    });
+
+    it('forgets the active room when the user leaves', () => {
+        renderProbe();
+        enterRoom();
+
+        act(() => {
+            screen.getByRole('button', { name: 'leave' }).click();
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBeNull();
+    });
+
+    it('forgets the active room when the user is kicked', () => {
+        renderProbe();
+        const socket = enterRoom();
+
+        act(() => {
+            socket.receive({ payload: {}, type: 'KICKED' });
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBeNull();
     });
 
     it('clears both storages when the user is kicked', () => {
@@ -360,6 +415,26 @@ describe('SocketProvider reconnection', () => {
         expect(second.sent).toEqual([]);
     });
 
+    it('proves the room it is leaving when another room opens', () => {
+        renderProbe();
+        const socket = enterRoom();
+
+        // Another tab of this browser is the one holding room 2; joining room 1
+        // from here has to hand the server room 2's token so it can end it.
+        localStorage.setItem('planit_active_room', 'ROOM02');
+        localStorage.setItem('planit_room_token:ROOM02', 'tok-room2');
+
+        act(() => {
+            screen.getByRole('button', { name: 'join' }).click();
+        });
+
+        const frame = JSON.parse(socket.sent[0]);
+        expect(frame.payload).toMatchObject({
+            previousRoomToken: 'tok-room2',
+            roomId: 'ROOM01',
+        });
+    });
+
     it('rejoins with the kept token and no user id after leaving', () => {
         renderProbe();
         const socket = enterRoom();
@@ -378,6 +453,7 @@ describe('SocketProvider reconnection', () => {
             avatar: 'avatar-1',
             color: '#1890ff',
             name: 'Ana',
+            previousRoomToken: null,
             roomId: 'ROOM01',
             sessionToken: 'tok',
             userId: null,
