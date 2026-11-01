@@ -7,6 +7,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
+permissions: {}
+
 jobs:
   mention:
     name: Respond to mention
@@ -47,7 +49,10 @@ jobs:
           OPENCODE_CONFIG_CONTENT: |
             {
               "permission": {
-                "external_directory": { "/tmp/**": "allow" },
+                "external_directory": {
+                  "*": "deny",
+                  "/tmp/**": "allow"
+                },
                 "doom_loop": "deny",
                 "question": "deny",
                 "read": {
@@ -100,7 +105,10 @@ jobs:
           OPENCODE_CONFIG_CONTENT: |
             {
               "permission": {
-                "external_directory": { "/tmp/**": "allow" },
+                "external_directory": {
+                  "*": "deny",
+                  "/tmp/**": "allow"
+                },
                 "doom_loop": "deny",
                 "question": "deny",
                 "read": {
@@ -119,4 +127,3 @@ jobs:
             typing, and consistency with the monorepo conventions.
             Report only actionable findings with file:line references; do not
             restate the diff.
-
