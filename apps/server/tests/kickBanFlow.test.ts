@@ -1,167 +1,20 @@
 import { KICK_BAN_DURATION_MS, WS_THROTTLE_MAX_MESSAGES } from '@planitpoker/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WebSocketServer } from 'ws';
 
-import { ConnectionLimiter } from '../src/connectionLimiter.js';
 import { JOIN_FAILURE_LIMIT } from '../src/constants.js';
-import { WebSocketHandler } from '../src/webSocketHandler.js';
-
-/** One message the handler sent to a socket double. */
-interface SentMessage {
-    payload: {
-        code?: string;
-        message?: string;
-        roomState?: { hostId: string; id: string };
-        sessionToken?: string;
-        userId?: string;
-    };
-    type: string;
-}
-
-/** A socket double that records what the handler sends it. */
-class SocketDouble {
-    public static readonly OPEN = 1;
-    public readyState = 1;
-    public isAlive = true;
-    public hasOrigin = true;
-    public roomId?: string;
-    public userId?: string;
-    /** Identity the handler read from the handshake cookie. */
-    public clientId?: string;
-    public readonly sent: SentMessage[] = [];
-    /** Close codes the handler asked the socket to use. */
-    public readonly closeCodes: number[] = [];
-    private readonly listeners = new Map<string, ((...args: unknown[]) => void)[]>();
-
-    public on(event: string, listener: (...args: unknown[]) => void): this {
-        this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
-        return this;
-    }
-
-    public emit(event: string, ...args: unknown[]): void {
-        (this.listeners.get(event) ?? []).forEach((listener) => listener(...args));
-    }
-
-    public send(data: string): void {
-        this.sent.push(JSON.parse(data) as SentMessage);
-    }
-
-    public terminate(): void {}
-    public close(code?: number, _reason?: string): void {
-        // `ws` does nothing when close() arrives on a socket that is already
-        // CLOSING or CLOSED, and leaves OPEN immediately otherwise.
-        if (this.readyState !== 1) {
-            return;
-        }
-        if (code !== undefined) {
-            this.closeCodes.push(code);
-        }
-        this.readyState = 2;
-    }
-    public ping(): void {}
-    public removeListener(): void {}
-}
-
-/** Messages of one type the handler sent to a socket. */
-const messagesOf = (socket: SocketDouble, type: string): SentMessage[] =>
-    socket.sent.filter((message) => message.type === type);
-
-/** The last message of one type, if any. */
-const lastMessage = (socket: SocketDouble, type: string): SentMessage | undefined => {
-    const matching = messagesOf(socket, type);
-    return matching.length > 0 ? matching[matching.length - 1] : undefined;
-};
-
-/** The room id of the last `ROOM_STATE` a socket received. */
-const roomIdOf = (socket: SocketDouble): string => {
-    const roomState = lastMessage(socket, 'ROOM_STATE')?.payload.roomState;
-    if (!roomState) {
-        throw new Error('no ROOM_STATE was received');
-    }
-    return roomState.id;
-};
-
-/** The participant id of the last `SESSION` a socket received. */
-const participantIdOf = (socket: SocketDouble): string => {
-    const participantId = lastMessage(socket, 'SESSION')?.payload.userId;
-    if (!participantId) {
-        throw new Error('no SESSION was received');
-    }
-    return participantId;
-};
-
-/** The token of the last `SESSION` a socket received. */
-const tokenOf = (socket: SocketDouble): string => {
-    const token = lastMessage(socket, 'SESSION')?.payload.sessionToken;
-    if (!token) {
-        throw new Error('no SESSION was received');
-    }
-    return token;
-};
-
-const handlers: WebSocketHandler[] = [];
-
-/** Boots the real handler against a socket double harness. */
-const boot = () => {
-    const sockets: SocketDouble[] = [];
-    const listeners = new Map<string, (...args: unknown[]) => void>();
-    const wss = {
-        clients: sockets,
-        close: vi.fn(),
-        on: vi.fn((event: string, listener: (...args: unknown[]) => void) => {
-            listeners.set(event, listener);
-        }),
-    } as unknown as WebSocketServer;
-
-    const handler = new WebSocketHandler(wss, {
-        cloudflareEnabled: false,
-        connections: new ConnectionLimiter(64, 1_000, 60_000, 100),
-        trustProxyHops: 0,
-    });
-    handlers.push(handler);
-
-    /**
-     * Opens a connection the way the handler sees it.
-     *
-     * @param options - Origin presence, the identity cookie and the peer address.
-     */
-    const connect = (options?: {
-        clientId?: string;
-        hasOrigin?: boolean;
-        remoteAddress?: string;
-    }): SocketDouble => {
-        const hasOrigin = options?.hasOrigin ?? true;
-        // A browser always carries the identity the server issued it, unless a
-        // test explicitly asks for one that has none.
-        const clientId =
-            options?.clientId ?? (hasOrigin ? '11111111-1111-4111-8111-111111111111' : undefined);
-        const socket = new SocketDouble();
-        socket.hasOrigin = hasOrigin;
-        if (clientId) {
-            socket.clientId = clientId;
-        }
-        sockets.push(socket);
-        listeners.get('connection')?.(socket, {
-            headers: {
-                ...(hasOrigin ? { origin: 'http://localhost:5173' } : {}),
-                ...(clientId ? { cookie: `pip_client=${clientId}` } : {}),
-            },
-            socket: { remoteAddress: options?.remoteAddress ?? '127.0.0.1' },
-        });
-        return socket;
-    };
-
-    return { connect, handler, sockets };
-};
-
-/** Sends a message to a socket double. */
-const send = (socket: SocketDouble, type: string, payload: unknown): void =>
-    socket.emit('message', JSON.stringify({ payload, type }));
+import {
+    boot,
+    lastMessage,
+    messagesOf,
+    participantIdOf,
+    roomIdOf,
+    send,
+    shutdownHandlers,
+    tokenOf,
+} from './support/socketHarness.js';
 
 afterEach(() => {
-    while (handlers.length > 0) {
-        handlers.pop()?.shutdown();
-    }
+    shutdownHandlers();
 });
 
 describe('Message dispatch hardening', () => {

@@ -318,4 +318,50 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         rm.revealVotes(roomId, hostId);
         expect(rm.getRoom(roomId)!.stories[0].rounds).toHaveLength(1);
     });
+
+    it('keeps the vote of a voter who becomes a spectator after the reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.submitVote(roomId, hostId, 3);
+        rm.submitVote(roomId, bobId, 5);
+        rm.revealVotes(roomId, hostId);
+
+        rm.toggleUserRole(roomId, hostId, bobId);
+
+        const bob = rm.getRoom(roomId)!.participants.find((p) => p.id === bobId)!;
+        expect(bob.isSpectator).toBe(true);
+        expect(bob.vote).toBe(5);
+        expect(bob.hasVoted).toBe(true);
+    });
+
+    it('clears the vote of a voter who becomes a spectator before the reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.submitVote(roomId, bobId, 5);
+        rm.toggleUserRole(roomId, hostId, bobId);
+
+        const bob = rm.getRoom(roomId)!.participants.find((p) => p.id === bobId)!;
+        expect(bob.isSpectator).toBe(true);
+        expect(bob.vote).toBeNull();
+        expect(bob.hasVoted).toBe(false);
+    });
+
+    it('reopens a finalized story on reset without losing the round history', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+        rm.updateStoryEstimate(roomId, hostId, rm.getRoom(roomId)!.stories[0].id, 5);
+        expect(rm.getRoom(roomId)!.stories[0].status).toBe('completed');
+
+        rm.resetVotes(roomId, hostId);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.stories[0].finalEstimate).toBeNull();
+        expect(room.stories[0].status).toBe('estimating');
+        expect(room.votesRevealed).toBe(false);
+        expect(room.stories[0].rounds).toHaveLength(1);
+    });
 });

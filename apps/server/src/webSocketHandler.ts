@@ -7,6 +7,7 @@ import {
     ErrorCode,
     JoinRoomPayload,
     KICK_BAN_DURATION_MS,
+    SESSION_REPLACED_CLOSE_CODE,
     SetCurrentStoryPayload,
     StartTimerPayload,
     TargetUserPayload,
@@ -476,6 +477,10 @@ export class WebSocketHandler {
         if (previous && !isActiveOwner(previous, ws)) {
             previous.roomId = undefined;
             previous.userId = undefined;
+            // The newer socket owns the participant: tell the old one why it is
+            // going away instead of letting it fight for the slot. Clearing the
+            // session first keeps the close handler from tearing it down.
+            previous.close(SESSION_REPLACED_CLOSE_CODE, 'session replaced');
         }
         this.activeSockets.set(key, ws);
     }

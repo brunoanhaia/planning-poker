@@ -64,6 +64,13 @@ export const WS_THROTTLE_MAX_MESSAGES = 30;
 /** Throttle window length, in milliseconds. */
 export const WS_THROTTLE_WINDOW_MS = 10 * 1000;
 
+/**
+ * Close code sent to a socket that the same browser superseded by opening the
+ * room again: the newer connection owns the participant, and the older one must
+ * stop reconnecting instead of fighting it.
+ */
+export const SESSION_REPLACED_CLOSE_CODE = 4001;
+
 /** How long a kicked participant is barred from rejoining, in milliseconds. */
 export const KICK_BAN_DURATION_MS = 5 * 60 * 1000;
 

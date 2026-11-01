@@ -61,6 +61,8 @@ export const ResultsPanel: React.FC = () => {
 
     const currentStory = roomState?.stories[roomState.currentStoryIndex ?? 0];
     const roundNumber = currentStory?.rounds.length ?? 0;
+    const finalEstimate = currentStory?.finalEstimate ?? null;
+    const isFinalized = currentStory?.status === 'completed' && finalEstimate !== null;
 
     if (!roomState?.votesRevealed) {
         return null;
@@ -130,30 +132,38 @@ export const ResultsPanel: React.FC = () => {
                 title={t('results.title')}
             >
                 <Flex gap={16} vertical>
-                    {isAdmin && (
+                    {isFinalized ? (
                         <Flex gap={8} justify="end" wrap>
-                            <Button
-                                icon={<EditOutlined />}
-                                onClick={() => {
-                                    setManualScore(String(suggestedEstimate));
-                                    setIsManualEditOpen(true);
-                                }}
-                            >
-                                {t('results.customScore')}
-                            </Button>
-                            <Button
-                                icon={<SaveOutlined />}
-                                onClick={() => promptSaveEstimate()}
-                                type="primary"
-                            >
-                                {t('results.accept', {
-                                    strategy: hasNumeric
-                                        ? t('results.accept.average')
-                                        : t('results.accept.mode'),
-                                    value: suggestedEstimate,
-                                })}
-                            </Button>
+                            <Tag color="success">
+                                {t('results.finalScore', { value: finalEstimate })}
+                            </Tag>
                         </Flex>
+                    ) : (
+                        isAdmin && (
+                            <Flex gap={8} justify="end" wrap>
+                                <Button
+                                    icon={<EditOutlined />}
+                                    onClick={() => {
+                                        setManualScore(String(suggestedEstimate));
+                                        setIsManualEditOpen(true);
+                                    }}
+                                >
+                                    {t('results.customScore')}
+                                </Button>
+                                <Button
+                                    icon={<SaveOutlined />}
+                                    onClick={() => promptSaveEstimate()}
+                                    type="primary"
+                                >
+                                    {t('results.accept', {
+                                        strategy: hasNumeric
+                                            ? t('results.accept.average')
+                                            : t('results.accept.mode'),
+                                        value: suggestedEstimate,
+                                    })}
+                                </Button>
+                            </Flex>
+                        )
                     )}
 
                     {/*

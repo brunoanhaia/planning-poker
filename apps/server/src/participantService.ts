@@ -157,6 +157,9 @@ export const submitVoteForParticipant = (
 /**
  * Toggles a participant's spectator status (voter <-> observer).
  *
+ * A revealed round is frozen: a voter who becomes a spectator keeps the card they already showed,
+ * so the displayed result does not change. Only Reset Votes can alter a revealed round.
+ *
  * @param room - The active room state.
  * @param userId - The identifier of the participant.
  * @returns The updated RoomState or null if participant not found.
@@ -168,7 +171,7 @@ export const toggleParticipantSpectator = (room: RoomState, userId: string): Roo
     }
 
     participant.isSpectator = !participant.isSpectator;
-    if (participant.isSpectator) {
+    if (participant.isSpectator && !room.votesRevealed) {
         participant.vote = null;
         participant.hasVoted = false;
     }

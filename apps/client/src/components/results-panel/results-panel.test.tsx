@@ -111,4 +111,33 @@ describe('ResultsPanel', () => {
         expect(screen.getByText('Estimation Results')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Accept Avg/i })).not.toBeInTheDocument();
     });
+
+    it('shows a finalized story with its saved estimate and no accept action', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({
+                roomState: {
+                    ...mockRevealedRoomState,
+                    stories: [
+                        {
+                            ...mockRevealedRoomState.stories[0],
+                            finalEstimate: 5,
+                            status: 'completed',
+                        },
+                    ],
+                },
+            })
+        );
+
+        const screen = render(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
+
+        expect(screen.queryByRole('button', { name: /Accept Avg/i })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Custom Score/i })).not.toBeInTheDocument();
+        expect(screen.getByText('Final estimate: 5')).toBeInTheDocument();
+        // The statistics stay readable after the story is accepted.
+        expect(screen.getAllByText('5.0')).toHaveLength(2);
+    });
 });

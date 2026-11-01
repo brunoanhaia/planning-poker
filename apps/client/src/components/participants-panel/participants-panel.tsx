@@ -28,7 +28,9 @@ export const ParticipantsPanel: React.FC = () => {
     const { currentUserId, isAdmin, isHost, roomState } = useSocket();
     const { t } = useTranslation();
 
-    if (!roomState) return null;
+    if (!roomState) {
+        return null;
+    }
 
     const participants = roomState.participants;
 
