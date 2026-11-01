@@ -30,9 +30,10 @@ The devcontainer pins a Node 24 LTS (Long Term Support) image, the same major as
 
 ## Build
 
-`@planitpoker/shared` must be built before the dependent apps start, because they consume it from `dist/` through the package `exports` map. The exception is type-checking and the unit tests, which read the source through `paths`.
+`@planitpoker/shared` must be built before the dependent apps start, because they consume it from `dist/` through the package `exports` map. Type-checking is the only exception.
 
 - Type-checking resolves the package from source: the client `tsconfig.json` maps `@planitpoker/shared` to `packages/shared/src/index.ts` through `paths`. `tsc --noEmit` therefore works without a prior build.
+- The unit suites do not: Vitest ignores `tsconfig` paths, and only the client maps them, so both suites import the built `dist/`. A stale or missing `dist/` breaks or misleads them.
 
 ## Test
 
@@ -228,4 +229,4 @@ Verify style conventions against executable config when in doubt.
 - `useSocket` uses the React 19 `use(Context)` hook, not `useContext`.
 - Client WebSocket URL resolution: `VITE_WS_URL` → dev fallback `ws://localhost:5000` → prod fallback dials `window.location.host` at the `/ws` path, the only route Nginx proxies (the bare host would answer with the SPA and the handshake would fail).
 - Server default CORS only allows `http://localhost:5173`; set `ALLOWED_ORIGINS` for other frontends.
-- `packages/shared` must be rebuilt after type changes before dependent apps see them in dev/build. Type-checking and unit tests read the source through `paths`, so they are the exception.
+- `packages/shared` must be rebuilt after type changes before dependent apps see them in dev/build. Type-checking reads the source through `paths`, but the unit suites read `dist/`, so a stale build shows up there as a failing import or an outdated constant.

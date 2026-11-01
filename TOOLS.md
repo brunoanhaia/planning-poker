@@ -11,7 +11,7 @@ npm run test
 
 ## Workspace Scripts
 
-Run these from the repo root; each one shells out to the workspace that owns the task.
+Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries shell out to the workspace that owns the task; `lint`, `format`, `lint:commits`, `changelog` and `prepare` run at the root.
 
 | Script                 | What it runs                                                   |
 | ---------------------- | -------------------------------------------------------------- |
@@ -31,13 +31,14 @@ Run these from the repo root; each one shells out to the workspace that owns the
 
 ## Package Scripts
 
-Each workspace also exposes its own scripts, in `apps/<name>/package.json`.
+Each workspace also exposes its own scripts, in `packages/<name>/package.json` or `apps/<name>/package.json`.
 
-| Workspace     | Scripts                                                                      |
-| ------------- | ---------------------------------------------------------------------------- |
-| `apps/client` | `dev` (Vite), `build` (`tsc` then `vite build`), `preview`, `test`           |
-| `apps/server` | `dev` (`tsx watch`), `build` (`tsc`), `start` (`node dist/index.js`), `test` |
-| `apps/e2e`    | `test` (`playwright test`), `test:ui` (`playwright test --ui`)               |
+| Workspace         | Scripts                                                                      |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `packages/shared` | `build` (`tsc`), `dev` (`tsc --watch`)                                       |
+| `apps/client`     | `dev` (Vite), `build` (`tsc` then `vite build`), `preview`, `test`           |
+| `apps/server`     | `dev` (`tsx watch`), `build` (`tsc`), `start` (`node dist/index.js`), `test` |
+| `apps/e2e`        | `test` (`playwright test`), `test:ui` (`playwright test --ui`)               |
 
 ## Development Servers
 
