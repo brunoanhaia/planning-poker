@@ -179,7 +179,9 @@ export const Home: React.FC = () => {
             </Col>
             <SessionSwitchModal
                 activeRoomId={pendingSwitch?.activeRoomId ?? ''}
-                onDismiss={() => setPendingSwitch(null)}
+                onDismiss={() => {
+                    setPendingSwitch(null);
+                }}
                 onProceed={handleProceed}
                 onRejoin={handleRejoin}
                 open={pendingSwitch !== null}
