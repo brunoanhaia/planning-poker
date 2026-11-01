@@ -1,0 +1,31 @@
+# Render blueprint for the hosted test deployment.
+#
+# The client is a static site on Vercel; this service only answers /api and /ws,
+# so the browser dials it directly (VITE_WS_URL=wss://<service>.onrender.com).
+#
+# Free plan notes: a single instance (room state stays in memory, as in the
+# compose stack), it spins down after 15 minutes without HTTP or WebSocket
+# traffic and takes about a minute to wake, and it never scales horizontally.
+services:
+    - type: web
+      name: planitpoker-server
+      runtime: docker
+      plan: free
+      region: oregon
+      dockerfilePath: ./apps/server/Dockerfile
+      # The server image builds the whole workspace, so the context is the repo root.
+      dockerContext: .
+      healthCheckPath: /api/health
+      autoDeployTrigger: commit
+      envVars:
+          - key: NODE_ENV
+            value: production
+          # Render terminates TLS in front of the service: one trusted hop.
+          - key: TRUST_PROXY_HOPS
+            value: '1'
+          # The browser reaches the API over HTTPS, so the identity cookie must be Secure.
+          - key: CLIENT_ID_COOKIE_SECURE
+            value: 'true'
+          # Set this in the dashboard to the Vercel origin, e.g. https://planitpoker.vercel.app
+          - key: ALLOWED_ORIGINS
+            sync: false

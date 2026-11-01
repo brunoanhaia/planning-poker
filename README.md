@@ -237,3 +237,26 @@ docker build -f apps/server/Dockerfile -t planitpoker-server .
 docker build -f apps/client/Dockerfile -t planitpoker-client .
 docker build -f apps/client/Dockerfile --build-arg VITE_WS_URL=wss://api.exemplo.com -t planitpoker-client .
 ```
+
+### Hosted test deployment (Vercel + Render)
+
+A public test deployment splits the two halves: the client is a static site on Vercel, the
+server is a Docker web service on Render. Both are configured from the repository, so a push to
+`main` redeploys them.
+
+| Piece  | Where                         | Configuration                                                                                                                                                                            |
+| ------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client | Vercel (`planitpoker`)        | `vercel.json` builds `apps/client/dist` from the monorepo; `VITE_WS_URL=wss://<service>.onrender.com` is set per environment and baked at build time                                     |
+| Server | Render (`planitpoker-server`) | `render.yaml`: Docker with `dockerfilePath: ./apps/server/Dockerfile` and the repo root as context, `healthCheckPath: /api/health`, `TRUST_PROXY_HOPS=1`, `CLIENT_ID_COOKIE_SECURE=true` |
+
+The server is the authority in both cases: with an external backend the browser sends
+`Origin`, so `ALLOWED_ORIGINS` on Render must list every hostname the client is served from.
+Each Vercel project has more than one (the canonical `*.vercel.app` domain and the
+`<project>-<team>.vercel.app` alias); a per-deployment URL
+(`<project>-<hash>-<team>.vercel.app`) is **not** accepted by the socket origin check, so share
+the alias, not a deployment link.
+
+Known limits of the free Render plan: a single instance (room state stays in memory, exactly
+like the compose stack), a 15-minute idle spin-down and about a minute to wake, and no
+horizontal scaling. Vercel's Deployment Protection stays on, so opening the site requires a
+Vercel session unless it is served from a custom domain.
