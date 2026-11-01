@@ -44,3 +44,6 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# Vercel CLI link metadata
+.vercel/
