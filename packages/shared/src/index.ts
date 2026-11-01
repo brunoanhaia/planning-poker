@@ -58,6 +58,16 @@ export const WS_MAX_PAYLOAD_BYTES = 32 * 1024;
 /** Largest JSON body the HTTP API accepts, in bytes. */
 export const HTTP_MAX_BODY_BYTES = 50 * 1024;
 
+/**
+ * Bytes a socket may have queued for a client that is not reading, before it is
+ * dropped.
+ *
+ * Everything the server writes goes through a per-socket buffer; a stalled
+ * client would otherwise let that buffer grow without bound. Past this cap the
+ * connection is terminated instead of queued behind.
+ */
+export const WS_MAX_BUFFERED_BYTES = 1024 * 1024;
+
 /** Messages a single socket may send inside the throttle window. */
 export const WS_THROTTLE_MAX_MESSAGES = 30;
 

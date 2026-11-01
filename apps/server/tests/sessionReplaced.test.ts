@@ -140,3 +140,96 @@ describe('Room switching', () => {
         expect(room?.participants[0]).toMatchObject({ id: joinerId, isAdmin: true, isHost: true });
     });
 });
+
+describe('Room switching without a token', () => {
+    it('releases the seat a socket left when it creates another room', () => {
+        const { connect } = boot();
+
+        const creator = connect({ clientId: '88888888-8888-4888-8888-888888888888' });
+        send(creator, 'CREATE_ROOM', { name: 'Alice' });
+        const leftRoomId = roomIdOf(creator);
+        const leftParticipantId = participantIdOf(creator);
+
+        // A second window keeps a view of the room the creator leaves.
+        const observer = connect({ clientId: '99999999-9999-4999-8999-999999999999' });
+        send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
+
+        // The same socket opens a second room without proving the first one,
+        // which is what a client-only Leave leaves behind.
+        send(creator, 'CREATE_ROOM', { name: 'Alice' });
+
+        const leftRoom = lastMessage(observer, 'ROOM_STATE')?.payload.roomState;
+        expect(leftRoom?.id).toBe(leftRoomId);
+        // The seat is offline, not a ghost the idle sweep would have to trust.
+        expect(leftRoom?.participants.find((it) => it.id === leftParticipantId)).toMatchObject({
+            id: leftParticipantId,
+            isOnline: false,
+        });
+    });
+
+    it('releases the room a socket created when it joins another one', () => {
+        const { connect } = boot();
+
+        const mover = connect({ clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+        send(mover, 'CREATE_ROOM', { name: 'Alice' });
+        const leftRoomId = roomIdOf(mover);
+        const leftParticipantId = participantIdOf(mover);
+
+        const observer = connect({ clientId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' });
+        send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
+
+        const otherHost = connect({ clientId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' });
+        send(otherHost, 'CREATE_ROOM', { name: 'Carol' });
+        const nextRoomId = roomIdOf(otherHost);
+
+        send(mover, 'JOIN_ROOM', { name: 'Alice', roomId: nextRoomId });
+
+        const leftRoom = lastMessage(observer, 'ROOM_STATE')?.payload.roomState;
+        expect(leftRoom?.id).toBe(leftRoomId);
+        expect(leftRoom?.participants.find((it) => it.id === leftParticipantId)?.isOnline).toBe(
+            false
+        );
+
+        // The socket is bound to the room it joined and still acts there.
+        const joinedParticipantId = participantIdOf(mover);
+        expect(roomIdOf(mover)).toBe(nextRoomId);
+        send(mover, 'TOGGLE_SPECTATOR', {});
+        const joinedRoom = lastMessage(mover, 'ROOM_STATE')?.payload.roomState;
+        expect(joinedRoom?.id).toBe(nextRoomId);
+        const joinedParticipant = joinedRoom?.participants.find(
+            (it) => it.id === joinedParticipantId
+        );
+        expect(joinedParticipant).toMatchObject({ id: joinedParticipantId, isSpectator: true });
+    });
+
+    it('switches the socket itself when it proves the room it leaves with a token', () => {
+        const { connect } = boot();
+
+        const mover = connect({ clientId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' });
+        send(mover, 'CREATE_ROOM', { name: 'Alice' });
+        const leftRoomId = roomIdOf(mover);
+        const leftParticipantId = participantIdOf(mover);
+
+        const observer = connect({ clientId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' });
+        send(observer, 'JOIN_ROOM', { name: 'Bob', roomId: leftRoomId });
+
+        const otherHost = connect({ clientId: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+        send(otherHost, 'CREATE_ROOM', { name: 'Carol' });
+        const nextRoomId = roomIdOf(otherHost);
+
+        // Same socket, old-room token: the seat is removed by the token path,
+        // so the moving socket must survive and the room must hear of it once.
+        send(mover, 'JOIN_ROOM', {
+            name: 'Alice',
+            previousRoomToken: tokenOf(mover),
+            roomId: nextRoomId,
+        });
+
+        expect(mover.closes).toEqual([]);
+        expect(roomIdOf(mover)).toBe(nextRoomId);
+        expect(observer.sent.filter((it) => it.type === 'ROOM_STATE')).toHaveLength(2);
+        const leftRoom = lastMessage(observer, 'ROOM_STATE')?.payload.roomState;
+        expect(leftRoom?.id).toBe(leftRoomId);
+        expect(leftRoom?.participants.map((it) => it.id)).not.toContain(leftParticipantId);
+    });
+});

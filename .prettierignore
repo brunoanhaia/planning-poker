@@ -11,3 +11,7 @@ CHANGELOG.md
 # Machine-generated lock files; rewriting them desyncs the tooling that regenerates them.
 .devcontainer/devcontainer-lock.json
 skills-lock.json
+
+# Dotenv template: prettier ships no `.env` parser, and its comments and ordering are the
+# documentation for the setting each variable controls.
+.env.example

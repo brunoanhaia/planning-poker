@@ -148,6 +148,45 @@ export class SessionRegistry {
     }
 
     /**
+     * Releases the seat a socket still holds before it is bound to another room.
+     *
+     * A socket only ever tracks one participant, so the seat it held for the
+     * previous room must be dropped here; otherwise the participant is left
+     * online in a room nobody watches and the idle sweep can never reclaim it.
+     * The ownership rule applies, so a detached socket cannot tear down the
+     * successor that replaced it. A previous-room token that already accounts
+     * for the seat is left to {@link endPreviousRoom}, which removes the row and
+     * broadcasts once, so the switch does not announce the same change twice.
+     *
+     * @param ws - The socket moving to another room.
+     * @param previousRoomToken - Token of the room the browser is leaving, if any.
+     * @returns The seat left behind and needing a leave, or null when none is.
+     */
+    public detach(ws: ExtendedWebSocket, previousRoomToken: string | null): RoomSession | null {
+        const released = this.release(ws);
+        if (released) {
+            // The socket acts for the new room from now on; clearing the old
+            // identifiers also keeps the leave broadcast from reaching it.
+            ws.roomId = undefined;
+            ws.userId = undefined;
+        }
+
+        if (previousRoomToken) {
+            const binding = sessionService.resolve(previousRoomToken);
+            if (
+                binding &&
+                released &&
+                binding.roomId === released.roomId &&
+                binding.userId === released.userId
+            ) {
+                return null;
+            }
+        }
+
+        return released;
+    }
+
+    /**
      * Ends the room session a browser still holds when it opens a different room.
      *
      * The client proves ownership with the token it already has, so the server

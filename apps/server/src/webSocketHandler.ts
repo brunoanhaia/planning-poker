@@ -13,6 +13,7 @@ import {
     UpdateRoomTitlePayload,
     UpdateStoryEstimatePayload,
     VotePayload,
+    WS_MAX_BUFFERED_BYTES,
     WS_THROTTLE_MAX_MESSAGES,
     WS_THROTTLE_WINDOW_MS,
     WSMessage,
@@ -414,6 +415,18 @@ export class WebSocketHandler {
         userId: string,
         previousRoomToken: string | null
     ): string {
+        // A socket only tracks one participant: the seat it still holds for a
+        // room it is leaving is dropped before the new identifiers overwrite it,
+        // so the old participant cannot linger online forever. A token that
+        // already accounts for that room revokes and removes the row itself.
+        const previous = this.sessions.detach(ws, previousRoomToken);
+        if (previous && (previous.roomId !== roomId || previous.userId !== userId)) {
+            const updatedRoom = roomManager.leaveRoom(previous.roomId, previous.userId);
+            if (updatedRoom) {
+                this.broadcastRoomState(previous.roomId);
+            }
+        }
+
         ws.roomId = roomId;
         ws.userId = userId;
         this.sessions.bind(ws, roomId, userId);
@@ -1120,9 +1133,16 @@ export class WebSocketHandler {
      * @param payload - Payload data.
      */
     private send(ws: WebSocket, type: WSMessageType, payload: unknown): void {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ payload, type }));
+        if (ws.readyState !== WebSocket.OPEN) {
+            return;
         }
+        // A client that stops reading must not make the server buffer without
+        // bound, so a socket past its write cap is dropped instead of queued.
+        if (ws.bufferedAmount > WS_MAX_BUFFERED_BYTES) {
+            ws.terminate();
+            return;
+        }
+        ws.send(JSON.stringify({ payload, type }));
     }
 
     /**

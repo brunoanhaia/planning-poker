@@ -292,6 +292,10 @@ export const promoteParticipantCoAdmin = (
 /**
  * Transfers the primary Room Administrator role to another participant.
  *
+ * The previous host is demoted to voter: both `isHost` and `isAdmin` are cleared,
+ * so it keeps no moderation rights after the handover. Co-admins are unaffected
+ * and keep the flag they were granted separately.
+ *
  * @param room - The active room state.
  * @param currentAdminId - The identifier of the current primary host.
  * @param targetUserId - The identifier of the target new host.
@@ -310,6 +314,7 @@ export const transferRoomAdmin = (
     const currentHost = room.participants.find((p) => p.id === currentAdminId);
     if (currentHost) {
         currentHost.isHost = false;
+        currentHost.isAdmin = false;
     }
 
     target.isHost = true;

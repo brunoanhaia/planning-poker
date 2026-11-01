@@ -93,9 +93,9 @@ describe('Failed room joins', () => {
         expect(lastMessage(honest, 'ERROR')?.payload.code).toBe('ROOM_NOT_FOUND');
     });
 
-    it('still admits a code that exists once the budget is spent', () => {
-        // The bar is for guessing, never for joining: a room that exists is
-        // looked up before the budget is consulted.
+    it('refuses a code that exists once the budget is spent', () => {
+        // The budget gates the room lookup itself, so a barred address cannot
+        // tell a real code from a guessed one.
         const { connect } = boot();
 
         const host = connect();
@@ -112,8 +112,36 @@ describe('Failed room joins', () => {
         const participant = connect();
         send(participant, 'JOIN_ROOM', { name: 'Bob', roomId });
 
-        expect(lastMessage(participant, 'ERROR')).toBeUndefined();
-        expect(participantIdOf(participant)).toBeTruthy();
+        expect(lastMessage(participant, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+        expect(messagesOf(participant, 'SESSION')).toHaveLength(0);
+    });
+
+    it('bars only the address that spent the budget', () => {
+        // A shared NAT can be locked out for the window, and that is the
+        // intended trade-off; an address that spent nothing still joins.
+        const { connect } = boot();
+
+        const host = connect();
+        send(host, 'CREATE_ROOM', { name: 'Alice' });
+        const roomId = roomIdOf(host);
+
+        for (let attempt = 0; attempt < JOIN_FAILURE_LIMIT; attempt += 1) {
+            send(connect(), 'JOIN_ROOM', {
+                name: `Probe ${attempt}`,
+                roomId: `CODE${attempt}`,
+            });
+        }
+
+        const barred = connect();
+        send(barred, 'JOIN_ROOM', { name: 'Bob', roomId });
+        expect(lastMessage(barred, 'ERROR')?.payload.code).toBe('RATE_LIMITED');
+        expect(messagesOf(barred, 'SESSION')).toHaveLength(0);
+
+        const otherAddress = connect({ remoteAddress: '203.0.113.9' });
+        send(otherAddress, 'JOIN_ROOM', { name: 'Carol', roomId });
+
+        expect(messagesOf(otherAddress, 'ERROR')).toHaveLength(0);
+        expect(participantIdOf(otherAddress)).toBeTruthy();
     });
 
     it('does not let a successful join buy more misses', () => {

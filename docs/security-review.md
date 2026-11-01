@@ -10,7 +10,9 @@
   `Accepted` (deliberate product decision, documented)
 
 Every `Fixed` row below has a regression test in the repository, so the finding cannot
-silently come back. Findings are ordered by severity, not by discovery order.
+silently come back — except SEC-16, which is a deployment template and is instead pinned by
+the default `docker-compose.yml` already uses for the same variable. Findings are ordered by
+severity, not by discovery order.
 
 ---
 
@@ -30,6 +32,11 @@ silently come back. Findings are ordered by severity, not by discovery order.
 | SEC-10 | Info     | `MAX_ROOMS` can be filled to deny room creation for 24 h                                     | Accepted |
 | SEC-11 | Info     | Origin-less clients may create rooms                                                         | Accepted |
 | SEC-12 | Info     | Session tokens have no expiry; they live as long as the room                                 | Accepted |
+| SEC-13 | High     | A socket that switches rooms keeps its previous seat online, pinning rooms past `MAX_ROOMS`  | Fixed    |
+| SEC-14 | Medium   | The failed-join budget does not gate the room lookup, so a barred address keeps probing      | Fixed    |
+| SEC-15 | High     | Server writes have no backpressure check, so a non-reading client buffers unbounded memory   | Fixed    |
+| SEC-16 | Medium   | `.env.example` ships `TRUST_PROXY_HOPS=0`, collapsing every client onto the proxy address    | Fixed    |
+| SEC-17 | Low      | `TRANSFER_ADMIN` clears `isHost` but keeps `isAdmin`, so the previous host stays an admin    | Fixed    |
 
 ---
 
@@ -176,9 +183,13 @@ shared address cannot be barred by its own users.
 refused every join from a barred address, which punished everybody behind a shared
 address: one office's typos locked their colleagues out of the room they were entering,
 and a carrier-grade NAT would let a single stranger do it to thousands of people. The
-room is therefore looked up _before_ the budget is consulted, so a code that matches a
-room never sees the budget at all — measured against a live server, 21 wrong codes from
-other users no longer stop a participant holding the correct one from joining.
+room was therefore looked up _before_ the budget was consulted, so a code that matched a
+room never saw the budget at all — measured against a live server, 21 wrong codes from
+other users no longer stopped a participant holding the correct one from joining.
+
+**That ordering is reversed in SEC-14.** Looking the room up first also let a barred
+address keep probing and join on a hit, so the budget now gates the lookup; the cost is
+that a shared address can be locked out for the cool-down window.
 
 **A join challenge was evaluated and rejected.** Cloudflare Turnstile would have asked a
 participant that arrives with nothing but a room code to prove it is a browser, with a
@@ -253,6 +264,12 @@ create in total, and a room outlives the socket that made it — a client that r
 can keep creating rooms until `MAX_ROOMS` is reached. Accepted: rooms are a few hundred
 bytes each and the failure mode is denial of _new room creation_, not data loss.
 
+**SEC-13 removes the permanent form of this.** A socket that switched rooms left its
+previous seat marked online with no socket behind it, so that room could never be swept;
+releasing the previous binding on switch lets the sweep reclaim it once the new room is
+the only one the socket owns. The accepted ceiling stands for rooms held by a live
+socket.
+
 ### SEC-11 — Origin-less room creation (Info, accepted)
 
 A client with no `Origin` header may call `CREATE_ROOM` — room creation is open to
@@ -267,6 +284,100 @@ Session tokens never expire on their own; they live until the room is dropped or
 participant is kicked, i.e. at most the room lifetime. A reconnecting participant keeps
 its identity, which is the product requirement. A maximum token lifetime would log
 participants out mid-session without adding a real security boundary.
+
+### SEC-13 — Room switching never released the previous seat (High)
+
+`enterRoom` overwrote `ws.roomId` and `ws.userId` and `SessionRegistry.bind` only added the
+new key: nothing removed the previous one, and `endPreviousRoom` returned early without a
+token. The client's Leave was client-only, so no frame ever told the server the old seat was
+vacant. The previous participant therefore stayed `isOnline: true` with no socket behind it,
+and `sweepIdleRooms` refuses to reclaim a room that holds an online participant — so every
+`CREATE_ROOM` that switched rooms pinned one more room permanently. No later connection owns
+that seat, so nothing could ever take it offline again: repeated room creation walked the
+server to `MAX_ROOMS` and kept it there (replacing the temporary denial of SEC-10 with a
+permanent one).
+
+**Fix:** `enterRoom` releases the socket's previous binding before binding the new one —
+`leaveRoom` plus the room-state broadcast, and the registry entry for the old room is
+dropped — so the abandoned room sees its last participant go offline and becomes reclaimable.
+Where the browser still presents the old room's token, the existing `endPreviousRoom` path
+revokes that row and broadcasts once instead, so the same change is not announced twice.
+Regression tests: `apps/server/tests/sessionReplaced.test.ts` (`releases the seat a socket
+left when it creates another room`, `releases the previous room when the socket joins
+another one`).
+
+**Still client-driven:** the "Leave" button stays a client-only action, so a browser that
+closes the tab without switching rooms relies on the socket close, exactly as before. A
+later review may add a `LEAVE_ROOM` message to make the client's Leave server-side and
+release the seat at the moment the participant leaves the room.
+
+### SEC-14 — The failed-join budget did not gate the room lookup (Medium)
+
+`handleJoinRoom` called `seatParticipant` before `JoinAdmission.reportUnknownRoom`
+consulted `joinFailures.allows`, so the budget only ever decided what to audit and throttle
+_after_ the room had already been looked up. A barred address kept probing at the throttle
+rate — with 300 sockets, the per-address ceiling of SEC-04, that is ~900 room lookups per
+second — and a probe that hit a live room still joined it, because joining never reached the
+check.
+
+**Fix:** the budget is consulted before the lookup, so a barred address gets `RATE_LIMITED`
+without the lookup running at all, and cannot distinguish a code that exists from one that
+does not. Accepted trade-off: because the budget is keyed on the shared address, a NAT can be
+locked out for the cool-down window by its own members (or by a stranger on the same address);
+the window is one minute, and a legitimately barred user retries with the same code once it
+passes. Regression tests: `apps/server/tests/kickBanFlow.test.ts` (`describe('Failed room
+joins')` — `refuses a code that exists once the budget is spent`, `refuses a valid room code
+from a barred address and admits a different address`).
+
+### SEC-15 — Server writes had no backpressure check (High)
+
+`WebSocketHandler.send` wrote to the socket unconditionally. `ws` never blocks: a frame for a
+peer whose receive window is closed (a client that stopped reading — tab suspended, hang, or
+a scripted participant that simply never reads) is queued in process memory, and every
+subsequent broadcast queues another. Room state is whole-state on each change, so a single
+non-reading participant in a busy room could grow the server heap without a bound until the
+process died — taking every room with it.
+
+**Fix:** `send` checks `ws.bufferedAmount` before writing and, once it exceeds
+`WS_MAX_BUFFERED_BYTES` (1 MiB, `packages/shared`), never writes the payload and calls
+`ws.terminate()` — the connection is destroyed and no close code is sent (`1013` and `4002`
+alike), the same treatment as the oversized-frame error path of SEC-01. A socket sitting
+exactly at the cap still receives its frame, so the constant is a ceiling rather than a
+reservation. A stuck reader now costs at most that per-socket budget instead of the process,
+and the room's other participants are unaffected. The ceiling is a source-level constant, not
+a deployment setting, so it moves with a code change. Regression tests:
+`apps/server/tests/writeBackpressure.test.ts` (`drops a client whose buffer is past the cap
+instead of queueing more`, `still writes to a client sitting exactly at the cap`).
+
+### SEC-16 — Env template shipped the proxy hop count wrong (Medium)
+
+`.env.example` shipped `TRUST_PROXY_HOPS=0` while `docker-compose.yml` already defaulted the
+same variable to `1` for the bundled Nginx stack. Copying the template — the documented
+deployment path — therefore told the server not to trust `X-Forwarded-For`, even though
+Nginx was the only thing it could see. Every client collapsed onto the Nginx address, so the
+per-address connection cap and handshake rate (SEC-04), the failed-join budget (SEC-05,
+SEC-14) and the browser-identity cookie all keyed on one address: the limits stopped being
+per client and became a single global bucket. One client could spend the budget of the whole
+deployment, and the NAT-lockout trade-off recorded in SEC-14 stopped being an edge case and
+became the default.
+
+**Fix:** the template ships `1`, matching `docker-compose.yml`; `0` remains documented as the
+direct-listener setting, together with the consequence of leaving it at `0` behind the
+bundled stack. This is the one `Fixed` row without a regression test — the finding lives in a
+deployment template, and the compose default it must match is already in the repository.
+
+### SEC-17 — Admin transfer kept the previous host's administrative rights (Low)
+
+`TRANSFER_ADMIN` cleared `isHost` on the previous host but left `isAdmin = true`, and
+`isUserAdmin` trusts `participant.isAdmin`. The host could therefore hand the room over and
+keep every privileged action — kick, ban, deck change, reveal, end session — beside the new
+host.
+
+**Fix:** transfer demotes the previous host to a plain voter, clearing `isHost` _and_
+`isAdmin` before the target is promoted, so the target is the only administrator.
+Regression test: `apps/server/tests/roomManager.test.ts`, `should allow promoting
+co-admins and transferring primary admin` (asserts the old host is neither host nor admin,
+`isUserAdmin` is false for it, and a co-admin keeps its rights).
 
 ---
 

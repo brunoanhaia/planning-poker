@@ -114,17 +114,29 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
+        const charlieResult = rm.joinRoom(roomId, 'Charlie', '🐱', '#10b981')!;
+        const charlieId = charlieResult.participant!.id;
 
         // Promote Bob to Co-Admin
         rm.promoteCoAdmin(roomId, hostId, bobId);
         expect(rm.isUserAdmin(rm.getRoom(roomId)!, bobId)).toBe(true);
 
-        // Transfer primary host
-        rm.transferAdmin(roomId, hostId, bobId);
+        // Transfer primary host to Charlie, who was a plain voter
+        rm.transferAdmin(roomId, hostId, charlieId);
         const room = rm.getRoom(roomId)!;
-        expect(room.hostId).toBe(bobId);
-        expect(room.participants.find((p) => p.id === bobId)?.isHost).toBe(true);
-        expect(room.participants.find((p) => p.id === hostId)?.isHost).toBe(false);
+        const oldHost = room.participants.find((p) => p.id === hostId)!;
+        const newHost = room.participants.find((p) => p.id === charlieId)!;
+
+        expect(room.hostId).toBe(charlieId);
+        expect(newHost.isHost).toBe(true);
+        expect(newHost.isAdmin).toBe(true);
+        // The previous host falls back to a plain voter, while the co-admin
+        // promoted separately keeps the flag granted to them.
+        expect(oldHost.isHost).toBe(false);
+        expect(oldHost.isAdmin).toBe(false);
+        expect(rm.isUserAdmin(room, hostId)).toBe(false);
+        expect(rm.isUserAdmin(room, bobId)).toBe(true);
+        expect(rm.isUserAdmin(room, charlieId)).toBe(true);
     });
 
     it('should allow bulk story import, estimate acceptance and session ending', () => {
