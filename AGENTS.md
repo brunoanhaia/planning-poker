@@ -19,7 +19,7 @@ npm workspaces monorepo:
 - `apps/e2e` — Playwright + Axe-core, package name `@planitpoker/e2e`
 - `packages/shared` — TypeScript types, enums, constants, package name `@planitpoker/shared`
 
-All WebSocket message types and domain models live in `packages/shared/src/index.ts`. Treat it as the source of truth; do not redefine event payloads locally.
+All WebSocket message types and domain models live in `packages/shared/src/index.ts`. Treat it as the source of truth; do not redefine event payloads locally. `Story.rounds` and `RoomState.stories` are the same contract as before, but a fresh room has an empty backlog and the creator joins as a spectator (`isSpectator: true`), so the client opens on `room-setup/` until the first story is staged.
 Voting rounds live on `Story.rounds` as append-only revealed snapshots, capped by `MAX_ROUNDS_PER_STORY`. `RoomState.endedAt` marks the session end.
 `ErrorCode` is the contract the client translates — a new code needs an `ERROR_KEYS` entry.
 

@@ -44,11 +44,12 @@ describe('Session replacement', () => {
         const afterClose = lastMessage(second, 'ROOM_STATE')?.payload.roomState?.participants;
         expect(afterClose).toHaveLength(1);
 
-        // The surviving connection still acts on the room.
+        // The surviving connection still acts on the room. The creator starts
+        // as a spectator, so the toggle turns them into a voter.
         send(second, 'TOGGLE_SPECTATOR', {});
         const updated = lastMessage(second, 'ROOM_STATE')?.payload.roomState?.participants;
         expect(updated).toHaveLength(1);
-        expect(updated?.[0]).toMatchObject({ id: participantId, isSpectator: true });
+        expect(updated?.[0]).toMatchObject({ id: participantId, isSpectator: false });
     });
 });
 

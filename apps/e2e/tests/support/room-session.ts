@@ -6,9 +6,32 @@ import {
     type Page,
 } from '@playwright/test';
 
+/**
+ * Default backlog staged by {@link createRoom}.
+ *
+ * Rooms start with no story, so every existing spec asks for the same single
+ * entry to keep its original fixture.
+ */
+const DEFAULT_SETUP_STORIES = ['First User Story'] as const;
+
+/** Accessible name of the setup action that stages the drafted story, in every shipped locale. */
+const ADD_STORY_BUTTON = /^(Add Story|Adicionar história|Añadir historia)$/i;
+
+/** Accessible name of the setup action that starts the room, in every shipped locale. */
+const START_SETUP_BUTTON = /^(Start Estimating|Iniciar estimativa|Iniciar estimación)$/i;
+
+/** Accessible name of the navbar spectator switch, in every shipped locale. */
+const SPECTATOR_SWITCH = /^(Spectator mode|Modo observador)$/i;
+
 export interface PageOptions {
+    /** Flips the creator to a voter before the session is returned. */
+    adminVotes?: boolean;
     locale?: string;
     preparePage?: (page: Page) => Promise<void>;
+    /** Leaves the room on its setup screen, for specs that drive it themselves. */
+    skipSetup?: boolean;
+    /** Backlog staged before starting; defaults to one "First User Story" entry. */
+    stories?: readonly string[];
     viewport?: { height: number; width: number };
 }
 
@@ -29,7 +52,58 @@ export interface OpenSession {
 }
 
 /**
+ * Stages the given stories on the room setup screen and starts the session.
+ *
+ * The screen is only rendered while the room has no story, so it disappears as
+ * soon as the server accepts the staged backlog.
+ *
+ * @param page - Page showing the setup screen.
+ * @param stories - Story titles to stage before starting.
+ */
+export const completeSetup = async (
+    page: Page,
+    stories: readonly string[] = DEFAULT_SETUP_STORIES
+): Promise<void> => {
+    const storyTitle = page.locator('#setup-story-title');
+    await expect(storyTitle).toBeVisible();
+
+    for (const story of stories) {
+        await storyTitle.fill(story);
+        await page.getByRole('button', { name: ADD_STORY_BUTTON }).click();
+        await expect(page.getByText(story, { exact: true }).first()).toBeVisible();
+    }
+
+    await page.getByRole('button', { name: START_SETUP_BUTTON }).click();
+    await expect(storyTitle).toBeHidden();
+};
+
+/**
+ * Flips the current participant to a voter when the room still has them as a
+ * spectator.
+ *
+ * The creator starts observing, so specs that vote as the admin have to leave
+ * that state first. The navbar switch is the one control rendered both on the
+ * setup screen and in the room.
+ *
+ * @param page - Page of the participant to convert.
+ */
+export const becomeVoter = async (page: Page): Promise<void> => {
+    const spectatorSwitch = page.getByRole('switch', { name: SPECTATOR_SWITCH });
+    await expect(spectatorSwitch).toBeVisible();
+    // The creator enters as a spectator, so the box is checked. Waiting for that
+    // state first matters after a room broadcast: an early read can see it
+    // unchecked, skip the click and leave the deck hidden and Reveal disabled.
+    await expect(spectatorSwitch).toBeChecked();
+    await spectatorSwitch.click();
+    await expect(spectatorSwitch).not.toBeChecked();
+};
+
+/**
  * Creates a new planning poker room as admin and extracts the generated room code.
+ *
+ * Unless `skipSetup` is set, the room is taken through its setup screen with the
+ * requested backlog, because a fresh room has no story and therefore no voting
+ * panel.
  */
 export const createRoom = async (
     browser: Browser,
@@ -63,6 +137,13 @@ export const createRoom = async (
         await expect(roomBadge).toBeVisible();
         const badgeText = await roomBadge.innerText();
         const roomCode = badgeText.replace(/^(Room|Sala):\s*/i, '').trim();
+
+        if (!options?.skipSetup) {
+            await completeSetup(adminPage, options?.stories ?? DEFAULT_SETUP_STORIES);
+        }
+        if (options?.adminVotes) {
+            await becomeVoter(adminPage);
+        }
 
         return { adminContext, adminPage, roomCode };
     } catch (error) {

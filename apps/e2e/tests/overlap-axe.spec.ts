@@ -2,6 +2,8 @@ import { COLOR_MODE_STORAGE_KEY } from '@planitpoker/shared';
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+import { becomeVoter, completeSetup } from './support/room-session';
+
 interface ViewportConfig {
     name: string;
     width: number;
@@ -173,6 +175,31 @@ return collectOverlapIssues(${JSON.stringify(FORM_ITEM_SELECTOR)});
 };
 
 /**
+ * Waits until every CSS transition and animation on the page has finished.
+ *
+ * antd animates button colours for ~200 ms when a control becomes enabled, and
+ * a scan landing inside that window measures the half-faded pair: the room's
+ * Reveal control, for one, reads ~1.2:1 mid-transition and 4.6:1 once settled.
+ * The state under test is the settled one, and waiting for `getAnimations()`
+ * instead of freezing the styles lets antd's own motion lifecycle complete.
+ *
+ * @param page - The page under test.
+ */
+const waitForSettledMotion = async (page: Page): Promise<void> => {
+    await page.waitForFunction(
+        () =>
+            !document
+                .getAnimations()
+                .some(
+                    (animation) =>
+                        animation instanceof CSSTransition && animation.playState === 'running'
+                ),
+        undefined,
+        { timeout: 5000 }
+    );
+};
+
+/**
  * Asserts the current page has no axe violations and no overlapping content.
  *
  * @param page - The page under test.
@@ -180,6 +207,10 @@ return collectOverlapIssues(${JSON.stringify(FORM_ITEM_SELECTOR)});
  * @param state - Which screen is on display, used in failure messages.
  */
 const expectCleanLayout = async (page: Page, viewportName: string, state: string) => {
+    // A pointer left over a deck card opens its tooltip, which at 320 px floats
+    // over the app bar; the state under test is the layout, not the hover card.
+    await page.mouse.move(0, 0);
+    await waitForSettledMotion(page);
     const accessibilityScanResults = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa'])
         .analyze();
@@ -225,6 +256,16 @@ test.describe('UI Overlap & Text Visibility Validation', () => {
                     .click();
 
                 await expect(page.getByText('👑 Admin')).toBeVisible({ timeout: 10000 });
+
+                // A new room opens on its setup screen: scan that state before
+                // staging the first story turns it into a voting room.
+                await expect(page.locator('#setup-story-title')).toBeVisible();
+                await expect(page.getByRole('button', { name: 'Start Estimating' })).toBeDisabled();
+                await expectCleanLayout(page, viewport.name, `${colorMode} setup`);
+
+                await completeSetup(page, ['First User Story']);
+                await becomeVoter(page);
+
                 await expect(page.getByText('Voting Progress')).toBeVisible();
                 await expectCleanLayout(page, viewport.name, `${colorMode} room`);
 

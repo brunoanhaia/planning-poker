@@ -18,6 +18,6 @@ test('creates a room and verifies admin presence', async ({ page }) => {
     // Admin should see the Admin badge
     await expect(page.getByText('👑 Admin')).toBeVisible();
 
-    // Admin should see the Settings button
-    await expect(page.getByRole('button', { name: /Room Settings/i })).toBeVisible();
+    // Admin should see the Settings button (navbar and setup screen both expose it)
+    await expect(page.getByRole('button', { name: /Room Settings/i }).first()).toBeVisible();
 });

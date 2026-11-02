@@ -186,6 +186,46 @@ describe('MainContent', () => {
         expect(socket.clearError).toHaveBeenCalled();
     });
 
+    it('shows the setup screen and the roster to an admin when the backlog is empty', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ roomState: { ...mockRoomState, stories: [] } })
+        );
+
+        const screen = renderMainContent();
+
+        expect(screen.getByLabelText('Room / Sprint Title')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Start Estimating' })).toBeInTheDocument();
+        expect(screen.getByText('Alice Host')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Reveal Votes/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the waiting state instead of the setup form to a voter', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({
+                currentUserId: 'user_2',
+                isAdmin: false,
+                isHost: false,
+                roomState: { ...mockRoomState, stories: [] },
+            })
+        );
+
+        const screen = renderMainContent();
+
+        expect(screen.getByText('Waiting for the host to set up the session')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Story Title')).not.toBeInTheDocument();
+    });
+
+    it('renders the three room panels once the backlog has a story', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ roomState: mockRoomState })
+        );
+
+        const screen = renderMainContent();
+
+        expect(screen.getByRole('button', { name: /Reveal Votes/i })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Start Estimating' })).not.toBeInTheDocument();
+    });
+
     it('waits for the host instead of offering reveal to a plain voter', () => {
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
             createMockSocketValue({

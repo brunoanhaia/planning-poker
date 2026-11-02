@@ -74,7 +74,13 @@ test.describe('Participant Management', () => {
             await expect(
                 voterPage.getByRole('button', { name: 'Select estimate 5', exact: true })
             ).toHaveCount(0);
-            await expect(voterPage.getByText('Spectator')).toBeVisible();
+            // The creator is a spectator too, so the tag is scoped to this row.
+            await expect(
+                voterPage
+                    .getByRole('listitem')
+                    .filter({ hasText: 'Voter 1' })
+                    .getByText('Spectator')
+            ).toBeVisible();
 
             await adminPage.getByRole('button', { name: 'Manage Voter 1' }).click();
             const makeVoterItem = adminPage.getByRole('menuitem', { name: 'Make Voter' });

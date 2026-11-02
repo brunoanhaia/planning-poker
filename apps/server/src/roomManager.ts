@@ -15,11 +15,10 @@ import {
     PRESET_DECKS,
     ROOM_IDLE_TTL_MS,
     RoomState,
-    Story,
 } from '@planitpoker/shared';
 
 import { DEFAULT_AVATAR, DEFAULT_HOST_COLOR, DEFAULT_TIMER_DURATION_SECONDS } from './constants.js';
-import { generateRoomId, generateRoundId, generateStoryId, generateUserId } from './idGenerator.js';
+import { generateRoomId, generateRoundId, generateUserId } from './idGenerator.js';
 import {
     joinParticipant,
     JoinParticipantResult,
@@ -122,7 +121,11 @@ export class RoomManager {
     }
 
     /**
-     * Creates a new Planning Poker room with an initial user story.
+     * Creates a new Planning Poker room with an empty backlog.
+     *
+     * The creator joins as a spectating host: moderation rights (admin/host)
+     * are independent of voting, and the host can turn the spectator switch off
+     * once there is something to estimate.
      *
      * @param hostName - Name of the creator/host.
      * @param hostAvatar - Avatar emoji of the host.
@@ -155,7 +158,7 @@ export class RoomManager {
             isAdmin: true,
             isHost: true,
             isOnline: true,
-            isSpectator: false,
+            isSpectator: true,
             name: hostName,
             vote: null,
         };
@@ -167,14 +170,6 @@ export class RoomManager {
                       ...(PRESET_DECKS[deckType as Exclude<DeckType, 'custom'>] ||
                           PRESET_DECKS.fibonacci),
                   ];
-
-        const initialStory: Story = {
-            description: 'Welcome to Planit Poker! Add story details or estimate this topic.',
-            id: generateStoryId(),
-            rounds: [],
-            status: 'estimating',
-            title: 'First User Story',
-        };
 
         const roomState: RoomState = {
             activeDeck,
@@ -189,7 +184,7 @@ export class RoomManager {
             isEnded: false,
             isLocked: false,
             participants: [host],
-            stories: [initialStory],
+            stories: [],
             timer: null,
             title: roomTitle || `${hostName}'s Planning Session`,
             votesRevealed: false,
@@ -744,6 +739,9 @@ export class RoomManager {
     /**
      * Deletes a story from the room backlog.
      *
+     * Removing the last story leaves the room with nothing to estimate, so the
+     * vote state is reset and a running countdown is stopped.
+     *
      * @param roomId - The room identifier.
      * @param userId - ID of the admin.
      * @param storyId - ID of the story to remove.
@@ -754,7 +752,20 @@ export class RoomManager {
         if (!room || !this.isUserAdmin(room, userId)) {
             return null;
         }
-        return deleteStoryFromRoom(room, storyId);
+
+        deleteStoryFromRoom(room, storyId);
+
+        // An empty backlog has no story to estimate, so any vote still on the
+        // table belongs to a story that no longer exists. Stop the countdown
+        // too: it was measuring a discussion about that same story.
+        if (room.stories.length === 0) {
+            this.resetRoomVotes(room);
+            if (room.timer) {
+                room.timer.isRunning = false;
+            }
+        }
+
+        return room;
     }
 
     /**

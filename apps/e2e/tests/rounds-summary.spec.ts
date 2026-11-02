@@ -17,7 +17,8 @@ test.describe('Rounds and Session Summary', () => {
         const { adminContext, adminPage, roomCode } = await createRoom(
             browser,
             'Admin',
-            'Two Rounds Session'
+            'Two Rounds Session',
+            { adminVotes: true }
         );
         let voterContext: BrowserContext | undefined;
         // Everything after the room exists lives in `try`, so a failed join or a
@@ -101,7 +102,8 @@ test.describe('Rounds and Session Summary', () => {
         const { adminContext, adminPage, roomCode } = await createRoom(
             browser,
             'Admin',
-            'Summary Test Session'
+            'Summary Test Session',
+            { adminVotes: true }
         );
         let voterContext: BrowserContext | undefined;
 
@@ -157,7 +159,8 @@ test.describe('Rounds and Session Summary', () => {
         const { adminContext, adminPage, roomCode } = await createRoom(
             browser,
             'Admin',
-            'Export Test Session'
+            'Export Test Session',
+            { adminVotes: true }
         );
         let voterContext: BrowserContext | undefined;
 
