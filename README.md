@@ -189,6 +189,29 @@ To run the visual overlap exploratory validation specifically:
 npm --workspace=@planitpoker/e2e run test tests/overlap-axe.spec.ts
 ```
 
+### Releases
+
+`main` is the release branch: every push to it runs the suites and then `semantic-release`
+(`.github/workflows/release.yml`). The Conventional Commit messages decide the next version, which
+is applied to `CHANGELOG.md` and the root `package.json`, tagged `v<version>` and published as a
+GitHub release. `feat`, `fix`, `perf` and `revert` produce a release; `chore`, `docs`, `style`,
+`refactor`, `test`, `build` and `ci` do not, so a maintenance merge does not mint a version. The
+exception is a breaking change: any type carrying `!` (or a `BREAKING CHANGE:` footer) releases a
+major, including `refactor!: …`.
+
+`semantic-release` pushes the changelog commit straight to `main`, so that branch has to accept a
+push from the workflow token. The default setup assumes it does. If `main` requires pull requests,
+the job must authenticate as a GitHub App that is allowed to bypass the rule
+(`actions/create-github-app-token`, wired into `actions/checkout` and into `semantic-release`), because
+the workflow's own `GITHUB_TOKEN` cannot be granted that bypass.
+
+Messages are checked twice: the `commit-msg` hook locally, and
+`.github/workflows/conventional-commits.yml` in CI — every commit in a pull request plus the pull
+request title, which is what a squash merge turns into the commit. To preview the next version
+without publishing anything, run `npm run release:dry` on `main` with `GH_TOKEN` (or
+`GITHUB_TOKEN`) set to a token with repository access: the GitHub plugin authenticates even in
+dry-run mode.
+
 ### Code Formatting and Linting
 
 The project uses ESLint for code quality and Prettier for code formatting. The configurations are integrated so that Prettier handles all stylistic rules without conflicting with ESLint.

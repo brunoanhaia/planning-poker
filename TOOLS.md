@@ -11,7 +11,7 @@ npm run test
 
 ## Workspace Scripts
 
-Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries shell out to the workspace that owns the task; `lint`, `format`, `lint:commits`, `changelog` and `prepare` run at the root.
+Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries shell out to the workspace that owns the task; `lint`, `format`, `lint:commits`, `release` and `prepare` run at the root.
 
 | Script                 | What it runs                                                   |
 | ---------------------- | -------------------------------------------------------------- |
@@ -26,7 +26,8 @@ Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries sh
 | `npm run lint:fix`     | `eslint . --fix` across the monorepo                           |
 | `npm run format`       | Prettier over `**/*.{ts,tsx,js,jsx,json,css,md}`               |
 | `npm run lint:commits` | `commitlint --from origin/main`                                |
-| `npm run changelog`    | `CHANGELOG.md` regenerated from the conventional history       |
+| `npm run release`      | `semantic-release` (runs in CI on `main`, not by hand)         |
+| `npm run release:dry`  | `semantic-release --dry-run`, to see the next version locally  |
 | `npm run prepare`      | the Husky commit-msg hook installed                            |
 
 ## Package Scripts
@@ -102,7 +103,6 @@ npm run lint
 npm run lint:fix
 npm run format
 npm run lint:commits
-npm run changelog
 ```
 
 - `lint:commits` needs the `origin/main` ref; on a fresh clone run `git fetch origin main` first.
@@ -119,5 +119,5 @@ codacy patterns <provider> <org> <repo> <toolName>    # per-pattern state and pa
 ```
 
 - Re-analysis happens on push, so `codacy issues` shows the last analysed commit, not local edits.
-- GitHub Actions runs CodeQL and dependency review (`.github/workflows/`); no workflow calls the `gh` CLI.
+- GitHub Actions runs CodeQL, dependency review, conventional commits and the release workflow (`.github/workflows/`); no workflow calls the `gh` CLI.
 - Once the branch is pushed, `codacy pull-request <number>` shows its analysis.

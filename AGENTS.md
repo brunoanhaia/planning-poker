@@ -57,7 +57,7 @@ The devcontainer pins a Node 24 LTS (Long Term Support) image, the same major as
 - **ESLint 10** with flat config; the root `package.json` owns the binary, so a single install serves every workspace.
 - **TypeScript is held at 6.x**: `typescript-eslint` 8.x peers on `>=4.8.4 <6.1.0`. Adoption of 7.x waits until the plugin widens that range.
 - **Vitest 5** for the unit suites and **Playwright 1.64** for e2e; the browser build is pinned per version.
-- **`conventional-changelog` 8** owns the changelog CLI. The older `conventional-changelog-cli` package is stuck on `conventional-changelog` 6 and cannot render the v10 conventionalcommits preset.
+- **`semantic-release` 24** owns the release and changelog flow. It uses the `conventionalcommits` preset from `conventional-changelog-conventionalcommits` 8, which matches the parser `@commitlint/config-conventional` follows.
 
 ## Versioning & Commits
 
@@ -70,9 +70,17 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - the body is not preceded by a blank line
     - the header exceeds 100 characters
 - **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky arms itself through the `prepare` script, so a plain `npm install` installs the hook. Where post-install scripts are blocked, run `npx husky` once.
-- **Changelog**: `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
-    - The `conventionalcommits` preset shows `feat`, `fix`, `perf` and `revert`, plus breaking changes.
-    - The same preset hides `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci`.
+- **CI gate**: `.github/workflows/conventional-commits.yml` validates every commit in a pull request and the pull request title, which becomes the commit on a squash merge. A title without a type is rejected there too.
+- **Releases**: `.github/workflows/release.yml` runs on every push to `main`. It runs the suites first, then `semantic-release`.
+    - The next version comes from the commit messages since the last tag.
+    - The notes are prepended to `CHANGELOG.md`, and the root `package.json` gets the same version.
+    - The changelog, `package.json` and `package-lock.json` are committed as `chore(release): <version> [skip ci]`.
+    - The tag `v<version>` and the GitHub release are published from that commit.
+    - Nothing is published to npm: the workspace is private.
+    - `feat`, `fix`, `perf` and `revert` produce a release.
+    - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.
+    - A breaking change releases a major whatever the type, so `refactor!: …` is a major.
+    - `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.
 

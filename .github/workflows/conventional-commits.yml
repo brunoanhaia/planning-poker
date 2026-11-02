@@ -1,0 +1,52 @@
+# Conventional Commits gate.
+#
+# The `commit-msg` hook only runs on a machine where Husky was installed, so the
+# same rules are enforced where they cannot be bypassed: every commit in the pull
+# request, and the pull request title, which becomes the commit when the branch is
+# squash-merged.
+name: Conventional commits
+
+on:
+    pull_request:
+        branches: [main]
+        # `edited` re-runs the title check after a rename; without it a passing
+        # check survives an invalid title that the squash merge would use.
+        types: [opened, synchronize, reopened, edited]
+
+permissions:
+    contents: read
+
+jobs:
+    messages:
+        name: Validate messages
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0
+                  # The job runs `npm ci` and the lint configuration from the pull
+                  # request, so no credential may sit in `.git/config` for it.
+                  persist-credentials: false
+
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - run: npm ci --ignore-scripts
+
+            - name: Fetch the base branch
+              env:
+                  BASE_REF: ${{ github.base_ref }}
+              run: git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+            - name: Commits in this pull request
+              env:
+                  BASE_REF: ${{ github.base_ref }}
+                  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+              run: ./node_modules/.bin/commitlint --from "origin/$BASE_REF" --to "$HEAD_SHA" --verbose
+
+            - name: Pull request title
+              env:
+                  TITLE: ${{ github.event.pull_request.title }}
+              run: printf '%s\n' "$TITLE" | ./node_modules/.bin/commitlint --config .github/commitlint-title.config.mjs --verbose
