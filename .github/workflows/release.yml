@@ -2,8 +2,8 @@
 #
 # `semantic-release` turns the Conventional Commit messages since the last tag
 # into the next version: it rewrites `CHANGELOG.md`, bumps the root `package.json`,
-# commits both with `[skip ci]`, and publishes the tag plus the GitHub release.
-# Nothing is published to npm — the workspace is private.
+# commits those plus `package-lock.json` with `[skip ci]`, and publishes the tag
+# and the GitHub release. Nothing is published to npm — the workspace is private.
 #
 # The suite runs first, so a red tree never produces a tag.
 name: Release
@@ -37,7 +37,9 @@ jobs:
 
             - run: npm ci --ignore-scripts
 
-            - run: npm run build:shared
+            # `npm run build` compiles `packages/shared` and then both apps, so a
+            # type error or a Vite build failure stops the job before a tag.
+            - run: npm run build
 
             - name: Server suite
               run: npm run test:server
