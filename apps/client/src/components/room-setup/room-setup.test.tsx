@@ -149,6 +149,34 @@ describe('RoomSetup', () => {
         expect(socket.bulkAddStories).toHaveBeenCalledWith([{ title: 'Checkout flow' }]);
     });
 
+    it('picks up title and deck changes made elsewhere instead of reverting them', () => {
+        const socket = createMockSocketValue({ roomState: buildRoomState() });
+        const useSocket = vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        const { rerender } = renderSetup();
+        stageStory('Checkout flow');
+
+        // The settings modal, or a co-host, applies a new title and a custom
+        // deck while this screen is open. The setup drafts are still untouched.
+        const updatedSocket = createMockSocketValue({
+            roomState: buildRoomState({
+                customDeck: [2, 3, 5],
+                deckType: 'custom',
+                title: 'Sprint 43',
+            }),
+        });
+        useSocket.mockReturnValue(updatedSocket);
+        rerender(<RoomSetup onOpenSettings={vi.fn()} />);
+
+        expect(screen.getByLabelText('Room / Sprint Title')).toHaveValue('Sprint 43');
+        expect(screen.getByLabelText('Comma-Separated Custom Cards')).toHaveValue('2, 3, 5');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Start Estimating' }));
+
+        expect(updatedSocket.updateRoomTitle).not.toHaveBeenCalled();
+        expect(updatedSocket.changeDeck).not.toHaveBeenCalled();
+        expect(updatedSocket.bulkAddStories).toHaveBeenCalledWith([{ title: 'Checkout flow' }]);
+    });
+
     it('blocks the dispatch when the custom deck is invalid', async () => {
         const socket = createMockSocketValue({ roomState: buildRoomState() });
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);

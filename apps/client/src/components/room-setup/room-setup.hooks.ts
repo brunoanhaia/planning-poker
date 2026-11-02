@@ -21,6 +21,14 @@ export interface StagedStory {
 /** Monotonic id for a locally staged story, so the list can be keyed by identity. */
 let stagedStorySeed = 0;
 
+/** A message shown above the setup actions, styled by its outcome. */
+export interface SetupNotice {
+    /** Whether the message reports a success or something the admin must fix. */
+    kind: 'success' | 'warning';
+    /** Translated message. */
+    message: string;
+}
+
 /** Everything the setup screen renders, plus the actions it dispatches. */
 export interface RoomSetupModel {
     /** Stages the story currently typed into the single-story fields. */
@@ -32,8 +40,8 @@ export interface RoomSetupModel {
     customDeckError: null | string;
     deckType: DeckType;
     isAdmin: boolean;
-    /** Warning about a paste or a full backlog, or `null` when there is none. */
-    notice: null | string;
+    /** Feedback about a paste or a full backlog, or `null` when there is none. */
+    notice: null | SetupNotice;
     removeStagedStory: (index: number) => void;
     roomTitle: string;
     setBulkText: (value: string) => void;
@@ -52,24 +60,32 @@ export interface RoomSetupModel {
 /**
  * Binds the setup screen to the live room and owns its local drafts.
  *
- * The title and deck start from the room, so "Start Estimating" only sends what
- * the admin actually changed; the staged stories stay local until then, which
- * keeps the backlog empty (and the setup screen visible) until the first one
- * activates in the domain.
+ * Title and deck are nullable drafts over the live room: an untouched field
+ * follows changes made elsewhere, while an edit wins at Start. The staged
+ * stories stay local until then, which keeps the backlog empty (and the setup
+ * screen visible) until the first one activates in the domain.
  */
 export const useRoomSetup = (): RoomSetupModel => {
     const { bulkAddStories, changeDeck, isAdmin, roomState, updateRoomTitle } = useSocket();
     const { t } = useTranslation();
 
-    const [roomTitle, setRoomTitle] = useState(roomState?.title ?? '');
-    const [deckType, setDeckType] = useState<DeckType>(roomState?.deckType ?? 'fibonacci');
-    const [customDeck, setCustomDeck] = useState(roomState?.customDeck?.join(', ') ?? '');
+    // Nullable drafts fall back to the live room for fields the admin has not
+    // edited. That keeps a title or a deck applied from the settings modal (or
+    // by a co-host) visible here, instead of Start reverting it to the values
+    // the room held when this screen mounted.
+    const [titleDraft, setTitleDraft] = useState<null | string>(null);
+    const [deckTypeDraft, setDeckTypeDraft] = useState<DeckType | null>(null);
+    const [customDeckDraft, setCustomDeckDraft] = useState<null | string>(null);
     const [customDeckError, setCustomDeckError] = useState<null | string>(null);
     const [storyTitle, setStoryTitle] = useState('');
     const [storyDescription, setStoryDescription] = useState('');
     const [bulkText, setBulkText] = useState('');
     const [stagedStories, setStagedStories] = useState<StagedStory[]>([]);
-    const [notice, setNotice] = useState<null | string>(null);
+    const [notice, setNotice] = useState<null | SetupNotice>(null);
+
+    const roomTitle = titleDraft ?? roomState?.title ?? '';
+    const deckType = deckTypeDraft ?? roomState?.deckType ?? 'fibonacci';
+    const customDeck = customDeckDraft ?? roomState?.customDeck?.join(', ') ?? '';
 
     const existingStories = roomState?.stories.length ?? 0;
     const remainingCapacity = Math.max(
@@ -78,12 +94,12 @@ export const useRoomSetup = (): RoomSetupModel => {
     );
 
     const changeCustomDeck = (value: string) => {
-        setCustomDeck(value);
+        setCustomDeckDraft(value);
         setCustomDeckError(null);
     };
 
     const changeDeckType = (nextDeckType: DeckType) => {
-        setDeckType(nextDeckType);
+        setDeckTypeDraft(nextDeckType);
         setCustomDeckError(null);
     };
 
@@ -93,12 +109,13 @@ export const useRoomSetup = (): RoomSetupModel => {
             return;
         }
         if (remainingCapacity === 0) {
-            setNotice(
-                t('backlog.imported.skipped', {
+            setNotice({
+                kind: 'warning',
+                message: t('backlog.imported.skipped', {
                     max: MAX_STORIES_PER_ROOM,
                     skipped: 1,
-                })
-            );
+                }),
+            });
             return;
         }
         const description = storyDescription.trim();
@@ -118,14 +135,16 @@ export const useRoomSetup = (): RoomSetupModel => {
         if (stories.length === 0) {
             // Nothing usable in the paste is a different problem from a full
             // backlog, and telling the admin the wrong one wastes their time.
-            setNotice(
-                parsed.length === 0
-                    ? t('backlog.imported.none')
-                    : t('backlog.imported.skipped', {
-                          max: MAX_STORIES_PER_ROOM,
-                          skipped: parsed.length,
-                      })
-            );
+            setNotice({
+                kind: 'warning',
+                message:
+                    parsed.length === 0
+                        ? t('backlog.imported.none')
+                        : t('backlog.imported.skipped', {
+                              max: MAX_STORIES_PER_ROOM,
+                              skipped: parsed.length,
+                          }),
+            });
             return;
         }
         setStagedStories((current) => [
@@ -134,15 +153,23 @@ export const useRoomSetup = (): RoomSetupModel => {
         ]);
         setBulkText('');
         const skipped = parsed.length - stories.length;
-        setNotice(
-            skipped > 0
-                ? t('backlog.imported.skipped', { max: MAX_STORIES_PER_ROOM, skipped })
-                : t('setup.bulk.added', { count: stories.length })
-        );
+        setNotice({
+            kind: skipped > 0 ? 'warning' : 'success',
+            message:
+                skipped > 0
+                    ? t('backlog.imported.skipped', {
+                          max: MAX_STORIES_PER_ROOM,
+                          skipped,
+                      })
+                    : t('setup.bulk.added', { count: stories.length }),
+        });
     };
 
     const removeStagedStory = (index: number) => {
         setStagedStories((current) => current.filter((_, position) => position !== index));
+        // Removing an entry frees capacity, so a "backlog is full" warning no
+        // longer describes the state the admin is looking at.
+        setNotice(null);
     };
 
     const startEstimating = () => {
@@ -199,7 +226,7 @@ export const useRoomSetup = (): RoomSetupModel => {
         setBulkText,
         setCustomDeck: changeCustomDeck,
         setDeckType: changeDeckType,
-        setRoomTitle,
+        setRoomTitle: setTitleDraft,
         setStoryDescription,
         setStoryTitle,
         stagedStories,

@@ -5,20 +5,10 @@ import React, { useState } from 'react';
 import { useSocket } from '../../context/socket-context/use-socket';
 import { deckLabelKey } from '../../i18n/dictionary';
 import { useTranslation } from '../../i18n/use-translation';
+import { hasSameCards, parseCustomDeck } from '../deck-select/deck-select.utils';
 
 /** Fallback cards offered when a custom deck parses to nothing usable. */
 const FALLBACK_CUSTOM_DECK: (number | string)[] = [1, 2, 3, 5, 8];
-
-/** Parses the comma separated custom deck into numbers where possible. */
-const parseCustomDeck = (raw: string): (number | string)[] => {
-    const parsed = raw
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0)
-        .map((entry) => (Number.isNaN(Number(entry)) ? entry : Number(entry)));
-
-    return parsed.length > 0 ? parsed : FALLBACK_CUSTOM_DECK;
-};
 
 export interface RoomSettingsModalProps {
     /** Closes the modal without applying anything. */
@@ -68,11 +58,9 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         }
 
         if (deckType === 'custom') {
-            const cards = parseCustomDeck(customDeck);
-            const hasSameCards =
-                cards.length === roomState.customDeck?.length &&
-                cards.every((card, index) => card === roomState.customDeck?.[index]);
-            if (deckType !== roomState.deckType || !hasSameCards) {
+            const parsedCards = parseCustomDeck(customDeck);
+            const cards = parsedCards.length > 0 ? parsedCards : FALLBACK_CUSTOM_DECK;
+            if (deckType !== roomState.deckType || !hasSameCards(cards, roomState.customDeck)) {
                 changeDeck('custom', cards);
             }
         } else if (deckType !== roomState.deckType) {

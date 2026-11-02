@@ -1,5 +1,5 @@
 import { CloseOutlined } from '@ant-design/icons';
-import { MAX_TITLE_LENGTH } from '@planitpoker/shared';
+import { MAX_DESCRIPTION_LENGTH, MAX_TITLE_LENGTH } from '@planitpoker/shared';
 import { Alert, Button, Card, Divider, Empty, Flex, Input, Typography } from 'antd';
 import React from 'react';
 
@@ -78,6 +78,7 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onOpenSettings }) => {
                     <label htmlFor="setup-story-title">{t('setup.story.title')}</label>
                     <Input
                         id="setup-story-title"
+                        maxLength={MAX_TITLE_LENGTH}
                         onChange={(event) => model.setStoryTitle(event.target.value)}
                         placeholder={t('setup.story.title.placeholder')}
                         value={model.storyTitle}
@@ -88,6 +89,7 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onOpenSettings }) => {
                     <label htmlFor="setup-story-description">{t('setup.story.description')}</label>
                     <Input.TextArea
                         id="setup-story-description"
+                        maxLength={MAX_DESCRIPTION_LENGTH}
                         onChange={(event) => model.setStoryDescription(event.target.value)}
                         placeholder={t('setup.story.description.placeholder')}
                         rows={2}
@@ -153,7 +155,9 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onOpenSettings }) => {
                     )}
                 </div>
 
-                {model.notice && <Alert showIcon title={model.notice} type="warning" />}
+                {model.notice && (
+                    <Alert showIcon title={model.notice.message} type={model.notice.kind} />
+                )}
 
                 <Flex gap={8} justify="space-between" wrap>
                     <Button onClick={onOpenSettings}>{t('setup.settings')}</Button>

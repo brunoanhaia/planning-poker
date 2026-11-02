@@ -175,13 +175,14 @@ return collectOverlapIssues(${JSON.stringify(FORM_ITEM_SELECTOR)});
 };
 
 /**
- * Waits until every CSS transition and animation on the page has finished.
+ * Waits until every CSS transition on the page has finished.
  *
  * antd animates button colours for ~200 ms when a control becomes enabled, and
  * a scan landing inside that window measures the half-faded pair: the room's
  * Reveal control, for one, reads ~1.2:1 mid-transition and 4.6:1 once settled.
- * The state under test is the settled one, and waiting for `getAnimations()`
+ * The state under test is the settled one, and waiting for the transitions
  * instead of freezing the styles lets antd's own motion lifecycle complete.
+ * Status badges pulse forever, so animations are deliberately left out.
  *
  * @param page - The page under test.
  */
@@ -235,7 +236,7 @@ const expectCleanLayout = async (page: Page, viewportName: string, state: string
 test.describe('UI Overlap & Text Visibility Validation', () => {
     for (const viewport of VIEWPORTS) {
         for (const colorMode of COLOR_MODES) {
-            test(`validates the ${colorMode} lobby, room and results on ${viewport.name}`, async ({
+            test(`validates the ${colorMode} lobby, setup, room and results on ${viewport.name}`, async ({
                 page,
             }) => {
                 await page.setViewportSize({ width: viewport.width, height: viewport.height });

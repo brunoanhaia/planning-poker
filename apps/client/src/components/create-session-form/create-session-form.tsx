@@ -66,7 +66,10 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                         setCustomDeck(value);
                         setCustomDeckError(null);
                     }}
-                    onDeckTypeChange={setDeckType}
+                    onDeckTypeChange={(nextDeckType) => {
+                        setDeckType(nextDeckType);
+                        setCustomDeckError(null);
+                    }}
                 />
 
                 <Button block disabled={disabled} htmlType="submit" size="large" type="primary">
