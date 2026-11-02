@@ -38,7 +38,7 @@ jobs:
           token=$(curl -sSf https://opencode.ai/console/auth/oauth/token \
             -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
             -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
-            -d client_id=sk_08293e30-dfab-446d-9f8d-e9f0feb92bcc \
+            -d client_id="$OPENCODE_CLIENT_ID" \
             -d subject_token="$oidc" | jq -r .access_token)
           echo "::add-mask::$token"
           echo "OPENCODE_API_KEY=$token" >> "$GITHUB_ENV"
@@ -94,7 +94,7 @@ jobs:
           token=$(curl -sSf https://opencode.ai/console/auth/oauth/token \
             -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
             -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
-            -d client_id=sk_08293e30-dfab-446d-9f8d-e9f0feb92bcc \
+            -d client_id="$OPENCODE_CLIENT_ID" \
             -d subject_token="$oidc" | jq -r .access_token)
           echo "::add-mask::$token"
           echo "OPENCODE_API_KEY=$token" >> "$GITHUB_ENV"
