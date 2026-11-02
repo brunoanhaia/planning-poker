@@ -1,4 +1,4 @@
-# Release on every merge into `develop`.
+# Release on every merge into `main`.
 #
 # `semantic-release` turns the Conventional Commit messages since the last tag
 # into the next version: it rewrites `CHANGELOG.md`, bumps the root `package.json`,
@@ -10,10 +10,10 @@ name: Release
 
 on:
     push:
-        branches: [develop]
+        branches: [main]
 
 concurrency:
-    group: release-develop
+    group: release-main
     cancel-in-progress: false
 
 jobs:

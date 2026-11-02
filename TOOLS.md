@@ -25,8 +25,8 @@ Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries sh
 | `npm run lint`         | `eslint .` across the monorepo                                 |
 | `npm run lint:fix`     | `eslint . --fix` across the monorepo                           |
 | `npm run format`       | Prettier over `**/*.{ts,tsx,js,jsx,json,css,md}`               |
-| `npm run lint:commits` | `commitlint --from origin/develop`                             |
-| `npm run release`      | `semantic-release` (runs in CI on `develop`, not by hand)      |
+| `npm run lint:commits` | `commitlint --from origin/main`                                |
+| `npm run release`      | `semantic-release` (runs in CI on `main`, not by hand)         |
 | `npm run release:dry`  | `semantic-release --dry-run`, to see the next version locally  |
 | `npm run prepare`      | the Husky commit-msg hook installed                            |
 
@@ -105,7 +105,7 @@ npm run format
 npm run lint:commits
 ```
 
-- `lint:commits` needs the `origin/develop` ref; on a fresh clone run `git fetch origin develop` first.
+- `lint:commits` needs the `origin/main` ref; on a fresh clone run `git fetch origin main` first.
 - `npm run format` writes files. `npx prettier --check <files>` only reports differences.
 
 ## Codacy and GitHub

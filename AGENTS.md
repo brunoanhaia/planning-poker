@@ -71,7 +71,7 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - the header exceeds 100 characters
 - **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky arms itself through the `prepare` script, so a plain `npm install` installs the hook. Where post-install scripts are blocked, run `npx husky` once.
 - **CI gate**: `.github/workflows/conventional-commits.yml` validates every commit in a pull request and the pull request title, which becomes the commit on a squash merge. A title without a type is rejected there too.
-- **Releases**: `.github/workflows/release.yml` runs on every push to `develop`. It runs the suites first, then `semantic-release`.
+- **Releases**: `.github/workflows/release.yml` runs on every push to `main`. It runs the suites first, then `semantic-release`.
     - The next version comes from the commit messages since the last tag.
     - The notes are prepended to `CHANGELOG.md`, and the root `package.json` gets the same version.
     - The changelog, `package.json` and `package-lock.json` are committed as `chore(release): <version> [skip ci]`.

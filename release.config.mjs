@@ -1,7 +1,7 @@
 /**
- * Release automation for `develop`.
+ * Release automation for `main`.
  *
- * Every push to `develop` runs `semantic-release`, which reads the commit
+ * Every push to `main` runs `semantic-release`, which reads the commit
  * messages since the last tag, decides the next version with the same
  * Conventional Commits rules the `commit-msg` hook enforces, prepends the
  * release notes to `CHANGELOG.md`, bumps the root `package.json`, commits the
@@ -13,7 +13,7 @@
  * start a second workflow run.
  */
 export default {
-    branches: ['develop'],
+    branches: ['main'],
     tagFormat: 'v${version}',
     plugins: [
         // Same parser as commitlint: `conventionalcommits` is the preset
