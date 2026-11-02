@@ -16,7 +16,7 @@
         "test": "npm run test --workspaces --if-present",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
-        "lint:commits": "git rev-parse --verify -q origin/main >/dev/null || { echo 'lint:commits needs the origin/main ref; run: git fetch origin main' >&2; exit 1; }; commitlint --from origin/main",
+        "lint:commits": "git rev-parse --verify -q origin/develop >/dev/null || { echo 'lint:commits needs the origin/develop ref; run: git fetch origin develop' >&2; exit 1; }; commitlint --from origin/develop",
         "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
         "prepare": "husky",
         "release": "semantic-release",

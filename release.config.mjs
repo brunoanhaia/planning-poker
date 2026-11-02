@@ -4,9 +4,10 @@
  * Every push to `develop` runs `semantic-release`, which reads the commit
  * messages since the last tag, decides the next version with the same
  * Conventional Commits rules the `commit-msg` hook enforces, prepends the
- * release notes to `CHANGELOG.md`, bumps the root `package.json`, commits both,
- * and publishes the git tag and the GitHub release. The npm package is private,
- * so nothing is published to a registry.
+ * release notes to `CHANGELOG.md`, bumps the root `package.json`, commits the
+ * changelog, `package.json` and `package-lock.json`, and publishes the git tag
+ * and the GitHub release. The npm package is private, so nothing is published
+ * to a registry.
  *
  * The commit written here carries `[skip ci]` so the release commit does not
  * start a second workflow run.
@@ -23,15 +24,12 @@ export default {
             '@semantic-release/commit-analyzer',
             {
                 preset: 'conventionalcommits',
-                // A custom rule list replaces the defaults, so the breaking rule
-                // is restated first: `refactor!:` or `revert!:` is a major, even
-                // for a type that would otherwise release nothing.
-                releaseRules: [
-                    { breaking: true, release: 'major' },
-                    // commitlint accepts a plain `revert:` header, which the
-                    // default rule only releases when the body carries the hash.
-                    { type: 'revert', release: 'patch' },
-                ],
+                // Custom rules are tried first and the analyzer falls back to
+                // its defaults. Those defaults already treat any breaking change
+                // as major, so only the plain `revert:` header needs a rule:
+                // commitlint accepts it, while the default revert rule expects
+                // the body to carry the hash.
+                releaseRules: [{ type: 'revert', release: 'patch' }],
             },
         ],
         [
