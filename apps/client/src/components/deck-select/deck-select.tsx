@@ -54,6 +54,11 @@ export const DeckSelect: React.FC<DeckSelectProps> = ({
                 <Select<DeckType>
                     id={deckId}
                     onChange={onDeckTypeChange}
+                    // Five decks do not need a virtual window, and the window is
+                    // what kept the last three out of the accessibility tree: a
+                    // screen reader announced a two-option listbox. Rendering all
+                    // of them also keeps `role="option"` queryable in tests.
+                    virtual={false}
                     options={DECK_TYPES.map((option) => ({
                         label: t(deckLabelKey(option)),
                         value: option,

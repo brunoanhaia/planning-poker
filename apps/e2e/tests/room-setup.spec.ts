@@ -37,14 +37,8 @@ test.describe('Room Setup', () => {
         try {
             await adminPage.locator('#setup-room-title').fill('Sprint 42');
 
-            // The dropdown is virtualised, so 'Powers of 2' (fourth of five decks)
-            // is outside the mounted window and cannot be clicked by role; the
-            // arrow keys move the highlight and Enter commits it.
             await adminPage.locator('#setup-deck').click();
-            for (let step = 0; step < 3; step += 1) {
-                await adminPage.keyboard.press('ArrowDown');
-            }
-            await adminPage.keyboard.press('Enter');
+            await adminPage.getByRole('option', { name: 'Powers of 2' }).click();
             await expect(adminPage.locator('.ant-select-content')).toHaveAttribute(
                 'title',
                 'Powers of 2'
