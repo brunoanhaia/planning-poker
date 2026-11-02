@@ -1,4 +1,4 @@
-import { DeckType, MAX_STORIES_PER_ROOM } from '@planitpoker/shared';
+import { DeckType, MAX_STORIES_PER_ROOM, RoomState } from '@planitpoker/shared';
 import { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
@@ -172,34 +172,51 @@ export const useRoomSetup = (): RoomSetupModel => {
         setNotice(null);
     };
 
+    const applyRoomTitle = (room: RoomState) => {
+        const title = roomTitle.trim();
+        if (title && title !== room.title) {
+            updateRoomTitle(title);
+        }
+    };
+
+    const applyDeck = (room: RoomState, cards: (number | string)[] | undefined) => {
+        if (deckType !== room.deckType) {
+            if (cards) {
+                changeDeck(deckType, cards);
+                return;
+            }
+            changeDeck(deckType);
+            return;
+        }
+        if (deckType === 'custom' && cards && !hasSameCards(cards, room.customDeck)) {
+            changeDeck('custom', cards);
+        }
+    };
+
+    const resolveDeckCards = (): { cards?: (number | string)[]; isValid: boolean } => {
+        if (deckType !== 'custom') {
+            return { isValid: true };
+        }
+        const cards = parseCustomDeck(customDeck);
+        const error = validateCustomDeck(cards);
+        if (!error) {
+            return { cards, isValid: true };
+        }
+        setCustomDeckError(t(error.key, error.params));
+        return { isValid: false };
+    };
+
     const startEstimating = () => {
         if (!roomState || stagedStories.length === 0) {
             return;
         }
-
-        let cards: (number | string)[] | undefined;
-        if (deckType === 'custom') {
-            cards = parseCustomDeck(customDeck);
-            const error = validateCustomDeck(cards);
-            if (error) {
-                setCustomDeckError(t(error.key, error.params));
-                return;
-            }
+        const { cards, isValid } = resolveDeckCards();
+        if (!isValid) {
+            return;
         }
 
-        const title = roomTitle.trim();
-        if (title && title !== roomState.title) {
-            updateRoomTitle(title);
-        }
-        if (deckType !== roomState.deckType) {
-            if (cards) {
-                changeDeck(deckType, cards);
-            } else {
-                changeDeck(deckType);
-            }
-        } else if (deckType === 'custom' && cards && !hasSameCards(cards, roomState.customDeck)) {
-            changeDeck('custom', cards);
-        }
+        applyRoomTitle(roomState);
+        applyDeck(roomState, cards);
 
         // The staged list is kept until the room reports the stories: the
         // server may still reject the import, and clearing early would hide
