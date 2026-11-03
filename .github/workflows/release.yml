@@ -6,9 +6,9 @@
 # `.release-please-manifest.json`, then publishes the tag and the GitHub
 # release. Nothing is published to npm — the workspace is private.
 #
-# The action uses a GitHub App token so the release pull request triggers the
-# normal pull request checks. The app never pushes to `main`, so it does not
-# need a ruleset bypass.
+# The action reads `RELEASE_TOKEN` when that secret exists and otherwise uses
+# the default `GITHUB_TOKEN`. A PAT triggers the release pull request checks;
+# the default token does not. Neither needs a GitHub App private key.
 name: Release
 
 on:
@@ -25,15 +25,8 @@ jobs:
         name: Release pull request
         runs-on: ubuntu-latest
         steps:
-            - name: Create release token
-              id: release-token
-              uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
-              with:
-                  app-id: ${{ secrets.RELEASE_APP_ID }}
-                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-
             - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
               with:
-                  token: ${{ steps.release-token.outputs.token }}
+                  token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
                   config-file: release-please-config.json
                   manifest-file: .release-please-manifest.json
