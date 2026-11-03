@@ -9,8 +9,8 @@
 #
 # The `main` ruleset only lets bypass actors push. The default `GITHUB_TOKEN`
 # is the github-actions app, which cannot be a bypass actor on a personal
-# repository, so `RELEASE_TOKEN` must be a PAT owned by a user with the bypass
-# role. The fallback keeps the workflow valid until that secret is configured.
+# repository. A dedicated GitHub App owned by the repository owner is added to
+# the bypass list; its short-lived installation token drives the release.
 name: Release
 
 on:
@@ -30,13 +30,19 @@ jobs:
             issues: write
             pull-requests: write
         steps:
+            - name: Create release token
+              id: release-token
+              uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2.1.1
+              with:
+                  app-id: ${{ secrets.RELEASE_APP_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
             - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
                   # `@semantic-release/git` pushes the release commit and tag
                   # through the git CLI, so the checkout must keep the token.
-                  # A PAT with the ruleset bypass role is required.
-                  token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+                  token: ${{ steps.release-token.outputs.token }}
                   persist-credentials: true
 
             - uses: actions/setup-node@v7
@@ -58,5 +64,5 @@ jobs:
 
             - name: Release
               env:
-                  GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ steps.release-token.outputs.token }}
               run: ./node_modules/.bin/semantic-release
