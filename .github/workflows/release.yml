@@ -1,34 +1,29 @@
 # Release on every merge into `main`.
 #
-# `semantic-release` turns the Conventional Commit messages since the last tag
-# into the next version: it rewrites `CHANGELOG.md`, bumps the root `package.json`,
-# commits those plus `package-lock.json` with `[skip ci]`, and publishes the tag
-# and the GitHub release. Nothing is published to npm — the workspace is private.
+# `release-please` reads the Conventional Commit messages since the last tag and
+# keeps a release pull request open. Merging that pull request writes the next
+# version to `CHANGELOG.md`, the root `package.json`, `package-lock.json` and
+# `.release-please-manifest.json`, then publishes the tag and the GitHub
+# release. Nothing is published to npm — the workspace is private.
 #
-# The suite runs first, so a red tree never produces a tag.
-#
-# The `main` ruleset only lets bypass actors push. The default `GITHUB_TOKEN`
-# is the github-actions app, which cannot be a bypass actor on a personal
-# repository. A dedicated GitHub App owned by the repository owner is added to
-# the bypass list; its short-lived installation token drives the release.
+# The action uses a GitHub App token so the release pull request triggers the
+# normal pull request checks. The app never pushes to `main`, so it does not
+# need a ruleset bypass.
 name: Release
 
 on:
     push:
         branches: [main]
 
-concurrency:
-    group: release-main
-    cancel-in-progress: false
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
 
 jobs:
-    release:
-        name: Version and publish
+    release-please:
+        name: Release pull request
         runs-on: ubuntu-latest
-        permissions:
-            contents: write
-            issues: write
-            pull-requests: write
         steps:
             - name: Create release token
               id: release-token
@@ -37,32 +32,8 @@ jobs:
                   app-id: ${{ secrets.RELEASE_APP_ID }}
                   private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
-            - uses: actions/checkout@v7
+            - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
               with:
-                  fetch-depth: 0
-                  # `@semantic-release/git` pushes the release commit and tag
-                  # through the git CLI, so the checkout must keep the token.
                   token: ${{ steps.release-token.outputs.token }}
-                  persist-credentials: true
-
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: 24
-                  cache: npm
-
-            - run: npm ci --ignore-scripts
-
-            # `npm run build` compiles `packages/shared` and then both apps, so a
-            # type error or a Vite build failure stops the job before a tag.
-            - run: npm run build
-
-            - name: Server suite
-              run: npm run test:server
-
-            - name: Client suite
-              run: npm run test:client
-
-            - name: Release
-              env:
-                  GITHUB_TOKEN: ${{ steps.release-token.outputs.token }}
-              run: ./node_modules/.bin/semantic-release
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json

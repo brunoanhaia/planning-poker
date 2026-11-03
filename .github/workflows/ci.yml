@@ -1,0 +1,36 @@
+# Build and unit suites for pull requests and `main`.
+#
+# The release pull request created by `release-please` is a normal pull request,
+# so this workflow runs on it before it can be merged.
+name: CI
+
+on:
+    pull_request:
+        branches: [main]
+    push:
+        branches: [main]
+
+permissions:
+    contents: read
+
+jobs:
+    test:
+        name: Build and test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - run: npm ci --ignore-scripts
+
+            - run: npm run build
+
+            - name: Server suite
+              run: npm run test:server
+
+            - name: Client suite
+              run: npm run test:client
