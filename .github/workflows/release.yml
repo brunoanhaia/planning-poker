@@ -6,6 +6,11 @@
 # and the GitHub release. Nothing is published to npm — the workspace is private.
 #
 # The suite runs first, so a red tree never produces a tag.
+#
+# The `main` ruleset only lets bypass actors push. The default `GITHUB_TOKEN`
+# is the github-actions app, which cannot be a bypass actor on a personal
+# repository, so `RELEASE_TOKEN` must be a PAT owned by a user with the bypass
+# role. The fallback keeps the workflow valid until that secret is configured.
 name: Release
 
 on:
@@ -30,6 +35,8 @@ jobs:
                   fetch-depth: 0
                   # `@semantic-release/git` pushes the release commit and tag
                   # through the git CLI, so the checkout must keep the token.
+                  # A PAT with the ruleset bypass role is required.
+                  token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
                   persist-credentials: true
 
             - uses: actions/setup-node@v7
@@ -51,5 +58,5 @@ jobs:
 
             - name: Release
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
               run: ./node_modules/.bin/semantic-release
