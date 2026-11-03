@@ -71,10 +71,11 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - the header exceeds 100 characters
 - **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky arms itself through the `prepare` script, so a plain `npm install` installs the hook. Where post-install scripts are blocked, run `npx husky` once.
 - **CI gate**: `.github/workflows/conventional-commits.yml` validates every commit in a pull request and the pull request title, which becomes the commit on a squash merge. A title without a type is rejected there too.
-- **Releases**: `.github/workflows/release.yml` runs on every push to `main` and keeps a release pull request open.
+- **Releases**: `.github/workflows/release.yml` runs on every push to `main`.
+    - The job keeps a release pull request open.
     - The release pull request carries the next version in `CHANGELOG.md`, the root `package.json`, `package-lock.json` and `.release-please-manifest.json`.
-    - Merging that pull request creates the `v<version>` tag and the GitHub release; `release-please` never pushes to `main`.
-    - The action authenticates with the `orih-release` GitHub App (`RELEASE_APP_ID`/`RELEASE_APP_PRIVATE_KEY`) so the release pull request triggers the normal pull request checks. The app needs no ruleset bypass because it never pushes to `main`.
+    - Merging that pull request creates the `v<version>` tag and the GitHub release; this flow does not push to `main`.
+    - The action authenticates with the `orih-release` GitHub App (`RELEASE_APP_ID`/`RELEASE_APP_PRIVATE_KEY`) so the release pull request triggers the normal pull request checks. The app does not need a ruleset bypass while it only opens pull requests.
     - Nothing is published to npm: the workspace is private.
     - `feat`, `fix`, `perf` and `revert` produce a release.
     - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.
