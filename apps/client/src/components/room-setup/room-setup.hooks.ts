@@ -29,6 +29,20 @@ export interface SetupNotice {
     message: string;
 }
 
+/** A start dispatch waiting for the room to report the staged stories. */
+interface StartRequest {
+    /** Total backlog size the room must report before Start is re-enabled. */
+    storyCount: number;
+}
+
+/** Whether a start dispatch is still waiting for the room or a server error. */
+const isStartPending = (
+    request: null | StartRequest,
+    room: null | RoomState,
+    error: null | string
+): boolean =>
+    request !== null && (room?.stories.length ?? 0) < request.storyCount && error === null;
+
 /** Everything the setup screen renders, plus the actions it dispatches. */
 export interface RoomSetupModel {
     /** Stages the story currently typed into the single-story fields. */
@@ -85,16 +99,13 @@ export const useRoomSetup = (): RoomSetupModel => {
     const [bulkText, setBulkText] = useState('');
     const [stagedStories, setStagedStories] = useState<StagedStory[]>([]);
     const [notice, setNotice] = useState<null | SetupNotice>(null);
-    const [startRequest, setStartRequest] = useState<null | { storyCount: number }>(null);
+    const [startRequest, setStartRequest] = useState<null | StartRequest>(null);
 
     // A start request stays active until the room reports every staged story or
     // the server answers with an error. The count, rather than the room
     // reference, keeps the guard active across the title and deck broadcasts
     // that arrive before the stories.
-    const isStarting =
-        startRequest !== null &&
-        (roomState?.stories.length ?? 0) < startRequest.storyCount &&
-        error === null;
+    const isStarting = isStartPending(startRequest, roomState, error);
 
     const roomTitle = titleDraft ?? roomState?.title ?? '';
     const deckType = deckTypeDraft ?? roomState?.deckType ?? 'fibonacci';
