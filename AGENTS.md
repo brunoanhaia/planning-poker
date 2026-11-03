@@ -75,7 +75,9 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - The job keeps a release pull request open.
     - The release pull request carries the next version in `CHANGELOG.md`, the root `package.json`, `package-lock.json` and `.release-please-manifest.json`.
     - Merging that pull request creates the `v<version>` tag and the GitHub release; this flow does not push to `main`.
-    - The action authenticates with the `orih-release` GitHub App (`RELEASE_APP_ID`/`RELEASE_APP_PRIVATE_KEY`) so the release pull request triggers the normal pull request checks. The app does not need a ruleset bypass while it only opens pull requests.
+    - The action authenticates with the `orih-release` GitHub App (`RELEASE_APP_ID`/`RELEASE_APP_PRIVATE_KEY`).
+    - That token makes the release pull request trigger the normal pull request checks.
+    - The app does not need a ruleset bypass while it only opens pull requests.
     - Nothing is published to npm: the workspace is private.
     - `feat`, `fix`, `perf` and `revert` produce a release.
     - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.
