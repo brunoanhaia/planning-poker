@@ -215,6 +215,24 @@ describe('MainContent', () => {
         expect(screen.queryByLabelText('Story Title')).not.toBeInTheDocument();
     });
 
+    it('hides the voting deck when an ended room has no story', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({
+                roomState: {
+                    ...mockRoomState,
+                    endedAt: Date.now(),
+                    isEnded: true,
+                    stories: [],
+                },
+            })
+        );
+
+        const screen = renderMainContent();
+
+        expect(screen.getByText('No active story selected')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Select estimate/i })).not.toBeInTheDocument();
+    });
+
     it('renders the three room panels once the backlog has a story', () => {
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
             createMockSocketValue({ roomState: mockRoomState })
