@@ -14,16 +14,21 @@ jobs:
         name: Respond to mention
         permissions:
             contents: read
+            # The action exchanges this OIDC token for an OpenCode GitHub App token.
             id-token: write
         if: |
             (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
             (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode')) &&
-            github.event.comment.user.type != 'Bot'
+            github.event.comment.user.type != 'Bot' &&
+            contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
         runs-on: ubuntu-latest
+        concurrency:
+            group: opencode-${{ github.event.issue.number || github.event.pull_request.number }}
+            cancel-in-progress: false
         timeout-minutes: 20
         steps:
             - name: Checkout repository
-              uses: actions/checkout@v7
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   fetch-depth: 1
                   persist-credentials: false

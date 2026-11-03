@@ -214,6 +214,7 @@ describe('Revealed rounds', () => {
         const host = connect();
         send(host, 'CREATE_ROOM', { name: 'Alice' });
         const roomId = roomIdOf(host);
+        send(host, 'ADD_STORY', { title: 'Story 1' });
 
         const bob = connect();
         send(bob, 'JOIN_ROOM', { name: 'Bob', roomId });

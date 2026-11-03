@@ -67,11 +67,17 @@ export const completeSetup = async (
     const storyTitle = page.locator('#setup-story-title');
     await expect(storyTitle).toBeVisible();
 
-    for (const story of stories) {
-        await storyTitle.fill(story);
-        await page.getByRole('button', { name: ADD_STORY_BUTTON }).click();
-        await expect(page.getByText(story, { exact: true }).first()).toBeVisible();
-    }
+    // The stories share one input and must be staged in order. Chaining the
+    // promises keeps that order without an await inside a loop.
+    await stories.reduce<Promise<void>>(
+        (previous, story) =>
+            previous.then(async () => {
+                await storyTitle.fill(story);
+                await page.getByRole('button', { name: ADD_STORY_BUTTON }).click();
+                await expect(page.getByText(story, { exact: true }).first()).toBeVisible();
+            }),
+        Promise.resolve()
+    );
 
     await page.getByRole('button', { name: START_SETUP_BUTTON }).click();
     await expect(storyTitle).toBeHidden();

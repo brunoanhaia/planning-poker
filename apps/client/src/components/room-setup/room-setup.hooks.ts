@@ -40,6 +40,8 @@ export interface RoomSetupModel {
     customDeckError: null | string;
     deckType: DeckType;
     isAdmin: boolean;
+    /** True while the start dispatch waits for the room to report the stories. */
+    isStarting: boolean;
     /** Feedback about a paste or a full backlog, or `null` when there is none. */
     notice: null | SetupNotice;
     removeStagedStory: (index: number) => void;
@@ -66,7 +68,8 @@ export interface RoomSetupModel {
  * screen visible) until the first one activates in the domain.
  */
 export const useRoomSetup = (): RoomSetupModel => {
-    const { bulkAddStories, changeDeck, isAdmin, roomState, updateRoomTitle } = useSocket();
+    const { bulkAddStories, changeDeck, clearError, error, isAdmin, roomState, updateRoomTitle } =
+        useSocket();
     const { t } = useTranslation();
 
     // Nullable drafts fall back to the live room for fields the admin has not
@@ -82,6 +85,16 @@ export const useRoomSetup = (): RoomSetupModel => {
     const [bulkText, setBulkText] = useState('');
     const [stagedStories, setStagedStories] = useState<StagedStory[]>([]);
     const [notice, setNotice] = useState<null | SetupNotice>(null);
+    const [startRequest, setStartRequest] = useState<null | { storyCount: number }>(null);
+
+    // A start request stays active until the room reports every staged story or
+    // the server answers with an error. The count, rather than the room
+    // reference, keeps the guard active across the title and deck broadcasts
+    // that arrive before the stories.
+    const isStarting =
+        startRequest !== null &&
+        (roomState?.stories.length ?? 0) < startRequest.storyCount &&
+        error === null;
 
     const roomTitle = titleDraft ?? roomState?.title ?? '';
     const deckType = deckTypeDraft ?? roomState?.deckType ?? 'fibonacci';
@@ -104,6 +117,7 @@ export const useRoomSetup = (): RoomSetupModel => {
     };
 
     const addStagedStory = () => {
+        setStartRequest(null);
         const title = storyTitle.trim();
         if (!title) {
             return;
@@ -130,6 +144,7 @@ export const useRoomSetup = (): RoomSetupModel => {
     };
 
     const addStoriesFromBulk = () => {
+        setStartRequest(null);
         const parsed = parseBulkStories(bulkText);
         const stories = parsed.slice(0, remainingCapacity);
         if (stories.length === 0) {
@@ -166,6 +181,7 @@ export const useRoomSetup = (): RoomSetupModel => {
     };
 
     const removeStagedStory = (index: number) => {
+        setStartRequest(null);
         setStagedStories((current) => current.filter((_, position) => position !== index));
         // Removing an entry frees capacity, so a "backlog is full" warning no
         // longer describes the state the admin is looking at.
@@ -207,7 +223,7 @@ export const useRoomSetup = (): RoomSetupModel => {
     };
 
     const startEstimating = () => {
-        if (!roomState || stagedStories.length === 0) {
+        if (!roomState || stagedStories.length === 0 || isStarting) {
             return;
         }
         const { cards, isValid } = resolveDeckCards();
@@ -215,6 +231,10 @@ export const useRoomSetup = (): RoomSetupModel => {
             return;
         }
 
+        clearError();
+        setStartRequest({
+            storyCount: roomState.stories.length + stagedStories.length,
+        });
         applyRoomTitle(roomState);
         applyDeck(roomState, cards);
 
@@ -237,6 +257,7 @@ export const useRoomSetup = (): RoomSetupModel => {
         customDeckError,
         deckType,
         isAdmin,
+        isStarting,
         notice,
         removeStagedStory,
         roomTitle,

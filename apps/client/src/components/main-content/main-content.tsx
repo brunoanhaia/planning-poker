@@ -44,6 +44,37 @@ export const MainContent: React.FC<MainContentProps> = ({ colorMode, onToggleCol
 
     const closeSettings = () => setSettingsOpen(false);
 
+    const renderContent = () => {
+        if (!roomState) {
+            return <Home />;
+        }
+        if (!roomState.isEnded && roomState.stories.length === 0) {
+            return (
+                <Row gutter={[PANEL_GUTTER, PANEL_GUTTER]} align="stretch">
+                    <Col xs={24} xl={18}>
+                        <RoomSetup onOpenSettings={() => setSettingsOpen(true)} />
+                    </Col>
+                    <Col xs={24} xl={6}>
+                        <ParticipantsPanel />
+                    </Col>
+                </Row>
+            );
+        }
+        return (
+            <Row gutter={[PANEL_GUTTER, PANEL_GUTTER]} align="stretch">
+                <Col xs={24} xl={6}>
+                    <ParticipantsPanel />
+                </Col>
+                <Col xs={24} xl={12}>
+                    <EstimationPanel />
+                </Col>
+                <Col xs={24} xl={6}>
+                    <StoryBacklog />
+                </Col>
+            </Row>
+        );
+    };
+
     return (
         <Layout style={{ minHeight: '100vh' }}>
             <Navbar
@@ -67,32 +98,7 @@ export const MainContent: React.FC<MainContentProps> = ({ colorMode, onToggleCol
                     />
                 )}
 
-                {roomState ? (
-                    !roomState.isEnded && roomState.stories.length === 0 ? (
-                        <Row gutter={[PANEL_GUTTER, PANEL_GUTTER]} align="stretch">
-                            <Col xs={24} xl={18}>
-                                <RoomSetup onOpenSettings={() => setSettingsOpen(true)} />
-                            </Col>
-                            <Col xs={24} xl={6}>
-                                <ParticipantsPanel />
-                            </Col>
-                        </Row>
-                    ) : (
-                        <Row gutter={[PANEL_GUTTER, PANEL_GUTTER]} align="stretch">
-                            <Col xs={24} xl={6}>
-                                <ParticipantsPanel />
-                            </Col>
-                            <Col xs={24} xl={12}>
-                                <EstimationPanel />
-                            </Col>
-                            <Col xs={24} xl={6}>
-                                <StoryBacklog />
-                            </Col>
-                        </Row>
-                    )
-                ) : (
-                    <Home />
-                )}
+                {renderContent()}
             </Layout.Content>
 
             {roomState && <RoomSettingsModal onClose={closeSettings} open={settingsOpen} />}

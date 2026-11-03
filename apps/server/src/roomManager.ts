@@ -470,7 +470,7 @@ export class RoomManager {
      */
     public submitVote(roomId: string, userId: string, vote: CardValue): RoomState | null {
         const room = this.getRoom(roomId);
-        if (!room || room.votesRevealed) {
+        if (!room || room.votesRevealed || room.stories.length === 0) {
             return null;
         }
 

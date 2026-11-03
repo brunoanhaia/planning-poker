@@ -135,6 +135,59 @@ describe('RoomSetup', () => {
         );
     });
 
+    it('disables Start while the first dispatch is pending', () => {
+        const socket = createMockSocketValue({ roomState: buildRoomState() });
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+
+        renderSetup();
+        stageStory('Checkout flow');
+
+        const start = screen.getByRole('button', { name: 'Start Estimating' });
+        fireEvent.click(start);
+
+        expect(start).toBeDisabled();
+        fireEvent.click(start);
+        expect(socket.bulkAddStories).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps Start disabled across the title broadcast before the stories arrive', () => {
+        const socket = createMockSocketValue({ roomState: buildRoomState() });
+        const useSocket = vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        const { rerender } = renderSetup();
+        fireEvent.change(screen.getByLabelText('Room / Sprint Title'), {
+            target: { value: 'Sprint 43' },
+        });
+        stageStory('Checkout flow');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Start Estimating' }));
+
+        // The title update broadcasts a new room object before the stories land.
+        useSocket.mockReturnValue({
+            ...socket,
+            roomState: buildRoomState({ title: 'Sprint 43' }),
+        });
+        rerender(<RoomSetup onOpenSettings={vi.fn()} />);
+
+        expect(screen.getByRole('button', { name: 'Start Estimating' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Start Estimating' }));
+        expect(socket.bulkAddStories).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-enables Start when the server rejects the dispatch', () => {
+        const socket = createMockSocketValue({ roomState: buildRoomState() });
+        const useSocket = vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        const { rerender } = renderSetup();
+        stageStory('Checkout flow');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Start Estimating' }));
+        expect(screen.getByRole('button', { name: 'Start Estimating' })).toBeDisabled();
+
+        useSocket.mockReturnValue({ ...socket, error: 'Rejected' });
+        rerender(<RoomSetup onOpenSettings={vi.fn()} />);
+
+        expect(screen.getByRole('button', { name: 'Start Estimating' })).toBeEnabled();
+    });
+
     it('skips the title and deck messages when neither changed', () => {
         const socket = createMockSocketValue({ roomState: buildRoomState() });
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);

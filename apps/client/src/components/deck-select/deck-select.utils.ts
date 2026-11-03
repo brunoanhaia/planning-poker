@@ -67,8 +67,8 @@ export const hasSameCards = (
     left: readonly (number | string)[],
     right: readonly (number | string)[] | undefined
 ): boolean => {
-    if (!right || left.length !== right.length) {
+    if (left.length !== right?.length) {
         return false;
     }
-    return left.every((card, index) => card === right[index]);
+    return left.every((card, index) => card === right?.[index]);
 };

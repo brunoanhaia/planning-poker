@@ -127,10 +127,16 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onOpenSettings }) => {
                             {model.stagedStories.map((story, index) => (
                                 <li key={story.key}>
                                     <Flex align="center" gap={8} justify="space-between">
-                                        <div>
-                                            <Typography.Text>{story.title}</Typography.Text>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <Typography.Text
+                                                ellipsis={{ tooltip: story.title }}
+                                                style={{ display: 'block' }}
+                                            >
+                                                {story.title}
+                                            </Typography.Text>
                                             {story.description && (
                                                 <Typography.Text
+                                                    ellipsis={{ tooltip: story.description }}
                                                     style={{ display: 'block' }}
                                                     type="secondary"
                                                 >
@@ -162,7 +168,7 @@ export const RoomSetup: React.FC<RoomSetupProps> = ({ onOpenSettings }) => {
                 <Flex gap={8} justify="space-between" wrap>
                     <Button onClick={onOpenSettings}>{t('setup.settings')}</Button>
                     <Button
-                        disabled={model.stagedStories.length === 0}
+                        disabled={model.stagedStories.length === 0 || model.isStarting}
                         onClick={model.startEstimating}
                         type="primary"
                     >

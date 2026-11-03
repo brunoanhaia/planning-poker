@@ -122,6 +122,7 @@ describe('Idle room sweep', () => {
             expect(rm.getRoom(roomId)).toBeDefined();
             expect(rm.getRoomCount()).toBe(1);
             // The room is still live: its host can act on it.
+            rm.addStory(roomId, hostId, 'Story 1');
             rm.toggleSpectator(roomId, hostId);
             expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
         } finally {

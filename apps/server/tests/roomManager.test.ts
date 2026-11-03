@@ -87,6 +87,17 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(rm.getRoom(roomId)!.votesRevealed).toBe(true);
     });
 
+    it('should reject votes while the backlog has no story', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+
+        expect(rm.submitVote(roomId, hostId, 5)).toBeNull();
+        expect(rm.getRoom(roomId)!.votesRevealed).toBe(false);
+
+        rm.addStory(roomId, hostId, 'First story');
+        expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
+    });
+
     it('should manage live countdown timer', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
