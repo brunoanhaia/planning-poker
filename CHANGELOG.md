@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0](https://github.com/brunoanhaia/planning-poker/compare/planitpoker-monorepo-v1.0.0...planitpoker-monorepo-v1.1.0) (2026-11-04)
+## [1.1.0](https://github.com/brunoanhaia/planning-poker/compare/v1.0.0...v1.1.0) (2026-11-04)
 
 
 ### Features
