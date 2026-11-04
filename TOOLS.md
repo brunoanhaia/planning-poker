@@ -26,8 +26,6 @@ Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries sh
 | `npm run lint:fix`     | `eslint . --fix` across the monorepo                           |
 | `npm run format`       | Prettier over `**/*.{ts,tsx,js,jsx,json,css,md}`               |
 | `npm run lint:commits` | `commitlint --from origin/main`                                |
-| `npm run release`      | `semantic-release` (runs in CI on `main`, not by hand)         |
-| `npm run release:dry`  | `semantic-release --dry-run`, to see the next version locally  |
 | `npm run prepare`      | the Husky commit-msg hook installed                            |
 
 ## Package Scripts

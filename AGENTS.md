@@ -57,7 +57,7 @@ The devcontainer pins a Node 24 LTS (Long Term Support) image, the same major as
 - **ESLint 10** with flat config; the root `package.json` owns the binary, so a single install serves every workspace.
 - **TypeScript is held at 6.x**: `typescript-eslint` 8.x peers on `>=4.8.4 <6.1.0`. Adoption of 7.x waits until the plugin widens that range.
 - **Vitest 5** for the unit suites and **Playwright 1.64** for e2e; the browser build is pinned per version.
-- **`semantic-release` 24** owns the release and changelog flow. It uses the `conventionalcommits` preset from `conventional-changelog-conventionalcommits` 8, which matches the parser `@commitlint/config-conventional` follows.
+- **`release-please` 5** owns the release and changelog flow. It reads the Conventional Commit messages and keeps a release pull request; merging it writes the changelog, version and manifest, then publishes the tag and the GitHub release.
 
 ## Versioning & Commits
 
@@ -71,11 +71,12 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - the header exceeds 100 characters
 - **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky arms itself through the `prepare` script, so a plain `npm install` installs the hook. Where post-install scripts are blocked, run `npx husky` once.
 - **CI gate**: `.github/workflows/conventional-commits.yml` validates every commit in a pull request and the pull request title, which becomes the commit on a squash merge. A title without a type is rejected there too.
-- **Releases**: `.github/workflows/release.yml` runs on every push to `main`. It runs the suites first, then `semantic-release`.
-    - The next version comes from the commit messages since the last tag.
-    - The notes are prepended to `CHANGELOG.md`, and the root `package.json` gets the same version.
-    - The changelog, `package.json` and `package-lock.json` are committed as `chore(release): <version> [skip ci]`.
-    - The tag `v<version>` and the GitHub release are published from that commit.
+- **Releases**: `.github/workflows/release.yml` runs on every push to `main`.
+    - The job keeps a release pull request open.
+    - The release pull request carries the next version in `CHANGELOG.md`, the root `package.json`, `package-lock.json` and `.release-please-manifest.json`.
+    - Merging that pull request creates the `v<version>` tag and the GitHub release; this flow does not push to `main`.
+    - The action authenticates with the workflow `GITHUB_TOKEN`.
+    - Pull requests created with `GITHUB_TOKEN` do not trigger other workflows, so an admin can merge the release pull request manually.
     - Nothing is published to npm: the workspace is private.
     - `feat`, `fix`, `perf` and `revert` produce a release.
     - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.

@@ -1,55 +1,32 @@
 # Release on every merge into `main`.
 #
-# `semantic-release` turns the Conventional Commit messages since the last tag
-# into the next version: it rewrites `CHANGELOG.md`, bumps the root `package.json`,
-# commits those plus `package-lock.json` with `[skip ci]`, and publishes the tag
-# and the GitHub release. Nothing is published to npm — the workspace is private.
+# `release-please` reads the Conventional Commit messages since the last tag and
+# keeps a release pull request open. Merging that pull request writes the next
+# version to `CHANGELOG.md`, the root `package.json`, `package-lock.json` and
+# `.release-please-manifest.json`, then publishes the tag and the GitHub
+# release. Nothing is published to npm — the workspace is private.
 #
-# The suite runs first, so a red tree never produces a tag.
+# The action uses the workflow's `GITHUB_TOKEN`. Pull requests created with
+# that token do not trigger other workflows, so an admin can merge the release
+# pull request manually.
 name: Release
 
 on:
     push:
         branches: [main]
 
-concurrency:
-    group: release-main
-    cancel-in-progress: false
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
 
 jobs:
-    release:
-        name: Version and publish
+    release-please:
+        name: Release pull request
         runs-on: ubuntu-latest
-        permissions:
-            contents: write
-            issues: write
-            pull-requests: write
         steps:
-            - uses: actions/checkout@v7
+            - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
               with:
-                  fetch-depth: 0
-                  # `@semantic-release/git` pushes the release commit and tag
-                  # through the git CLI, so the checkout must keep the token.
-                  persist-credentials: true
-
-            - uses: actions/setup-node@v7
-              with:
-                  node-version: 24
-                  cache: npm
-
-            - run: npm ci --ignore-scripts
-
-            # `npm run build` compiles `packages/shared` and then both apps, so a
-            # type error or a Vite build failure stops the job before a tag.
-            - run: npm run build
-
-            - name: Server suite
-              run: npm run test:server
-
-            - name: Client suite
-              run: npm run test:client
-
-            - name: Release
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: ./node_modules/.bin/semantic-release
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json
