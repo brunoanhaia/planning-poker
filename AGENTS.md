@@ -20,6 +20,8 @@ npm workspaces monorepo:
 - `packages/shared` — TypeScript types, enums, constants, package name `@planitpoker/shared`
 
 All WebSocket message types and domain models live in `packages/shared/src/index.ts`. Treat it as the source of truth; do not redefine event payloads locally.
+`RoomState.stories` may be empty for a fresh room, so `currentStoryIndex` can point at no story; consumers should handle `stories[currentStoryIndex]` being `undefined`.
+The creator joins as a spectator (`isSpectator: true`), so the client opens on `room-setup/` until the first story is staged.
 Voting rounds live on `Story.rounds` as append-only revealed snapshots, capped by `MAX_ROUNDS_PER_STORY`. `RoomState.endedAt` marks the session end.
 `ErrorCode` is the contract the client translates — a new code needs an `ERROR_KEYS` entry.
 

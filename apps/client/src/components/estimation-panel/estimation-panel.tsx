@@ -335,7 +335,8 @@ export const EstimationPanel: React.FC = () => {
 
                     {renderStoryCard(currentStory, roundNumber, t)}
 
-                    {roomState.votesRevealed ? <ResultsPanel /> : <CardDeck />}
+                    {roomState.votesRevealed && <ResultsPanel />}
+                    {!roomState.votesRevealed && currentStory && <CardDeck />}
 
                     {renderVotingProgress({
                         activeVoterCount: activeVoters.length,

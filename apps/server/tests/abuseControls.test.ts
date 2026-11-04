@@ -46,8 +46,8 @@ describe('Room caps', () => {
     it('caps the backlog at MAX_STORIES_PER_ROOM', () => {
         const { hostId, roomId } = rm.createRoom('Alice')!;
 
-        // The room starts with one story.
-        for (let i = 1; i < MAX_STORIES_PER_ROOM; i += 1) {
+        // The room starts with an empty backlog.
+        for (let i = 0; i < MAX_STORIES_PER_ROOM; i += 1) {
             expect(rm.addStory(roomId, hostId, `Story ${i}`)).not.toBeNull();
         }
         expect(isBacklogFull(rm.getRoom(roomId)!)).toBe(true);
@@ -121,6 +121,9 @@ describe('Idle room sweep', () => {
             expect(dropped).not.toContain(roomId);
             expect(rm.getRoom(roomId)).toBeDefined();
             expect(rm.getRoomCount()).toBe(1);
+            // The room is still live: its host can act on it.
+            rm.addStory(roomId, hostId, 'Story 1');
+            rm.toggleSpectator(roomId, hostId);
             expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
         } finally {
             vi.useRealTimers();
