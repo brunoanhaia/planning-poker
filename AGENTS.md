@@ -57,7 +57,7 @@ The devcontainer pins a Node 24 LTS (Long Term Support) image, the same major as
 - **ESLint 10** with flat config; the root `package.json` owns the binary, so a single install serves every workspace.
 - **TypeScript is held at 6.x**: `typescript-eslint` 8.x peers on `>=4.8.4 <6.1.0`. Adoption of 7.x waits until the plugin widens that range.
 - **Vitest 5** for the unit suites and **Playwright 1.64** for e2e; the browser build is pinned per version.
-- **`release-please` 4** owns the release and changelog flow. It reads the Conventional Commit messages and keeps a release pull request; merging it writes the changelog, version and manifest, then publishes the tag and the GitHub release.
+- **`release-please` 5** owns the release and changelog flow. It reads the Conventional Commit messages and keeps a release pull request; merging it writes the changelog, version and manifest, then publishes the tag and the GitHub release.
 
 ## Versioning & Commits
 
