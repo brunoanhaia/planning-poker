@@ -200,10 +200,10 @@ version, which the pull request writes to `CHANGELOG.md`, the root `package.json
 not mint a version. The exception is a breaking change: any type carrying `!` (or a
 `BREAKING CHANGE:` footer) releases a major, including `refactor!: …`.
 
-The release pull request uses `RELEASE_TOKEN` when that secret exists and `GITHUB_TOKEN`
-otherwise. A PAT triggers its CI checks; the default token does not, so an admin may need to merge
-it manually. Because it is a normal pull request, `main` can require pull requests, signed commits
-and code scanning; `release-please` does not push to the branch.
+The release pull request uses the workflow `GITHUB_TOKEN`. Pull requests created with that token do
+not trigger other workflows, so an admin may need to merge the release pull request manually.
+Because it is a normal pull request, `main` can require pull requests, signed commits and code
+scanning; `release-please` does not push to the branch.
 
 Messages are checked twice: the `commit-msg` hook locally, and
 `.github/workflows/conventional-commits.yml` in CI — every commit in a pull request plus the pull

@@ -75,9 +75,8 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - The job keeps a release pull request open.
     - The release pull request carries the next version in `CHANGELOG.md`, the root `package.json`, `package-lock.json` and `.release-please-manifest.json`.
     - Merging that pull request creates the `v<version>` tag and the GitHub release; this flow does not push to `main`.
-    - The action uses `RELEASE_TOKEN` when the secret is present and `GITHUB_TOKEN` otherwise.
-    - A personal access token (PAT) in `RELEASE_TOKEN` makes the release pull request trigger the normal pull request checks.
-    - Without `RELEASE_TOKEN`, the release pull request does not trigger other workflows, so an admin can merge it manually.
+    - The action authenticates with the workflow `GITHUB_TOKEN`.
+    - Pull requests created with `GITHUB_TOKEN` do not trigger other workflows, so an admin can merge the release pull request manually.
     - Nothing is published to npm: the workspace is private.
     - `feat`, `fix`, `perf` and `revert` produce a release.
     - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.
