@@ -60,6 +60,7 @@ The devcontainer pins a Node 24 LTS (Long Term Support) image, the same major as
 - **TypeScript is held at 6.x**: `typescript-eslint` 8.x peers on `>=4.8.4 <6.1.0`. Adoption of 7.x waits until the plugin widens that range.
 - **Vitest 5** for the unit suites and **Playwright 1.64** for e2e; the browser build is pinned per version.
 - **`release-please` 5** owns the release and changelog flow. It reads the Conventional Commit messages and keeps a release pull request; merging it writes the changelog, version and manifest, then publishes the tag and the GitHub release.
+- **`skills` 1.9** is a root devDependency, not an unpinned `npx` download. The CLI rewrites `skills-lock.json` on install, and running the latest release silently migrated the file from v1 to v2 once. Update it deliberately.
 
 ## Versioning & Commits
 
@@ -210,13 +211,41 @@ Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. On
 - Skills are loaded **on demand**: the `description` is matched against the request, and the full `SKILL.md` is read only on a hit.
   The directory name must match the frontmatter `name`; a mismatch is an exception the loader does not tolerate, so rename one of them.
     - UI / architecture: `accessible-ui-components`, `isolated-component-design`, `modular-css-architecture`, `react-clean-architecture`
+    - UI / Ant Design 6: `ant-design` (decision guide for tokens, theming, a11y, migration) and `antd` (offline `@ant-design/cli` lookups; needs `npm i -g @ant-design/cli`)
     - Code quality: `clean-code-refactoring`
+    - Typing: `typescript-advanced-types` (generics and conditional types for the shared socket contract)
+    - Testing: `playwright-best-practices` (E2E including axe and WebSockets) and `vitest`
+    - Performance: `vercel-react-best-practices` — React 19 rules. Skip the Next.js sections, including React Server Components (RSC), which do not apply to this Vite client
+    - Accessibility audit: `accessibility` (WCAG 2.2 with Lighthouse/axe) — audit-time counterpart of `accessible-ui-components`
+    - Security: `security-review` — Open Worldwide Application Security Project (OWASP) patterns for Express and WebSockets
     - Real-time: `realtime-websocket-manager` (native WebSockets, not the `socket.io` package)
     - Efficiency: `token-usage-best-practices` (canonical source for token-saving principles)
 
+Skills are installed **at project scope**, so they are committed under `.agents/skills/`.
+That makes them available to the team and to CI.
+A global install (`-g`) is invisible to CI and drifts from the pinned version.
+Use `-g` only where project scope is impossible.
+The install, list and update commands live in [`TOOLS.md`](./TOOLS.md#skills).
+
+The whole `.agents/skills/` tree is excluded from Prettier, ESLint, Codacy and Sonar.
+The files are upstream prompt material, not project code.
+Reformatting one changes its `computedHash`.
+The Markdown linters would otherwise report every upstream style choice as a new issue.
+
+Each third-party skill is pinned in `skills-lock.json` by `commit` and `computedHash`. These rules follow:
+
+- Run `skills update` on its own, not as part of another task. It rewrites the whole lockfile.
+- The v2 hash covers the whole skill folder. `skills add` has already left the `autofix` hash empty once.
+- After any install or update, diff `skills-lock.json` and confirm every entry has a hash.
+- Commit the downloaded `SKILL.md` files together with the lockfile.
+- `.github/workflows/skills-lock.yml` fails when a vendored folder no longer matches its hash.
+- Editing a `SKILL.md` by hand needs a matching lockfile update, not just the file change.
+
+Version alignment matters: `ant-design` targets antd 6.x and React 18–19, `vitest` is generated from Vitest 5.1, and `antd` reads its metadata offline, so re-check a recommendation against the installed version before applying it.
+
 ### Rule Playbooks
 
-OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. Load rules through [`opencode.json`'s `instructions` setting](https://opencode.ai/docs/rules/#custom-instructions) (for example, `[".agents/rules/*.md"]`) or an explicit read instruction in `AGENTS.md`; a file reference alone does not load its contents.
+OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. The root `opencode.jsonc` loads them through its `instructions` setting (`[".agents/rules/*.md"]`), and the same mechanism works for any editor that reads that file.
 Read and follow these rule files when their conditions apply:
 
 - [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change
@@ -227,7 +256,7 @@ Only YAML frontmatter fields that tooling actually implements should be used. `t
 
 ### Vendored CodeRabbit Skills
 
-CodeRabbit skills are vendored from `coderabbitai/skills` and pinned in `skills-lock.json`:
+The CodeRabbit skills are vendored from `coderabbitai/skills`, and their lockfile entries are pinned by hand rather than by `npx skills add`:
 
 - `code-review` — CodeRabbit CLI reviews plus finding triage (default for review requests).
 - `autofix` — fetch unresolved CodeRabbit PR threads, then apply validated fixes with per-change approval.
