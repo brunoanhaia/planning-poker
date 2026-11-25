@@ -80,6 +80,7 @@ Fill in the pull request template. Keep the title in Conventional Commit form; i
 | `conventional-commits.yml` | pull request to `main`                                       | Validates every commit and the pull request title                |
 | `release.yml`              | push to `main`                                               | Opens/updates the release pull request and publishes the release |
 | `ci.yml`                   | pull request and push to `main`                              | Builds both apps and runs the server/client unit suites          |
+| `skills-lock.yml`          | pull request and push to `main`                              | Fails when a vendored skill no longer matches `skills-lock.json` |
 
 No workflow runs lint. `ci.yml` runs the build and the server/client unit suites on pull requests and
 `main`, so a green check on its own still does not mean lint passed.
