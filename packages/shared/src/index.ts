@@ -300,7 +300,8 @@ export interface SetCurrentStoryPayload {
 }
 
 export interface UpdateStoryEstimatePayload {
-    estimate: CardValue;
+    /** Accepted estimate; `null` clears it and reopens the story. */
+    estimate: EstimateValue;
     storyId: string;
 }
 
