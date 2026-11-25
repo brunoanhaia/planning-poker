@@ -248,6 +248,7 @@ export type WSMessageType =
     | 'TRANSFER_ADMIN'
     | 'PROMOTE_COADMIN'
     | 'KICK_PARTICIPANT'
+    | 'CLEAR_OFFLINE_PARTICIPANTS'
     | 'KICKED'
     | 'UPDATE_ROOM_TITLE'
     | 'TOGGLE_LOCK_ROOM'
