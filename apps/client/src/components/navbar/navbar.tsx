@@ -63,7 +63,6 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
         closeRename,
         colorModeToggle,
         handleCopyLink,
-        handleInviteKeyDown,
         isAdmin,
         isConnected,
         isEditingTitle,
@@ -134,17 +133,18 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             </Tooltip>
                         )}
 
+                        {/* A real button rather than a Tag with `role="button"`:
+                            focus ring, disabled state and Enter/Space activation
+                            are native, so no keyboard handler is needed. */}
                         <Tooltip title={t('nav.copy.hint')}>
-                            <Tag
-                                icon={<CopyOutlined />}
+                            <Button
+                                aria-label={t('nav.copy.aria', { code: roomState.id })}
+                                icon={<CopyOutlined aria-hidden />}
                                 onClick={handleCopyLink}
-                                role="button"
-                                style={{ cursor: 'pointer' }}
-                                tabIndex={0}
-                                onKeyDown={handleInviteKeyDown}
+                                type="text"
                             >
                                 {t('nav.room', { code: roomState.id })}
-                            </Tag>
+                            </Button>
                         </Tooltip>
 
                         {spectatorHint && (

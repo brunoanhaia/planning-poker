@@ -39,7 +39,6 @@ export interface NavbarModel {
     closeRename: () => void;
     colorModeToggle: NavbarIconLabel;
     handleCopyLink: () => Promise<void>;
-    handleInviteKeyDown: (event: React.KeyboardEvent<HTMLElement>) => Promise<void>;
     isAdmin: boolean;
     isConnected: boolean;
     isEditingTitle: boolean;
@@ -94,14 +93,6 @@ export const useNavbar = (colorMode: ColorMode): NavbarModel => {
         message.error(t('nav.copy.error'));
     };
 
-    const handleInviteKeyDown = async (event: React.KeyboardEvent<HTMLElement>): Promise<void> => {
-        if (event.key !== 'Enter' && event.key !== ' ') {
-            return;
-        }
-        event.preventDefault();
-        await handleCopyLink();
-    };
-
     const openRename = (): void => {
         if (!isAdmin || !roomState) {
             return;
@@ -123,7 +114,6 @@ export const useNavbar = (colorMode: ColorMode): NavbarModel => {
         closeRename,
         colorModeToggle: getColorModeToggle(colorMode, t),
         handleCopyLink,
-        handleInviteKeyDown,
         isAdmin,
         isConnected,
         isEditingTitle,
