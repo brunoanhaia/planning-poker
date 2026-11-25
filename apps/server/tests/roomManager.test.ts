@@ -796,6 +796,25 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(room.stories[0].rounds).toHaveLength(0);
     });
 
+    it('does not auto-reveal when a participant is removed after the session ends', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.endSession(roomId, hostId);
+        rm.removeParticipant(roomId, bobId);
+
+        // The room-removal path shares the same completion predicate, so it
+        // must also stay frozen once the session has ended.
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(false);
+        expect(room.stories[0].rounds).toHaveLength(0);
+        expect(room.participants.map((participant) => participant.id)).toEqual([hostId]);
+    });
+
     it('keeps the recorded round when a voter is cleared after the reveal', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         makeHostVoter(roomId, hostId);
