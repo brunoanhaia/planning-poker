@@ -47,6 +47,10 @@ test.describe('Session Closure', () => {
     });
 
     test('a participant already inside reconnects after the end', async ({ browser }) => {
+        // This scenario performs a full reload and reconnect while the parallel
+        // dev server is still compiling; give the two contexts room to settle.
+        test.setTimeout(60_000);
+
         const { adminContext, adminPage, roomCode } = await createRoom(browser);
         let voterContext: BrowserContext | undefined;
 
