@@ -2,6 +2,7 @@ import {
     DeckType,
     ErrorCode,
     ErrorPayload,
+    EstimateValue,
     RoomState,
     RoomStatePayload,
     ROOM_SWITCHED_CLOSE_CODE,
@@ -372,13 +373,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const joinRoom = useCallback(
         (roomId: string, name: string, avatar: string, color: string) => {
+            // Room codes are case-insensitive for the user but canonical on the
+            // server. Normalizing once keeps the stored-token lookup aligned with
+            // the key written when the room was entered; otherwise a lowercase
+            // code misses the token and mints a second participant.
+            const normalizedRoomId = roomId.trim().toUpperCase();
+
             send('JOIN_ROOM', {
                 avatar,
                 color,
                 name,
-                previousRoomToken: previousRoomTokenFor(roomId.toUpperCase()),
-                roomId,
-                sessionToken: sessionTokenRef.current ?? localStorage.getItem(roomTokenKey(roomId)),
+                previousRoomToken: previousRoomTokenFor(normalizedRoomId),
+                roomId: normalizedRoomId,
+                sessionToken:
+                    sessionTokenRef.current ?? localStorage.getItem(roomTokenKey(normalizedRoomId)),
                 userId: currentUserId,
             });
         },
@@ -488,7 +496,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
 
     const updateStoryEstimate = useCallback(
-        (storyId: string, estimate: number | string | null) => {
+        (storyId: string, estimate: EstimateValue) => {
             send('UPDATE_STORY_ESTIMATE', { estimate, storyId });
         },
         [send]

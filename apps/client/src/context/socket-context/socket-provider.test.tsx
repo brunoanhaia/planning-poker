@@ -102,6 +102,9 @@ const Probe = () => {
             <button onClick={() => joinRoom('ROOM01', 'Ana', 'avatar-1', '#1890ff')} type="button">
                 join
             </button>
+            <button onClick={() => joinRoom('room01', 'Ana', 'avatar-1', '#1890ff')} type="button">
+                join-lowercase
+            </button>
         </>
     );
 };
@@ -220,6 +223,27 @@ describe('SocketProvider reconnection', () => {
 
         expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
         expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok');
+    });
+
+    it('normalizes a lowercase room code before looking up the stored token', () => {
+        // The server canonicalizes room ids to uppercase, so the token written
+        // when this browser first joined is keyed under `ROOM01`. A lowercase
+        // code typed elsewhere must still find it instead of minting a stranger.
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+
+        act(() => {
+            screen.getByRole('button', { name: 'join-lowercase' }).click();
+        });
+
+        expect(JSON.parse(socket.sent[0])).toMatchObject({
+            payload: { roomId: 'ROOM01', sessionToken: 'tok-room' },
+            type: 'JOIN_ROOM',
+        });
     });
 
     it('stops reconnecting and shows a notice when another tab takes over', () => {
