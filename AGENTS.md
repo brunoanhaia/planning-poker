@@ -233,7 +233,7 @@ Version alignment matters: `ant-design` targets antd 6.x and React 18–19, `vit
 
 ### Rule Playbooks
 
-OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. Load rules through [`opencode.json`'s `instructions` setting](https://opencode.ai/docs/rules/#custom-instructions) (for example, `[".agents/rules/*.md"]`) or an explicit read instruction in `AGENTS.md`; a file reference alone does not load its contents.
+OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. The root `opencode.jsonc` loads them through its `instructions` setting (`[".agents/rules/*.md"]`), and the same mechanism works for any editor that reads that file.
 Read and follow these rule files when their conditions apply:
 
 - [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change
