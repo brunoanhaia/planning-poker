@@ -106,6 +106,17 @@ describe('ParticipantRosterRow', () => {
         expect(view.getByText('Voted')).toBeInTheDocument();
     });
 
+    it('replaces the voting badge with a departed state for an offline participant', () => {
+        // A voter who left keeps `hasVoted` on the server, but the roster must
+        // not present them as an active participant still waiting for their card.
+        const { view } = renderRow({
+            participant: { ...participant, isOnline: false },
+        });
+
+        expect(view.getByText('Left')).toBeInTheDocument();
+        expect(view.queryByText('Voted')).not.toBeInTheDocument();
+    });
+
     it('draws the separator rule only when the row follows another one', () => {
         const { view: plain } = renderRow();
         const { view: separated } = renderRow({ showSeparator: true });

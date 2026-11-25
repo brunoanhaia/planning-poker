@@ -48,6 +48,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         return null;
     }
 
+    // The server freezes every content change once the session ends; the
+    // dialog mirrors that instead of offering actions that would be refused.
+    const isReadOnly = roomState.isEnded;
+
     // The fields fall back to the live room, so a value changed elsewhere — a
     // room renamed from the navbar, a deck switched by another administrator —
     // is picked up instead of being overwritten by a draft from an earlier
@@ -58,6 +62,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         customDeckDraft ?? roomState.customDeck?.join(', ') ?? FALLBACK_CUSTOM_DECK.join(', ');
 
     const handleSave = () => {
+        if (isReadOnly) {
+            return;
+        }
+
         // Validate before dispatching anything: a rejected deck must not apply
         // the title change on the way out and leave the dialog half-applied.
         const parsedCustomDeck = deckType === 'custom' ? parseCustomDeck(customDeck) : null;
@@ -102,7 +110,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
             footer={
                 <Flex gap={8} justify="end">
                     <Button onClick={onClose}>{t('common.cancel')}</Button>
-                    <Button onClick={handleSave} type="primary">
+                    <Button disabled={isReadOnly} onClick={handleSave} type="primary">
                         {t('settings.apply')}
                     </Button>
                 </Flex>
@@ -117,6 +125,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                 <div>
                     <label htmlFor="room-settings-title">{t('nav.roomTitle')}</label>
                     <Input
+                        disabled={isReadOnly}
                         id="room-settings-title"
                         onChange={(event) => setTitleDraft(event.target.value)}
                         value={title}
@@ -126,6 +135,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                 <div>
                     <label htmlFor="room-settings-deck">{t('settings.deck')}</label>
                     <Select<DeckType>
+                        disabled={isReadOnly}
                         id="room-settings-deck"
                         onChange={(value) => {
                             setDeckTypeDraft(value);
@@ -150,6 +160,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                                 customDeckError ? 'room-settings-custom-deck-error' : undefined
                             }
                             aria-invalid={Boolean(customDeckError)}
+                            disabled={isReadOnly}
                             id="room-settings-custom-deck"
                             onChange={(event) => {
                                 setCustomDeckDraft(event.target.value);
@@ -186,6 +197,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <Switch
                         aria-label={t('settings.autoReveal')}
                         checked={roomState.autoReveal}
+                        disabled={isReadOnly}
                         onChange={toggleAutoReveal}
                     />
                 </Flex>
@@ -200,6 +212,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <Switch
                         aria-label={t('settings.lock')}
                         checked={roomState.isLocked}
+                        disabled={isReadOnly}
                         onChange={toggleLockRoom}
                     />
                 </Flex>

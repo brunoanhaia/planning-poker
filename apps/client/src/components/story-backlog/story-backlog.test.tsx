@@ -53,6 +53,28 @@ const runImport = (paste: string): void => {
 };
 
 describe('StoryBacklog bulk import', () => {
+    it('hides the editing controls once the session has ended', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...roomWithStories(2), isEnded: true },
+            })
+        );
+        render(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        // The server freezes content changes after the end, so the backlog stops
+        // offering them; exporting the result stays available.
+        expect(screen.queryByRole('button', { name: 'Add Story' })).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Bulk import stories' })
+        ).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Delete Story 0' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Export backlog to CSV' })).toBeInTheDocument();
+    });
+
     it('sends a small paste as one import', () => {
         const bulkAddStories = vi.fn();
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(

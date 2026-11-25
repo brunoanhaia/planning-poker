@@ -537,6 +537,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const clearError = useCallback(() => setErrorNotice(null), []);
     const clearKickedMessage = useCallback(() => setIsKicked(false), []);
 
+    /** Asks the server to drop every participant who is no longer connected. */
+    const clearOfflineParticipants = useCallback(() => {
+        send('CLEAR_OFFLINE_PARTICIPANTS', {});
+    }, [send]);
+
     // Translation happens while the context value is built, not in the socket
     // handler: a notice already on screen follows a language change instead of
     // freezing in the language it arrived in.
@@ -552,6 +557,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             changeDeck,
             clearError,
             clearKickedMessage,
+            clearOfflineParticipants,
             createRoom,
             currentUserId,
             deleteStory,
@@ -587,6 +593,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         changeDeck,
         clearError,
         clearKickedMessage,
+        clearOfflineParticipants,
         createRoom,
         currentUserId,
         deleteStory,

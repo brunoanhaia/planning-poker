@@ -99,6 +99,7 @@ interface StoryRowProps {
     index: number;
     isActive: boolean;
     isAdmin: boolean;
+    isEnded: boolean;
     isFirst: boolean;
     showDelete: boolean;
     story: Story;
@@ -111,6 +112,7 @@ const renderStoryRow = ({
     index,
     isActive,
     isAdmin,
+    isEnded,
     isFirst,
     showDelete,
     story,
@@ -170,7 +172,7 @@ const renderStoryRow = ({
                         />
                     </Tooltip>
 
-                    {isAdmin && (
+                    {isAdmin && !isEnded && (
                         <>
                             <Tooltip title={t('backlog.edit.aria', { title: story.title })}>
                                 <Button
@@ -338,7 +340,7 @@ export const StoryBacklog: React.FC = () => {
                 }
             >
                 <Flex gap={8} style={{ padding: PANEL_PADDING }} wrap>
-                    {isAdmin && (
+                    {isAdmin && !roomState.isEnded && (
                         <>
                             <Button
                                 icon={<PlusOutlined />}
@@ -366,7 +368,7 @@ export const StoryBacklog: React.FC = () => {
                     </Tooltip>
                 </Flex>
 
-                {isAdding && isAdmin && (
+                {isAdding && isAdmin && !roomState.isEnded && (
                     <form onSubmit={handleCreateStory}>
                         <Flex gap={8} style={{ padding: PANEL_PADDING }} vertical>
                             <Typography.Text strong>{t('backlog.new')}</Typography.Text>
@@ -419,6 +421,7 @@ export const StoryBacklog: React.FC = () => {
                                 index,
                                 isActive: index === roomState.currentStoryIndex,
                                 isAdmin,
+                                isEnded: roomState.isEnded,
                                 isFirst: index === 0,
                                 showDelete: roomState.stories.length > 1,
                                 story,

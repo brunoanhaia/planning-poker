@@ -30,7 +30,7 @@ test.describe('Session Closure', () => {
             await newPage.getByRole('button', { name: /Join Room Now/i }).click();
 
             await expect(newPage.getByRole('alert')).toContainText(
-                'This session has ended, so no further votes are accepted.'
+                'This session has ended, so no further changes are accepted.'
             );
             await expect(
                 newPage.getByRole('heading', { name: 'Planit Poker Real-Time' })
@@ -78,6 +78,10 @@ test.describe('Session Closure', () => {
 
             await expect(voterPage.getByText('Participants (2)')).toBeVisible();
             await expect(voterPage.getByText('Voter 1', { exact: true })).toHaveCount(1);
+            // An ended room is read-only: the deck is visible but cannot vote.
+            await expect(
+                voterPage.getByRole('button', { name: 'Select estimate 5', exact: true })
+            ).toBeDisabled();
         } finally {
             await voterContext?.close();
             await adminContext.close();

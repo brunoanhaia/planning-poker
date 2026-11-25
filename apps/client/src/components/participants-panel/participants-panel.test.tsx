@@ -1,5 +1,5 @@
-import { RoomState } from '@planitpoker/shared';
-import { render } from '@testing-library/react';
+import { Participant, RoomState } from '@planitpoker/shared';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -62,6 +62,24 @@ const roomStateWithThreeParticipants: RoomState = {
     votesRevealed: false,
 };
 
+const departedParticipant: Participant = {
+    avatar: '👻',
+    color: '#f59e0b',
+    hasVoted: true,
+    id: 'user_4',
+    isAdmin: false,
+    isHost: false,
+    isOnline: false,
+    isSpectator: false,
+    name: 'Dora Departed',
+    vote: 8,
+};
+
+const roomStateWithDepartedParticipant: RoomState = {
+    ...roomStateWithThreeParticipants,
+    participants: [...roomStateWithThreeParticipants.participants, departedParticipant],
+};
+
 describe('ParticipantsPanel', () => {
     it('lists every participant as a list item and nothing else', () => {
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
@@ -75,6 +93,34 @@ describe('ParticipantsPanel', () => {
             true
         );
         expect(list?.children).toHaveLength(3);
+    });
+
+    it('collapses departed participants and reports the online count', async () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ roomState: roomStateWithDepartedParticipant })
+        );
+        render(<ParticipantsPanel />);
+
+        expect(screen.getByText('Participants (3 online / 4)')).toBeInTheDocument();
+        expect(screen.queryByText('Dora Departed')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('1 participant left'));
+
+        expect(await screen.findByText('Dora Departed')).toBeInTheDocument();
+        expect(screen.getByText('Left')).toBeInTheDocument();
+        // Only Alice, who is still online, keeps the "Voted" badge.
+        expect(screen.getAllByText('Voted')).toHaveLength(1);
+    });
+
+    it('lets an admin clear the departed participants', async () => {
+        const socket = createMockSocketValue({ roomState: roomStateWithDepartedParticipant });
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        render(<ParticipantsPanel />);
+
+        fireEvent.click(screen.getByText('1 participant left'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Clear left participants' }));
+
+        expect(socket.clearOfflineParticipants).toHaveBeenCalledTimes(1);
     });
 
     it('offers the management menu to an admin, but never for their own row', () => {

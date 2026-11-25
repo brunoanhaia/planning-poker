@@ -33,6 +33,37 @@ test.describe('Participant Management', () => {
         }
     });
 
+    test('shows departed participants and lets the host clear them', async ({ browser }) => {
+        const { adminContext, adminPage, roomCode } = await createRoom(browser);
+        let voterContext: BrowserContext | undefined;
+
+        try {
+            const voterSession = await joinRoom(browser, roomCode, 'Voter 1');
+            voterContext = voterSession.voterContext;
+            const { voterPage } = voterSession;
+
+            // Closing the page drops the socket; the participant becomes a ghost
+            // instead of being removed from the roster outright.
+            await voterPage.close();
+
+            await expect(adminPage.getByText('Participants (1 online / 2)')).toBeVisible();
+            await expect(adminPage.getByText('1 participant left')).toBeVisible();
+            await expect(adminPage.getByText('Voter 1', { exact: true })).not.toBeVisible();
+
+            await adminPage.getByText('1 participant left').click();
+            await expect(adminPage.getByText('Voter 1', { exact: true })).toBeVisible();
+            await expect(adminPage.getByText('Left', { exact: true })).toBeVisible();
+
+            await adminPage.getByRole('button', { name: 'Clear left participants' }).click();
+
+            await expect(adminPage.getByText('Participants (1)')).toBeVisible();
+            await expect(adminPage.getByText('Voter 1', { exact: true })).toHaveCount(0);
+        } finally {
+            await voterContext?.close();
+            await adminContext.close();
+        }
+    });
+
     test('promotion to co-admin grants the reveal control', async ({ browser }) => {
         const { adminContext, adminPage, roomCode } = await createRoom(browser);
         let voterContext: BrowserContext | undefined;

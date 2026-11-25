@@ -19,6 +19,7 @@ export const createMockSocketValue = (
     changeDeck: vi.fn(),
     clearError: vi.fn(),
     clearKickedMessage: vi.fn(),
+    clearOfflineParticipants: vi.fn(),
     createRoom: vi.fn(),
     currentUserId: 'user_1',
     deleteStory: vi.fn(),

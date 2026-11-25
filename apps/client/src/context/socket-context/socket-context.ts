@@ -8,6 +8,7 @@ export interface SocketContextValue {
     changeDeck: (deckType: DeckType, customDeck?: (number | string)[]) => void;
     clearError: () => void;
     clearKickedMessage: () => void;
+    clearOfflineParticipants: () => void;
     createRoom: (
         name: string,
         avatar: string,

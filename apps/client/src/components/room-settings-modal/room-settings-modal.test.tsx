@@ -134,6 +134,19 @@ describe('RoomSettingsModal', () => {
         expect(onClose).not.toHaveBeenCalled();
     });
 
+    it('freezes every control once the session has ended', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ roomState: buildRoomState({ isEnded: true }) })
+        );
+        render(<RoomSettingsModal onClose={vi.fn()} open />);
+
+        expect(screen.getByRole('button', { name: 'Apply Settings' })).toBeDisabled();
+        expect(screen.getByLabelText('Room / Sprint Title')).toBeDisabled();
+        expect(screen.getByLabelText('Estimation Deck Type')).toBeDisabled();
+        expect(screen.getByRole('switch', { name: 'Auto-Reveal Votes' })).toBeDisabled();
+        expect(screen.getByRole('switch', { name: 'Lock Room' })).toBeDisabled();
+    });
+
     it('confirms ending the session with an Ant Design Popconfirm', async () => {
         const socket = createMockSocketValue({ roomState: buildRoomState() });
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);

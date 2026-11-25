@@ -139,7 +139,11 @@ export const ResultsPanel: React.FC = () => {
                             </Tag>
                         </Flex>
                     ) : (
-                        isAdmin && (
+                        // A closed session is read-only: the accepted score is
+                        // final, so neither a manual override nor a new accept
+                        // would be applied by the server.
+                        isAdmin &&
+                        !roomState.isEnded && (
                             <Flex gap={8} justify="end" wrap>
                                 <Button
                                     icon={<EditOutlined />}
