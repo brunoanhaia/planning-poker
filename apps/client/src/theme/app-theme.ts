@@ -55,6 +55,18 @@ const ERROR_COLOR: Record<ColorMode, string> = {
     light: '#cf1322',
 };
 
+/** Hover red, kept readable against text and as a solid danger background. */
+const ERROR_HOVER_COLOR: Record<ColorMode, string> = {
+    dark: '#ffa39e',
+    light: '#d4380d',
+};
+
+/** Pressed red, kept readable against text and as a solid danger background. */
+const ERROR_ACTIVE_COLOR: Record<ColorMode, string> = {
+    dark: '#ffc9c9',
+    light: '#a8071a',
+};
+
 /** Text colour Ant Design paints on a solid danger button, per scheme. */
 const DANGER_SOLID_TEXT_COLOR: Record<ColorMode, string> = {
     dark: '#141414',
@@ -94,7 +106,11 @@ export const getAppTheme = (mode: ColorMode): ThemeConfig => ({
     },
     token: {
         colorError: ERROR_COLOR[mode],
+        colorErrorActive: ERROR_ACTIVE_COLOR[mode],
+        colorErrorHover: ERROR_HOVER_COLOR[mode],
         colorErrorText: ERROR_COLOR[mode],
+        colorErrorTextActive: ERROR_ACTIVE_COLOR[mode],
+        colorErrorTextHover: ERROR_HOVER_COLOR[mode],
         colorPrimary: PRIMARY_COLOR,
         colorTextDescription: DESCRIPTION_TEXT_COLOR[mode],
     },

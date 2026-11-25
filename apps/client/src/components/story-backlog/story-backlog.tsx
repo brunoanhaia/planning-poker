@@ -262,9 +262,12 @@ export const StoryBacklog: React.FC = () => {
         setDescription('');
     };
 
+    // The server freezes content changes at the end; the dialogs and their
+    // submit callbacks mirror that so an already-open dialog cannot report a
+    // successful mutation the server refused.
     const handleCreateStory = (event: React.FormEvent) => {
         event.preventDefault();
-        if (!title.trim()) {
+        if (roomState.isEnded || !title.trim()) {
             return;
         }
         addStory(title.trim(), description.trim() || undefined);
@@ -272,6 +275,9 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const handleBulkImport = () => {
+        if (roomState.isEnded) {
+            return;
+        }
         const parsed = parseBulkStories(bulkText);
         // A room holds a bounded backlog, and the import travels as a bounded
         // number of frames, so the paste is capped at what the room can still
@@ -306,6 +312,9 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const openScoreDraft = (story: Story) => {
+        if (roomState.isEnded) {
+            return;
+        }
         setScoreDraft({ currentScore: story.finalEstimate, id: story.id, title: story.title });
         setEditScoreValue(
             story.finalEstimate !== undefined && story.finalEstimate !== null
@@ -320,7 +329,7 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const saveScoreDraft = () => {
-        if (!scoreDraft || !editScoreValue.trim()) {
+        if (roomState.isEnded || !scoreDraft || !editScoreValue.trim()) {
             return;
         }
         updateStoryEstimate(scoreDraft.id, toFinalEstimate(editScoreValue.trim()));
@@ -443,9 +452,9 @@ export const StoryBacklog: React.FC = () => {
                     <Flex gap={8} justify="space-between" wrap>
                         <Button
                             danger
-                            disabled={scoreDraft?.currentScore == null}
+                            disabled={scoreDraft?.currentScore == null || roomState.isEnded}
                             onClick={() => {
-                                if (scoreDraft) {
+                                if (scoreDraft && !roomState.isEnded) {
                                     updateStoryEstimate(scoreDraft.id, null);
                                     closeScoreDraft();
                                 }
@@ -466,7 +475,7 @@ export const StoryBacklog: React.FC = () => {
                     </Flex>
                 }
                 onCancel={closeScoreDraft}
-                open={Boolean(scoreDraft)}
+                open={Boolean(scoreDraft) && !roomState.isEnded}
                 title={t('backlog.edit.title')}
             >
                 <Flex gap={12} vertical>
@@ -497,7 +506,7 @@ export const StoryBacklog: React.FC = () => {
                 okText={t('backlog.import.button')}
                 onCancel={() => setIsBulkOpen(false)}
                 onOk={handleBulkImport}
-                open={isBulkOpen}
+                open={isBulkOpen && !roomState.isEnded}
                 title={t('backlog.import.title')}
             >
                 <Flex gap={12} vertical>
@@ -520,12 +529,12 @@ export const StoryBacklog: React.FC = () => {
                 okText={t('backlog.change.ok')}
                 onCancel={() => setPendingStoryIndex(null)}
                 onOk={() => {
-                    if (pendingStoryIndex !== null) {
+                    if (pendingStoryIndex !== null && !roomState.isEnded) {
                         setCurrentStory(pendingStoryIndex);
                         setPendingStoryIndex(null);
                     }
                 }}
-                open={pendingStoryIndex !== null}
+                open={pendingStoryIndex !== null && !roomState.isEnded}
                 title={t('backlog.change.title')}
             >
                 <Typography.Paragraph>{t('backlog.change.body')}</Typography.Paragraph>
