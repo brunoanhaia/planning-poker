@@ -196,6 +196,9 @@ test.describe('Rounds and Session Summary', () => {
             await summaryDialog.getByRole('button', { name: /Export/i }).click();
             const download = await downloadPromise;
 
+            // The summary must not reuse the backlog marker in its filename.
+            expect(download.suggestedFilename()).toBe('Export_Test_Session_Session_Summary.csv');
+
             // Verify CSV content
             const csvContent = await readDownloadContent(download);
             const lines = csvContent

@@ -17,9 +17,12 @@ import React from 'react';
 import { useSocket } from '../../context/socket-context/use-socket';
 import { useTranslation } from '../../i18n/use-translation';
 import { buildSessionSummary } from '../../utils/estimation-stats';
-import { buildBacklogCsvFilename } from '../story-backlog/story-backlog.utils';
 import { StoryBreakdown } from '../story-breakdown/story-breakdown';
-import { buildSummaryCsv, formatDuration } from './session-summary.utils';
+import {
+    buildSessionSummaryCsvFilename,
+    buildSummaryCsv,
+    formatDuration,
+} from './session-summary.utils';
 
 export interface SessionSummaryProps {
     /** Closes the summary overlay. */
@@ -32,7 +35,7 @@ export interface SessionSummaryProps {
 const downloadSummaryCsv = (roomTitle: string, csv: string): void => {
     const link = document.createElement('a');
     link.setAttribute('href', `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`);
-    link.setAttribute('download', buildBacklogCsvFilename(`${roomTitle} summary`));
+    link.setAttribute('download', buildSessionSummaryCsvFilename(roomTitle));
     document.body.appendChild(link);
     link.click();
     link.remove();
