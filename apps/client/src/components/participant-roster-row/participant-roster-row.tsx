@@ -117,7 +117,7 @@ export const ParticipantRosterRow: React.FC<ParticipantRosterRowProps> = ({
                     <Badge status="success" text={t('participants.voted')} />
                 )}
                 {participant.isSpectator && (
-                    <Tag icon={<EyeOutlined />}>{t('participants.spectator')}</Tag>
+                    <Tag icon={<EyeOutlined aria-hidden />}>{t('participants.spectator')}</Tag>
                 )}
 
                 {canManage && (

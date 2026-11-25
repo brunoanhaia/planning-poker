@@ -104,7 +104,7 @@ describe('ParticipantsPanel', () => {
         expect(screen.getByText('Participants (3 online / 4)')).toBeInTheDocument();
         expect(screen.queryByText('Dora Departed')).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByText('1 participant left'));
+        fireEvent.click(screen.getByRole('button', { name: 'Show 1 participant who left' }));
 
         expect(await screen.findByText('Dora Departed')).toBeInTheDocument();
         expect(screen.getByText('Left')).toBeInTheDocument();
@@ -117,7 +117,7 @@ describe('ParticipantsPanel', () => {
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
         render(<ParticipantsPanel />);
 
-        fireEvent.click(screen.getByText('1 participant left'));
+        fireEvent.click(screen.getByRole('button', { name: 'Show 1 participant who left' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Clear left participants' }));
 
         expect(socket.clearOfflineParticipants).toHaveBeenCalledTimes(1);

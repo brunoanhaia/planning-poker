@@ -20,7 +20,9 @@ export const LanguageSwitcher: React.FC = () => {
 
     const items: MenuProps['items'] = LANGUAGES.map((code: Language) => ({
         key: code,
-        label: t(`language.${code}`),
+        // The language name is a part in another language, so it carries its
+        // own `lang` for screen readers.
+        label: <span lang={code}>{t(`language.${code}`)}</span>,
     }));
 
     return (
@@ -36,6 +38,7 @@ export const LanguageSwitcher: React.FC = () => {
             <Tooltip title={t('nav.language')}>
                 <Button
                     aria-label={t('nav.language.current', {
+                        code: LANGUAGE_SHORT_LABELS[language],
                         language: t(`language.${language}`),
                     })}
                     icon={<GlobalOutlined aria-hidden />}

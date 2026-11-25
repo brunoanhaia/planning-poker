@@ -41,12 +41,35 @@ const DESCRIPTION_TEXT_COLOR: Record<ColorMode, string> = {
 };
 
 /**
+ * Error text and danger-button colour.
+ *
+ * Ant Design's stock `colorError`/`colorErrorText` measures 3.27:1 on white and
+ * 3.89:1 on the dark elevated surface, both below the 4.5:1 WCAG AA threshold
+ * for normal text. These values clear it on every surface the application
+ * renders: `#cf1322` on white is 5.57:1, and `#ff7875` is 7.19:1 on the dark
+ * layout. A solid danger button keeps its text readable by switching to a dark
+ * label on the light red in the dark scheme.
+ */
+const ERROR_COLOR: Record<ColorMode, string> = {
+    dark: '#ff7875',
+    light: '#cf1322',
+};
+
+/** Text colour Ant Design paints on a solid danger button, per scheme. */
+const DANGER_SOLID_TEXT_COLOR: Record<ColorMode, string> = {
+    dark: '#141414',
+    light: '#ffffff',
+};
+
+/**
  * Builds the global Ant Design theme for a colour scheme.
  *
  * Rendering uses stock Ant Design tokens; the only overrides are WCAG AA
  * contrast corrections for two combinations Ant Design itself does not pass:
  *
  * - description text, at 4.42:1 on the dark layout background;
+ * - error text and danger buttons, at 3.27:1 on white and 3.89:1 on the dark
+ *   elevated surface;
  * - the selected tab label, which Ant Design paints in `colorPrimary`
  *   (3.55:1 on a dark card and 4.10:1 on white);
  * - white text on the light primary button, at 4.10:1.
@@ -61,12 +84,17 @@ const DESCRIPTION_TEXT_COLOR: Record<ColorMode, string> = {
 export const getAppTheme = (mode: ColorMode): ThemeConfig => ({
     algorithm: mode === 'dark' ? DARK_MODE_ALGORITHM : LIGHT_MODE_ALGORITHM,
     components: {
+        Button: {
+            dangerColor: DANGER_SOLID_TEXT_COLOR[mode],
+        },
         Tabs: {
             itemColor: DESCRIPTION_TEXT_COLOR[mode],
             itemSelectedColor: PRIMARY_TEXT_COLOR[mode],
         },
     },
     token: {
+        colorError: ERROR_COLOR[mode],
+        colorErrorText: ERROR_COLOR[mode],
         colorPrimary: PRIMARY_COLOR,
         colorTextDescription: DESCRIPTION_TEXT_COLOR[mode],
     },

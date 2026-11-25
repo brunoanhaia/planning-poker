@@ -9,7 +9,7 @@ describe('LanguageSwitcher', () => {
         render(<LanguageSwitcher />);
 
         const button = screen.getByRole('button', {
-            name: 'Change language (current: English)',
+            name: 'Change language, current EN (English)',
         });
         expect(button).toHaveTextContent('EN');
     });

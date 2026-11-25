@@ -1,6 +1,18 @@
 import { DECK_TYPES, DeckType, PRESET_DECKS } from '@planitpoker/shared';
-import { Button, Divider, Flex, Input, Modal, Popconfirm, Select, Switch, Typography } from 'antd';
-import React, { useState } from 'react';
+import {
+    Alert,
+    Button,
+    Divider,
+    Flex,
+    Input,
+    InputRef,
+    Modal,
+    Popconfirm,
+    Select,
+    Switch,
+    Typography,
+} from 'antd';
+import React, { useRef, useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
 import { deckLabelKey } from '../../i18n/dictionary';
@@ -44,6 +56,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
     const [deckTypeDraft, setDeckTypeDraft] = useState<null | DeckType>(null);
     const [customDeckDraft, setCustomDeckDraft] = useState<null | string>(null);
     const [customDeckError, setCustomDeckError] = useState<CustomDeckError | null>(null);
+    const customDeckInputRef = useRef<InputRef>(null);
 
     if (!roomState || !isAdmin) {
         return null;
@@ -73,6 +86,9 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         const customDeckRule = parsedCustomDeck ? validateCustomDeck(parsedCustomDeck) : null;
         if (customDeckRule) {
             setCustomDeckError(customDeckRule);
+            // The alert is announced, and focus moves to the field that needs
+            // fixing so keyboard and screen-reader users land on the cause.
+            customDeckInputRef.current?.focus();
             return;
         }
 
@@ -106,22 +122,30 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         onClose();
     };
 
+    /** Dismisses the dialog and drops a validation error from the previous attempt. */
+    const handleCancel = () => {
+        setCustomDeckError(null);
+        onClose();
+    };
+
     return (
         <Modal
             footer={
                 <Flex gap={8} justify="end">
-                    <Button onClick={onClose}>{t('common.cancel')}</Button>
+                    <Button onClick={handleCancel}>{t('common.cancel')}</Button>
                     <Button disabled={isReadOnly} onClick={handleSave} type="primary">
                         {t('settings.apply')}
                     </Button>
                 </Flex>
             }
-            onCancel={onClose}
+            onCancel={handleCancel}
             open={open}
             title={t('settings.title')}
         >
             <Flex gap={12} vertical>
                 <Typography.Text type="secondary">{t('settings.description')}</Typography.Text>
+
+                {isReadOnly && <Alert showIcon title={t('settings.readOnly')} type="info" />}
 
                 <div>
                     <label htmlFor="room-settings-title">{t('nav.roomTitle')}</label>
@@ -168,17 +192,20 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                                 setCustomDeckError(null);
                             }}
                             placeholder={t('settings.customCards.placeholder')}
+                            ref={customDeckInputRef}
+                            status={customDeckError ? 'error' : undefined}
                             value={customDeck}
                         />
-                        {customDeckError && (
-                            <Typography.Text
-                                id="room-settings-custom-deck-error"
-                                role="alert"
-                                type="danger"
-                            >
-                                {t(customDeckError.key, customDeckError.params)}
-                            </Typography.Text>
-                        )}
+                        {/* The live region stays mounted: a region inserted with
+                            its content already inside is often skipped by screen
+                            readers, so only the message is conditional. */}
+                        <Typography.Text
+                            id="room-settings-custom-deck-error"
+                            role="alert"
+                            type="danger"
+                        >
+                            {customDeckError ? t(customDeckError.key, customDeckError.params) : ''}
+                        </Typography.Text>
                     </div>
                 ) : (
                     <Typography.Text type="secondary">

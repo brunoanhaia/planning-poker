@@ -120,7 +120,9 @@ export const Home: React.FC = () => {
                         </Typography.Paragraph>
                     </Flex>
 
-                    {error && <Alert closable onClose={clearError} title={error} type="error" />}
+                    {error && (
+                        <Alert closable={{ onClose: clearError }} title={error} type="error" />
+                    )}
 
                     <Card>
                         <Flex gap={16} vertical>

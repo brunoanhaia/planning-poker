@@ -111,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                     <Tooltip title={t('nav.rename')}>
                                         <Button
                                             aria-label={t('nav.rename')}
-                                            icon={<EditOutlined />}
+                                            icon={<EditOutlined aria-hidden />}
                                             onClick={openRename}
                                             size="small"
                                             type="text"
@@ -129,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
 
                         {roomState.isLocked && (
                             <Tooltip title={t('nav.locked.hint')}>
-                                <Tag icon={<LockOutlined />}>{t('nav.locked')}</Tag>
+                                <Tag icon={<LockOutlined aria-hidden />}>{t('nav.locked')}</Tag>
                             </Tooltip>
                         )}
 
@@ -138,7 +138,9 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             are native, so no keyboard handler is needed. */}
                         <Tooltip title={t('nav.copy.hint')}>
                             <Button
-                                aria-label={t('nav.copy.aria', { code: roomState.id })}
+                                aria-label={t('nav.copy.aria', {
+                                    room: t('nav.room', { code: roomState.id }),
+                                })}
                                 icon={<CopyOutlined aria-hidden />}
                                 onClick={handleCopyLink}
                                 type="text"
@@ -165,7 +167,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             <Tooltip title={t('nav.settings')}>
                                 <Button
                                     aria-label={t('nav.settings')}
-                                    icon={<SettingOutlined />}
+                                    icon={<SettingOutlined aria-hidden />}
                                     onClick={onOpenSettings}
                                     type="text"
                                 />
@@ -183,7 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             <Button
                                 aria-label={t('nav.leave')}
                                 danger
-                                icon={<LogoutOutlined />}
+                                icon={<LogoutOutlined aria-hidden />}
                                 onClick={leaveRoom}
                                 type="text"
                             />

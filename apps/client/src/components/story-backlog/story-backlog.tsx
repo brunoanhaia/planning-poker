@@ -13,17 +13,17 @@ import {
     Badge,
     Button,
     Card,
-    Divider,
     Empty,
     Flex,
     Input,
     Modal,
     Space,
     Tag,
+    theme,
     Tooltip,
     Typography,
 } from 'antd';
-import React, { Fragment, useState } from 'react';
+import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
 import { Translate } from '../../i18n/i18n-context';
@@ -101,6 +101,8 @@ interface StoryRowProps {
     isAdmin: boolean;
     isEnded: boolean;
     isFirst: boolean;
+    /** Colour of the separator drawn above a row that follows another one. */
+    separatorColor: string;
     showDelete: boolean;
     story: Story;
     t: Translate;
@@ -114,6 +116,7 @@ const renderStoryRow = ({
     isAdmin,
     isEnded,
     isFirst,
+    separatorColor,
     showDelete,
     story,
     t,
@@ -121,100 +124,101 @@ const renderStoryRow = ({
     const hasEstimate = story.finalEstimate !== undefined && story.finalEstimate !== null;
 
     return (
-        <Fragment key={story.id}>
-            {!isFirst && <Divider style={{ margin: 0 }} />}
-            <Flex
-                align="center"
-                component="li"
-                gap={8}
-                justify="space-between"
-                style={{ padding: PANEL_PADDING }}
-                wrap
-            >
-                <Flex gap={4} style={{ flex: 1, minWidth: 0 }} vertical>
-                    <Space align="center" size={4} wrap>
-                        <Typography.Text
-                            ellipsis={{ tooltip: story.title }}
-                            strong
-                            style={{ maxWidth: STORY_TITLE_MAX_WIDTH }}
-                        >
-                            {`${index + 1}. ${story.title}`}
-                        </Typography.Text>
-                        {renderStoryStatus(story.status, t)}
-                        {hasEstimate && (
-                            <Tag>
-                                {t('backlog.score', {
-                                    value: String(story.finalEstimate),
-                                })}
-                            </Tag>
-                        )}
-                        {story.rounds.length > 0 && (
-                            <Tag>
-                                {t('backlog.rounds', {
-                                    count: story.rounds.length,
-                                })}
-                            </Tag>
-                        )}
-                    </Space>
-                    {story.description && (
-                        <Typography.Text type="secondary">{story.description}</Typography.Text>
+        <Flex
+            align="center"
+            component="li"
+            gap={8}
+            justify="space-between"
+            key={story.id}
+            style={{
+                borderTop: isFirst ? undefined : `1px solid ${separatorColor}`,
+                padding: PANEL_PADDING,
+            }}
+            wrap
+        >
+            <Flex gap={4} style={{ flex: 1, minWidth: 0 }} vertical>
+                <Space align="center" size={4} wrap>
+                    <Typography.Text
+                        ellipsis={{ tooltip: story.title }}
+                        strong
+                        style={{ maxWidth: STORY_TITLE_MAX_WIDTH }}
+                    >
+                        {`${index + 1}. ${story.title}`}
+                    </Typography.Text>
+                    {renderStoryStatus(story.status, t)}
+                    {hasEstimate && (
+                        <Tag>
+                            {t('backlog.score', {
+                                value: String(story.finalEstimate),
+                            })}
+                        </Tag>
                     )}
-                </Flex>
+                    {story.rounds.length > 0 && (
+                        <Tag>
+                            {t('backlog.rounds', {
+                                count: story.rounds.length,
+                            })}
+                        </Tag>
+                    )}
+                </Space>
+                {story.description && (
+                    <Typography.Text type="secondary">{story.description}</Typography.Text>
+                )}
+            </Flex>
 
-                <Space size={4}>
-                    <Tooltip title={t('backlog.breakdown')}>
-                        <Button
-                            aria-label={t('backlog.breakdown')}
-                            icon={<ProfileOutlined />}
-                            onClick={() => actions.onBreakdown(story.id)}
-                            size="small"
-                            type="text"
-                        />
-                    </Tooltip>
+            <Space size={4}>
+                <Tooltip title={t('backlog.breakdown')}>
+                    <Button
+                        aria-label={t('backlog.breakdown')}
+                        icon={<ProfileOutlined />}
+                        onClick={() => actions.onBreakdown(story.id)}
+                        size="small"
+                        type="text"
+                    />
+                </Tooltip>
 
-                    {isAdmin && !isEnded && (
-                        <>
-                            <Tooltip title={t('backlog.edit.aria', { title: story.title })}>
+                {isAdmin && !isEnded && (
+                    <>
+                        <Tooltip title={t('backlog.edit.aria', { title: story.title })}>
+                            <Button
+                                aria-label={t('backlog.edit.aria', { title: story.title })}
+                                icon={<EditOutlined />}
+                                onClick={() => actions.onEdit(story)}
+                                size="small"
+                                type="text"
+                            />
+                        </Tooltip>
+                        {!isActive && (
+                            <Tooltip title={t('backlog.estimate.aria', { title: story.title })}>
                                 <Button
-                                    aria-label={t('backlog.edit.aria', { title: story.title })}
-                                    icon={<EditOutlined />}
-                                    onClick={() => actions.onEdit(story)}
+                                    aria-label={t('backlog.estimate.aria', {
+                                        title: story.title,
+                                    })}
+                                    icon={<PlayCircleOutlined />}
+                                    onClick={() => actions.onEstimate(index)}
                                     size="small"
                                     type="text"
                                 />
                             </Tooltip>
-                            {!isActive && (
-                                <Tooltip title={t('backlog.estimate.aria', { title: story.title })}>
-                                    <Button
-                                        aria-label={t('backlog.estimate.aria', {
-                                            title: story.title,
-                                        })}
-                                        icon={<PlayCircleOutlined />}
-                                        onClick={() => actions.onEstimate(index)}
-                                        size="small"
-                                        type="text"
-                                    />
-                                </Tooltip>
-                            )}
-                            {showDelete && (
-                                <Tooltip title={t('backlog.delete.aria', { title: story.title })}>
-                                    <Button
-                                        aria-label={t('backlog.delete.aria', {
-                                            title: story.title,
-                                        })}
-                                        danger
-                                        icon={<DeleteOutlined />}
-                                        onClick={() => actions.onDelete(story.id)}
-                                        size="small"
-                                        type="text"
-                                    />
-                                </Tooltip>
-                            )}
-                        </>
-                    )}
-                </Space>
-            </Flex>
-        </Fragment>
+                        )}
+                        {showDelete && (
+                            <Tooltip title={t('backlog.delete.aria', { title: story.title })}>
+                                <Button
+                                    aria-label={t('backlog.delete.aria', {
+                                        title: story.title,
+                                    })}
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    onClick={() => actions.onDelete(story.id)}
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
+                        )}
+                    </>
+                )}
+            </Space>
+        </Flex>
     );
 };
 
@@ -236,6 +240,7 @@ export const StoryBacklog: React.FC = () => {
     } = useSocket();
     const { message } = AntApp.useApp();
     const { t } = useTranslation();
+    const { token } = theme.useToken();
 
     const [isAdding, setIsAdding] = useState(false);
     const [title, setTitle] = useState('');
@@ -423,6 +428,7 @@ export const StoryBacklog: React.FC = () => {
                                 isAdmin,
                                 isEnded: roomState.isEnded,
                                 isFirst: index === 0,
+                                separatorColor: token.colorSplit,
                                 showDelete: roomState.stories.length > 1,
                                 story,
                                 t,
