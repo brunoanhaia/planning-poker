@@ -22,6 +22,7 @@ import {
 import { DEFAULT_AVATAR, DEFAULT_HOST_COLOR, DEFAULT_TIMER_DURATION_SECONDS } from './constants.js';
 import { generateRoomId, generateRoundId, generateStoryId, generateUserId } from './idGenerator.js';
 import {
+    clearOfflineParticipants as clearOfflineParticipantsFromRoom,
     joinParticipant,
     JoinParticipantResult,
     kickParticipant,
@@ -336,6 +337,21 @@ export class RoomManager {
             return null;
         }
         return removeParticipant(room, userId);
+    }
+
+    /**
+     * Drops every participant who is no longer connected (admin-only).
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin or co-host requesting the cleanup.
+     * @returns Updated RoomState or null if unauthorized.
+     */
+    public clearOfflineParticipants(roomId: string, userId: string): RoomState | null {
+        const room = this.getRoom(roomId);
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
+        return clearOfflineParticipantsFromRoom(room);
     }
 
     /**
@@ -772,7 +788,23 @@ export class RoomManager {
         if (!room || !this.isUserAdmin(room, userId)) {
             return null;
         }
-        return deleteStoryFromRoom(room, storyId);
+
+        const previousStoryId = room.stories[room.currentStoryIndex]?.id ?? null;
+        const updated = deleteStoryFromRoom(room, storyId);
+        if (!updated) {
+            return null;
+        }
+
+        // The votes and the countdown belonged to the story that just vanished.
+        // When a different story becomes active, both have to start over rather
+        // than carry the removed story's round into the new one.
+        const currentStoryId = updated.stories[updated.currentStoryIndex]?.id ?? null;
+        if (currentStoryId !== previousStoryId) {
+            this.resetRoomVotes(room);
+            this.resetRoomTimer(room);
+        }
+
+        return updated;
     }
 
     /**
@@ -861,6 +893,11 @@ export class RoomManager {
         if (!room.isEnded) {
             room.isEnded = true;
             room.endedAt = Date.now();
+        }
+        // A countdown left running after the session closes would keep ticking
+        // and broadcasting a clock nobody can act on.
+        if (room.timer) {
+            room.timer.isRunning = false;
         }
         return room;
     }

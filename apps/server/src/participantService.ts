@@ -197,6 +197,37 @@ export const removeParticipant = (room: RoomState, userId: string): RoomState =>
 };
 
 /**
+ * Removes every participant who is no longer connected.
+ *
+ * The caller proves it is an administrator before reaching this function. At
+ * least one online participant is kept, so a socket command can never empty the
+ * room on its own; if the host was among the ghosts, the remaining online
+ * administrator (or the first online participant) inherits the role, the same
+ * way a normal disconnect hands it over.
+ *
+ * @param room - The active room state.
+ * @returns The updated RoomState.
+ */
+export const clearOfflineParticipants = (room: RoomState): RoomState => {
+    const onlineParticipants = room.participants.filter((participant) => participant.isOnline);
+    if (onlineParticipants.length === 0) {
+        return room;
+    }
+
+    room.participants = onlineParticipants;
+
+    if (!onlineParticipants.some((participant) => participant.id === room.hostId)) {
+        const nextHost =
+            onlineParticipants.find((participant) => participant.isAdmin) ?? onlineParticipants[0];
+        nextHost.isHost = true;
+        nextHost.isAdmin = true;
+        room.hostId = nextHost.id;
+    }
+
+    return room;
+};
+
+/**
  * Submits an estimation vote for a participant and handles auto-reveal triggers.
  *
  * @param room - The active room state.
@@ -218,6 +249,9 @@ export const submitVoteForParticipant = (
     participant.hasVoted = true;
 
     if (room.autoReveal) {
+        // Completion is measured against the people who are still here. A voter
+        // who closed the tab keeps their card for the reveal, but waiting on a
+        // disconnected browser would block the round indefinitely.
         const activeVoters = room.participants.filter((p) => !p.isSpectator && p.isOnline);
         const allVoted = activeVoters.length > 0 && activeVoters.every((p) => p.hasVoted);
         if (allVoted) {

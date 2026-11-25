@@ -113,6 +113,12 @@ export const setRoomCurrentStory = (room: RoomState, storyIndex: number): RoomSt
     room.stories.forEach((story, index) => {
         if (index === storyIndex) {
             story.status = 'estimating';
+            return;
+        }
+        // Only the active story is being estimated; leaving the previous one
+        // behind made the backlog show two `estimating` badges at once.
+        if (story.status === 'estimating') {
+            story.status = 'pending';
         }
     });
 
@@ -143,16 +149,43 @@ export const updateStoryEstimateInRoom = (
 };
 
 /**
- * Deletes a story from the room backlog and adjusts the active index if needed.
+ * Deletes a story from the room backlog and keeps the active index coherent.
+ *
+ * Removing a story before the active one shifts every following index, so the
+ * pointer has to move with the list. Removing the active story promotes the
+ * story that takes its place (or the previous one when it was last) and marks
+ * it as the one being estimated.
  *
  * @param room - The active room state.
  * @param storyId - The identifier of the story to delete.
- * @returns The updated RoomState.
+ * @returns The updated RoomState, or null when the story does not exist.
  */
-export const deleteStoryFromRoom = (room: RoomState, storyId: string): RoomState => {
-    room.stories = room.stories.filter((s) => s.id !== storyId);
-    if (room.currentStoryIndex >= room.stories.length) {
-        room.currentStoryIndex = Math.max(0, room.stories.length - 1);
+export const deleteStoryFromRoom = (room: RoomState, storyId: string): RoomState | null => {
+    const deletedIndex = room.stories.findIndex((story) => story.id === storyId);
+    if (deletedIndex === -1) {
+        return null;
     }
+
+    const wasCurrent = deletedIndex === room.currentStoryIndex;
+    room.stories = room.stories.filter((story) => story.id !== storyId);
+
+    if (deletedIndex < room.currentStoryIndex) {
+        // The active story is still there, one position earlier.
+        room.currentStoryIndex -= 1;
+        return room;
+    }
+
+    if (!wasCurrent) {
+        return room;
+    }
+
+    // The active story is gone: clamp to the last remaining position and make
+    // that story the one under estimation, so the badge follows the room.
+    room.currentStoryIndex = Math.max(0, Math.min(room.currentStoryIndex, room.stories.length - 1));
+    const currentStory = room.stories[room.currentStoryIndex];
+    if (currentStory) {
+        currentStory.status = 'estimating';
+    }
+
     return room;
 };
