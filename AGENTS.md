@@ -210,9 +210,23 @@ Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. On
 - Skills are loaded **on demand**: the `description` is matched against the request, and the full `SKILL.md` is read only on a hit.
   The directory name must match the frontmatter `name`; a mismatch is an exception the loader does not tolerate, so rename one of them.
     - UI / architecture: `accessible-ui-components`, `isolated-component-design`, `modular-css-architecture`, `react-clean-architecture`
+    - UI / Ant Design 6: `ant-design` (decision guide for tokens, theming, a11y, migration) and `antd` (offline `@ant-design/cli` lookups; needs `npm i -g @ant-design/cli`)
     - Code quality: `clean-code-refactoring`
+    - Testing: `playwright-best-practices` (E2E including axe and WebSockets) and `vitest`
+    - Performance: `vercel-react-best-practices` — React 19 rules; skip the Next.js/RSC sections, which do not apply to this Vite client
+    - Accessibility audit: `accessibility` (WCAG 2.2 with Lighthouse/axe) — audit-time counterpart of `accessible-ui-components`
+    - Security: `security-review` (OWASP review for the Express and `ws` surface)
     - Real-time: `realtime-websocket-manager` (native WebSockets, not the `socket.io` package)
     - Efficiency: `token-usage-best-practices` (canonical source for token-saving principles)
+
+Skills are installed **at project scope**, so they are committed under `.agents/skills/` and available to the team and to CI. Do not install them with `-g`: a global copy is invisible to CI and drifts from the pinned version. The install, list and update commands live in [`TOOLS.md`](./TOOLS.md#skills).
+
+Each third-party skill is pinned in `skills-lock.json` (`commit` + `computedHash`). Two rules follow:
+
+- Run `skills update` deliberately, never as part of another task. It rewrites the whole lockfile.
+- The v2 hash covers the whole skill folder. `skills add` has already left the `autofix` hash empty once; after any install or update, diff `skills-lock.json` and confirm every entry has a hash. Commit the downloaded `SKILL.md` files together with the lockfile.
+
+Version alignment matters: `ant-design` targets antd 6.x and React 18–19, `vitest` is generated from Vitest 5.1, and `antd` reads its metadata offline, so re-check a recommendation against the installed version before applying it.
 
 ### Rule Playbooks
 
@@ -227,7 +241,7 @@ Only YAML frontmatter fields that tooling actually implements should be used. `t
 
 ### Vendored CodeRabbit Skills
 
-CodeRabbit skills are vendored from `coderabbitai/skills` and pinned in `skills-lock.json`:
+The CodeRabbit skills are vendored from `coderabbitai/skills`, and their lockfile entries are pinned by hand rather than by `npx skills add`:
 
 - `code-review` — CodeRabbit CLI reviews plus finding triage (default for review requests).
 - `autofix` — fetch unresolved CodeRabbit PR threads, then apply validated fixes with per-change approval.

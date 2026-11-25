@@ -94,6 +94,19 @@ docker compose up --build   # client :80, server :5000
 - The same script through Nginx: `node apps/e2e/chaos/ws-chaos.mjs --http http://localhost:8080 --ws http://localhost:8080/ws`.
 - After a Playwright version bump, run `npx playwright install chromium`; the browser build is pinned per version.
 
+## Skills
+
+```bash
+npx skills add <owner/repo@skill>     # project scope; never -g
+npx skills add <owner/repo@skill> -y  # non-interactive
+npx skills list                       # installed skills and lock state
+npx skills update                     # rewrites skills-lock.json
+```
+
+- Installs land in `.agents/skills/` and are pinned in `skills-lock.json`; commit both together.
+- `npx skills update` rewrites every lock entry. Run it on its own, then diff `skills-lock.json` and confirm no `computedHash` is empty.
+- The `antd` skill calls `antd` from `@ant-design/cli`, which has to be installed globally: `npm i -g @ant-design/cli`.
+
 ## Lint, Format and Commits
 
 ```bash
