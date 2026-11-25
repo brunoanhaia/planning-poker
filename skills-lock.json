@@ -1,17 +1,73 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
+    "accessibility": {
+      "source": "addyosmani/web-quality-skills",
+      "commit": "afa8da942115f2961fdbfa80807ea0b232ff6c00",
+      "sourceType": "github",
+      "skillPath": "skills/accessibility/SKILL.md",
+      "computedHash": "c668809f5df57feb87cc06f1bc37fb340d1d92e26bacb6edbeab9258d22e76a5"
+    },
+    "ant-design": {
+      "source": "ant-design/antd-skill",
+      "commit": "e65d2d3da9a2a129885131f5aeffe2c9037f83cb",
+      "sourceType": "github",
+      "skillPath": "skills/ant-design/SKILL.md",
+      "computedHash": "dafacb3003b3e1ac788ad521ab5d3c17521b435350016aa692e5eda07a390ac9"
+    },
+    "antd": {
+      "source": "ant-design/antd-skill",
+      "commit": "e65d2d3da9a2a129885131f5aeffe2c9037f83cb",
+      "sourceType": "github",
+      "skillPath": "skills/antd/SKILL.md",
+      "computedHash": "8fbc642688c38278da459cda82863ac7d97a0b89e98aff4260a9fa3ae909c6b1"
+    },
     "autofix": {
       "source": "coderabbitai/skills",
       "sourceType": "github",
       "skillPath": "skills/autofix/SKILL.md",
-      "computedHash": "1c665af094b2a307a8ab149a4b6ee73097dac24a4fa533821d7cc2e7ede7b9cf"
+      "computedHash": "b2490634bfaea003ca660bf2faeba7377336fb5a90806c6e3ba85b95678488c2"
     },
     "code-review": {
       "source": "coderabbitai/skills",
       "sourceType": "github",
       "skillPath": "skills/code-review/SKILL.md",
-      "computedHash": "8693dd3d57986d051ea8faa504742c4f4cb707c9e48aea740d29f0dbb7bf04e0"
+      "computedHash": "a51461ef32e35f6352bc4f604e518c3fb414cb00ec36ebb85d2e8d875c4f1a5b"
+    },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "commit": "0b75b5835a87de1fdd202ba965f3bc5a27738fdf",
+      "sourceType": "github",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "computedHash": "111e9d3e9d63dea34814120fb6583c0b28ee45371662801d8e8d8bdf4b05dcb0"
+    },
+    "security-review": {
+      "source": "getsentry/skills",
+      "commit": "a582c51ee29d0f35e6ac321340796f77d43da733",
+      "sourceType": "github",
+      "skillPath": "skills/security-review/SKILL.md",
+      "computedHash": "4af8c6b37142b46cbbca40d5f5e6c505699b8785486a7306faf1b79dcce7ff47"
+    },
+    "typescript-advanced-types": {
+      "source": "wshobson/agents",
+      "commit": "c96b5f6552dba32e4492307493ee613581430715",
+      "sourceType": "github",
+      "skillPath": "plugins/javascript-typescript/skills/typescript-advanced-types/SKILL.md",
+      "computedHash": "34c5b3863fde1fc85981ac583ecaf0140471b374d0b7002ac5bc0bea2cf38b24"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "5a37a6329fbad3666c3207392a6a7c0110e92efb",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "7991ed4fbecdac23f47c1a40c243e00a212a9e7f3604db93959b3ae11dffe299"
+    },
+    "vitest": {
+      "source": "antfu/skills",
+      "commit": "4a6bb39e7b45e26402eb215393c51ccf5df1ca4c",
+      "sourceType": "github",
+      "skillPath": "skills/vitest/SKILL.md",
+      "computedHash": "bd95e41d66d76da9008893c9bc48c30f0a68f352cd2b00017767f5e4c129501d"
     }
   }
 }

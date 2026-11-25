@@ -1,0 +1,40 @@
+name: Skills lock
+
+on:
+    push:
+        branches: ['main']
+    pull_request:
+        branches: ['main']
+
+permissions:
+    contents: read
+
+jobs:
+    verify:
+        name: Verify vendored skills
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v7
+
+            - name: Set up Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci --ignore-scripts --no-audit --no-fund
+
+            # `skills list` hashes every vendored skill folder locally, so this needs
+            # no network beyond the install above. A mismatch means a SKILL.md was
+            # edited without refreshing skills-lock.json.
+            - name: Verify skills match the lockfile
+              run: |
+                  set -euo pipefail
+                  npm exec -- skills list | tee skills.txt
+                  if grep -q "differs from the lock" skills.txt; then
+                    echo "::error::A vendored skill differs from skills-lock.json. Reinstall it with 'npm exec -- skills add' and commit the updated lockfile."
+                    exit 1
+                  fi
