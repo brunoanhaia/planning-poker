@@ -1,0 +1,7 @@
+---
+# Vendored agent skills are third-party prompt material, not application code.
+# The Markdown must stay byte-identical to the `computedHash` in
+# skills-lock.json, and Codacy's Markdown tools would otherwise report every
+# upstream style choice as a new project issue.
+exclude_paths:
+    - '.agents/skills/**'

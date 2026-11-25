@@ -241,7 +241,7 @@ npm exec -- skills list    # installed skills and lock state
 npm exec -- skills add <owner/repo@skill>
 ```
 
-The `Skills lock` workflow fails when a vendored skill no longer matches its hash, so commit the `SKILL.md` files and the lockfile together.
+The `Skills lock` workflow fails when a vendored skill no longer matches its hash, so commit the `SKILL.md` files and the lockfile together. The vendored tree is excluded from Prettier, ESLint, Codacy and Sonar for the same reason: no formatter or analyzer may rewrite the pinned content.
 
 ## Deployment (Production)
 

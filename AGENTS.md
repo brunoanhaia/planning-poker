@@ -223,6 +223,8 @@ Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. On
 
 Skills are installed **at project scope**, so they are committed under `.agents/skills/` and available to the team and to CI. Do not install them with `-g`: a global copy is invisible to CI and drifts from the pinned version. The install, list and update commands live in [`TOOLS.md`](./TOOLS.md#skills).
 
+The whole `.agents/skills/` tree is excluded from Prettier, ESLint, Codacy and Sonar. The files are upstream prompt material, not project code: reformatting one changes its `computedHash`, and the Markdown linters would otherwise report every upstream style choice as a new issue.
+
 Each third-party skill is pinned in `skills-lock.json` (`commit` + `computedHash`). Three rules follow:
 
 - Run `skills update` deliberately, never as part of another task. It rewrites the whole lockfile.

@@ -38,6 +38,7 @@ export default tseslint.config(
             '**/coverage/**',
             '**/playwright-report/**',
             '**/test-results/**',
+            '.agents/skills/**',
         ],
     },
     ...tseslint.configs.recommended,
