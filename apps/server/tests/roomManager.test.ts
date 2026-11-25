@@ -94,6 +94,31 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(resetRoom.timer?.remaining).toBe(60);
     });
 
+    it('rewinds the countdown when the votes are reset', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.startTimer(roomId, hostId, 90);
+        rm.tickTimer(roomId);
+        rm.tickTimer(roomId);
+        expect(rm.getRoom(roomId)!.timer?.remaining).toBe(88);
+
+        rm.resetVotes(roomId, hostId);
+
+        // The new round starts from the configured duration, paused, instead of
+        // inheriting the last seconds of the round that was just discarded.
+        const timer = rm.getRoom(roomId)!.timer;
+        expect(timer?.remaining).toBe(90);
+        expect(timer?.isRunning).toBe(false);
+    });
+
+    it('leaves a room without a timer untouched when the votes are reset', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.resetVotes(roomId, hostId);
+
+        expect(rm.getRoom(roomId)!.timer).toBeNull();
+    });
+
     it('should allow admin to kick participant and toggle participant role', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
@@ -375,5 +400,24 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(room.stories[0].status).toBe('estimating');
         expect(room.votesRevealed).toBe(false);
         expect(room.stories[0].rounds).toHaveLength(1);
+    });
+
+    it('clears the accepted estimate and reopens the story when null is accepted', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const storyId = rm.getRoom(roomId)!.stories[0].id;
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+        rm.updateStoryEstimate(roomId, hostId, storyId, 5);
+
+        // `null` is a legitimate final estimate: it withdraws the accepted
+        // score instead of storing a value the deck cannot represent.
+        rm.updateStoryEstimate(roomId, hostId, storyId, null);
+
+        const story = rm.getRoom(roomId)!.stories[0];
+        expect(story.finalEstimate).toBeNull();
+        expect(story.status).toBe('pending');
+        // Clearing the estimate does not erase the revealed round.
+        expect(story.rounds).toHaveLength(1);
     });
 });

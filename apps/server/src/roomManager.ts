@@ -4,6 +4,7 @@ import {
     CardValue,
     DECK_TYPES,
     DeckType,
+    EstimateValue,
     MAX_CUSTOM_DECK_SIZE,
     MAX_ROOMS,
     MAX_ROUNDS_PER_STORY,
@@ -66,6 +67,23 @@ export class RoomManager {
             participant.vote = null;
             participant.hasVoted = false;
         });
+    }
+
+    /**
+     * Stops the countdown and restores its initial duration.
+     *
+     * A new round starts from the configured duration rather than from whatever
+     * was left of the previous one, so the timer must be rewound whenever the
+     * round itself is reset. A room with no timer is left untouched.
+     *
+     * @param room - The room whose timer is rewound.
+     */
+    private resetRoomTimer(room: RoomState): void {
+        if (!room.timer) {
+            return;
+        }
+        room.timer.remaining = room.timer.duration;
+        room.timer.isRunning = false;
     }
 
     /**
@@ -436,10 +454,7 @@ export class RoomManager {
             return null;
         }
 
-        if (room.timer) {
-            room.timer.remaining = room.timer.duration;
-            room.timer.isRunning = false;
-        }
+        this.resetRoomTimer(room);
         return room;
     }
 
@@ -563,6 +578,9 @@ export class RoomManager {
         }
 
         this.resetRoomVotes(room);
+        // A reset opens a new round, so a countdown left running from the
+        // previous one would time the new discussion from the wrong position.
+        this.resetRoomTimer(room);
 
         const story = room.stories[room.currentStoryIndex];
         if (story && (story.finalEstimate ?? null) !== null) {
@@ -732,7 +750,7 @@ export class RoomManager {
         roomId: string,
         userId: string,
         storyId: string,
-        estimate: CardValue
+        estimate: EstimateValue
     ): RoomState | null {
         const room = this.getRoom(roomId);
         if (!room || !this.isUserAdmin(room, userId)) {

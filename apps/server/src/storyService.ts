@@ -1,5 +1,5 @@
 import {
-    CardValue,
+    EstimateValue,
     MAX_DESCRIPTION_LENGTH,
     MAX_STORIES_PER_ROOM,
     MAX_TITLE_LENGTH,
@@ -130,7 +130,7 @@ export const setRoomCurrentStory = (room: RoomState, storyIndex: number): RoomSt
 export const updateStoryEstimateInRoom = (
     room: RoomState,
     storyId: string,
-    estimate: CardValue
+    estimate: EstimateValue
 ): RoomState | null => {
     const story = room.stories.find((s) => s.id === storyId);
     if (!story) {
