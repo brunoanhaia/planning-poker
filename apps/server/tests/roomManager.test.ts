@@ -777,4 +777,41 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(room.votesRevealed).toBe(true);
         expect(room.stories[0].rounds[0].votes.map((vote) => vote.vote)).toEqual([5]);
     });
+
+    it('does not auto-reveal when the session ends before a disconnect', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.endSession(roomId, hostId);
+        rm.leaveRoom(roomId, bobId);
+
+        // An ended session is read-only: a late disconnect cannot reveal or
+        // append a round after the summary was closed.
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(false);
+        expect(room.stories[0].rounds).toHaveLength(0);
+    });
+
+    it('keeps the recorded round when a voter is cleared after the reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.submitVote(roomId, bobId, 8);
+        rm.revealVotes(roomId, hostId);
+        const revealedVotes = structuredClone(rm.getRoom(roomId)!.stories[0].rounds[0].votes);
+
+        rm.leaveRoom(roomId, bobId);
+        rm.clearOfflineParticipants(roomId, hostId);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.participants.map((participant) => participant.id)).toEqual([hostId]);
+        expect(room.stories[0].rounds[0].votes).toEqual(revealedVotes);
+    });
 });

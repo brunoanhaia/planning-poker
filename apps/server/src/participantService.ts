@@ -152,13 +152,13 @@ export const joinParticipant = (
  * offline voter keeps their card for the reveal, but a disconnected browser
  * must not block the round indefinitely. The predicate is shared by the vote
  * path and the disconnect/leave path so the progress bar and the actual reveal
- * cannot disagree.
+ * cannot disagree. An ended session is never reopened by a late disconnect.
  *
  * @param room - The active room state.
  * @returns True when auto-reveal is enabled and every online voter has voted.
  */
 export const shouldAutoReveal = (room: RoomState): boolean => {
-    if (!room.autoReveal || room.votesRevealed || room.stories.length === 0) {
+    if (!room.autoReveal || room.isEnded || room.votesRevealed || room.stories.length === 0) {
         return false;
     }
 
