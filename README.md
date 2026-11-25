@@ -90,17 +90,18 @@ The application supports multiple users connecting to a single room to vote on t
     - Join a room using a unique URL.
     - Select a card to submit an estimate.
     - Toggle personal status between Voter and Spectator.
+    - **Presence**: the roster lists online participants first and collapses anyone who left behind a count; an offline voter's card still appears in the revealed round, but is not counted as an active voter.
     - View the current story backlog, with a per-story breakdown of every revealed round.
     - **Voting rounds**: re-voting a story keeps the previous rounds instead of erasing them, so the room can compare attempts before accepting a number.
     - **Result statistics**: average, median, consensus, top vote, voters and population standard deviation, plus the voters whose card falls outside 1.5 interquartile ranges.
-    - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it.
+    - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it. The ended room is read-only: the server refuses content changes with `SESSION_ENDED` and stops a running countdown.
     - **Interface languages**: English, Brazilian Portuguese and Spanish, switchable from the application bar and remembered across reloads.
     - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
 
 - **Administrative Features** (Restricted to Admin and Co-host):
     - **Room Settings**: Rename the room, lock/unlock the room to prevent new joins, and change the estimation deck type (e.g., Fibonacci, T-Shirt sizes).
-    - **Participant Management**: Kick users from the room, promote users to Co-host, and transfer the primary Administrator role.
-    - **Voting Control**: Reveal all submitted votes, reset the current voting session, and finalize the agreed-upon estimate (automated average/mode or custom manual override) with automatic progression to the next backlog story.
+    - **Participant Management**: Kick users from the room, promote users to Co-host, transfer the primary Administrator role, and clear the participants who left.
+    - **Voting Control**: Reveal all submitted votes, reset the current voting session, and finalize the agreed-upon estimate (automated average/mode or custom manual override) with automatic progression to the next backlog story. Resetting the votes also rewinds the discussion timer.
     - **Backlog Management**: Add new stories, delete stories, bulk import stories, and manually edit story estimates.
     - **Time Management**: Start, stop, and manage a synchronized countdown timer for discussions.
 
