@@ -1,0 +1,32 @@
+# Release on every merge into `main`.
+#
+# `release-please` reads the Conventional Commit messages since the last tag and
+# keeps a release pull request open. Merging that pull request writes the next
+# version to `CHANGELOG.md`, the root `package.json`, `package-lock.json` and
+# `.release-please-manifest.json`, then publishes the tag and the GitHub
+# release. Nothing is published to npm — the workspace is private.
+#
+# The action uses the workflow's `GITHUB_TOKEN`. Pull requests created with
+# that token do not trigger other workflows, so an admin can merge the release
+# pull request manually.
+name: Release
+
+on:
+    push:
+        branches: [main]
+
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
+
+jobs:
+    release-please:
+        name: Release pull request
+        runs-on: ubuntu-latest
+        steps:
+            - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json

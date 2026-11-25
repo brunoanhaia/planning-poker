@@ -12,7 +12,12 @@ test.describe('Admin Management', () => {
             .click();
 
         // Verify Settings is accessible
-        await adminPage.getByRole('button', { name: /Room Settings/i }).click();
+        // Both the navbar icon and the setup screen expose this name; either
+        // opens the same modal.
+        await adminPage
+            .getByRole('button', { name: /Room Settings/i })
+            .first()
+            .click();
 
         // Check if the dialog is open
         const dialog = adminPage.getByRole('dialog');

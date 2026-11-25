@@ -19,6 +19,26 @@ export const isBacklogFull = (room: RoomState): boolean =>
     room.stories.length >= MAX_STORIES_PER_ROOM;
 
 /**
+ * Activates the first story of a backlog that was empty before the insert.
+ *
+ * A room with no stories has nothing to estimate, so the first one to arrive
+ * becomes the active story immediately. Adding to a backlog that already had
+ * a story leaves the active one and the revealed state untouched.
+ *
+ * @param room - The active room state.
+ * @param wasEmpty - Whether the backlog was empty before the story was pushed.
+ */
+const activateFirstStory = (room: RoomState, wasEmpty: boolean): void => {
+    if (!wasEmpty || room.stories.length === 0) {
+        return;
+    }
+
+    room.currentStoryIndex = 0;
+    room.stories[0].status = 'estimating';
+    room.votesRevealed = false;
+};
+
+/**
  * Adds a new user story to the backlog of a room.
  *
  * @param room - The active room state.
@@ -42,6 +62,7 @@ export const addStoryToRoom = (
         return room;
     }
 
+    const wasEmpty = room.stories.length === 0;
     const newStory: Story = {
         description: description?.trim().slice(0, MAX_DESCRIPTION_LENGTH),
         id: generateStoryId(),
@@ -51,6 +72,7 @@ export const addStoryToRoom = (
     };
 
     room.stories.push(newStory);
+    activateFirstStory(room, wasEmpty);
     return room;
 };
 
@@ -59,6 +81,9 @@ export const addStoryToRoom = (
  *
  * Stops at the backlog quota: a room that already holds stories keeps the ones
  * it has and refuses the rest instead of accepting an unbounded import.
+ *
+ * When the backlog was empty, the first imported story becomes the active one
+ * and the rest wait as pending; order is preserved.
  *
  * @param room - The active room state.
  * @param storiesList - Array of story title and description pairs.
@@ -93,7 +118,9 @@ export const bulkAddStoriesToRoom = (
         return room;
     }
 
+    const wasEmpty = room.stories.length === 0;
     room.stories.push(...accepted);
+    activateFirstStory(room, wasEmpty);
     return room;
 };
 

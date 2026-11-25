@@ -79,7 +79,7 @@ The application supports multiple users connecting to a single room to vote on t
 
 ### User Roles
 
-1. **Administrator**: The creator of the room. Possesses full control over the room settings and participants.
+1. **Administrator**: The creator of the room. Enters as a spectator, so voting starts only after switching to voter. Possesses full control over the room settings and participants.
 2. **Co-host**: Appointed by the Administrator. Possesses the same management permissions as the Administrator, except for transferring the primary Administrator role.
 3. **Voter**: A standard participant who can submit votes on active tasks.
 4. **Spectator**: A participant who can observe the room activity but cannot submit votes.
@@ -88,6 +88,7 @@ The application supports multiple users connecting to a single room to vote on t
 
 - **Standard Features**:
     - Join a room using a unique URL.
+    - **Guided setup**: a fresh room opens on a setup screen where the host names the session, picks the deck and stages the first stories; the room deals cards as soon as it starts.
     - Select a card to submit an estimate.
     - Toggle personal status between Voter and Spectator.
     - **Presence**: the roster lists online participants first and collapses anyone who left behind a count; an offline voter's card still appears in the revealed round, but is not counted as an active voter.
@@ -189,6 +190,27 @@ To run the visual overlap exploratory validation specifically:
 ```bash
 npm --workspace=@planitpoker/e2e run test tests/overlap-axe.spec.ts
 ```
+
+### Releases
+
+`main` is the release branch: every push runs `release-please` (`.github/workflows/release.yml`),
+which opens or updates a release pull request. The Conventional Commit messages decide the next
+version, which the pull request writes to `CHANGELOG.md`, the root `package.json`,
+`package-lock.json` and `.release-please-manifest.json`. Merging that pull request creates the
+`v<version>` tag and the GitHub release. `feat`, `fix`, `perf` and `revert` produce a release;
+`chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` do not, so a maintenance merge does
+not mint a version. The exception is a breaking change: any type carrying `!` (or a
+`BREAKING CHANGE:` footer) releases a major, including `refactor!: …`.
+
+The release pull request uses the workflow `GITHUB_TOKEN`. Pull requests created with that token do
+not trigger other workflows, so an admin may need to merge the release pull request manually.
+Because it is a normal pull request, `main` can require pull requests, signed commits and code
+scanning; `release-please` does not push to the branch.
+
+Messages are checked twice: the `commit-msg` hook locally, and
+`.github/workflows/conventional-commits.yml` in CI — every commit in a pull request plus the pull
+request title, which is what a squash merge turns into the commit. The release pull request itself
+shows the pending version, so there is no local dry-run script.
 
 ### Code Formatting and Linting
 

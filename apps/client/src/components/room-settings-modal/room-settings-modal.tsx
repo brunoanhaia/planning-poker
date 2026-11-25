@@ -7,9 +7,10 @@ import { deckLabelKey } from '../../i18n/dictionary';
 import { useTranslation } from '../../i18n/use-translation';
 import {
     CustomDeckError,
+    hasSameCards,
     parseCustomDeck,
-    translateCustomDeckError,
-} from '../../utils/custom-deck';
+    validateCustomDeck,
+} from '../deck-select/deck-select.utils';
 
 /** Fallback cards offered when a custom deck parses to nothing usable. */
 const FALLBACK_CUSTOM_DECK: (number | string)[] = [1, 2, 3, 5, 8];
@@ -69,8 +70,9 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         // Validate before dispatching anything: a rejected deck must not apply
         // the title change on the way out and leave the dialog half-applied.
         const parsedCustomDeck = deckType === 'custom' ? parseCustomDeck(customDeck) : null;
-        if (parsedCustomDeck?.error) {
-            setCustomDeckError(parsedCustomDeck.error);
+        const customDeckRule = parsedCustomDeck ? validateCustomDeck(parsedCustomDeck) : null;
+        if (customDeckRule) {
+            setCustomDeckError(customDeckRule);
             return;
         }
 
@@ -79,12 +81,11 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         }
 
         if (parsedCustomDeck) {
-            const { cards } = parsedCustomDeck;
-            const hasSameCards =
-                cards.length === roomState.customDeck?.length &&
-                cards.every((card, index) => card === roomState.customDeck?.[index]);
-            if (deckType !== roomState.deckType || !hasSameCards) {
-                changeDeck('custom', cards);
+            if (
+                deckType !== roomState.deckType ||
+                !hasSameCards(parsedCustomDeck, roomState.customDeck)
+            ) {
+                changeDeck('custom', parsedCustomDeck);
             }
         } else if (deckType !== roomState.deckType) {
             changeDeck(deckType);
@@ -175,7 +176,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                                 role="alert"
                                 type="danger"
                             >
-                                {translateCustomDeckError(customDeckError, t)}
+                                {t(customDeckError.key, customDeckError.params)}
                             </Typography.Text>
                         )}
                     </div>

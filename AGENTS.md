@@ -20,6 +20,8 @@ npm workspaces monorepo:
 - `packages/shared` — TypeScript types, enums, constants, package name `@planitpoker/shared`
 
 All WebSocket message types and domain models live in `packages/shared/src/index.ts`. Treat it as the source of truth; do not redefine event payloads locally.
+`RoomState.stories` may be empty for a fresh room, so `currentStoryIndex` can point at no story; consumers should handle `stories[currentStoryIndex]` being `undefined`.
+The creator joins as a spectator (`isSpectator: true`), so the client opens on `room-setup/` until the first story is staged.
 Voting rounds live on `Story.rounds` as append-only revealed snapshots, capped by `MAX_ROUNDS_PER_STORY`. `RoomState.endedAt` marks the session end.
 `ErrorCode` is the contract the client translates — a new code needs an `ERROR_KEYS` entry.
 
@@ -57,7 +59,7 @@ The devcontainer pins a Node 24 LTS (Long Term Support) image, the same major as
 - **ESLint 10** with flat config; the root `package.json` owns the binary, so a single install serves every workspace.
 - **TypeScript is held at 6.x**: `typescript-eslint` 8.x peers on `>=4.8.4 <6.1.0`. Adoption of 7.x waits until the plugin widens that range.
 - **Vitest 5** for the unit suites and **Playwright 1.64** for e2e; the browser build is pinned per version.
-- **`conventional-changelog` 8** owns the changelog CLI. The older `conventional-changelog-cli` package is stuck on `conventional-changelog` 6 and cannot render the v10 conventionalcommits preset.
+- **`release-please` 5** owns the release and changelog flow. It reads the Conventional Commit messages and keeps a release pull request; merging it writes the changelog, version and manifest, then publishes the tag and the GitHub release.
 
 ## Versioning & Commits
 
@@ -70,9 +72,18 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - the body is not preceded by a blank line
     - the header exceeds 100 characters
 - **Local hook**: `.husky/commit-msg` runs `commitlint --edit`. Husky arms itself through the `prepare` script, so a plain `npm install` installs the hook. Where post-install scripts are blocked, run `npx husky` once.
-- **Changelog**: `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
-    - The `conventionalcommits` preset shows `feat`, `fix`, `perf` and `revert`, plus breaking changes.
-    - The same preset hides `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci`.
+- **CI gate**: `.github/workflows/conventional-commits.yml` validates every commit in a pull request and the pull request title, which becomes the commit on a squash merge. A title without a type is rejected there too.
+- **Releases**: `.github/workflows/release.yml` runs on every push to `main`.
+    - The job keeps a release pull request open.
+    - The release pull request carries the next version in `CHANGELOG.md`, the root `package.json`, `package-lock.json` and `.release-please-manifest.json`.
+    - Merging that pull request creates the `v<version>` tag and the GitHub release; this flow does not push to `main`.
+    - The action authenticates with the workflow `GITHUB_TOKEN`.
+    - Pull requests created with `GITHUB_TOKEN` do not trigger other workflows, so an admin can merge the release pull request manually.
+    - Nothing is published to npm: the workspace is private.
+    - `feat`, `fix`, `perf` and `revert` produce a release.
+    - `chore`, `docs`, `style`, `refactor`, `test`, `build` and `ci` produce none.
+    - A breaking change releases a major whatever the type, so `refactor!: …` is a major.
+    - `CHANGELOG.md` is generated, never hand-edited. The one exception is a broken generator: fix the tool, then regenerate.
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.
 

@@ -73,12 +73,16 @@ Fill in the pull request template. Keep the title in Conventional Commit form; i
 
 ### Continuous integration
 
-| Workflow                | Runs on                                                      | What it does                                                   |
-| ----------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
-| `codeql.yml`            | push and pull request to `main`, plus a weekly scheduled run | CodeQL analysis of `actions` and `javascript-typescript`       |
-| `dependency-review.yml` | pull request to `main`                                       | Reviews dependency changes and comments its findings on the PR |
+| Workflow                   | Runs on                                                      | What it does                                                     |
+| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `codeql.yml`               | push and pull request to `main`, plus a weekly scheduled run | CodeQL analysis of `actions` and `javascript-typescript`         |
+| `dependency-review.yml`    | pull request to `main`                                       | Reviews dependency changes and comments its findings on the PR   |
+| `conventional-commits.yml` | pull request to `main`                                       | Validates every commit and the pull request title                |
+| `release.yml`              | push to `main`                                               | Opens/updates the release pull request and publishes the release |
+| `ci.yml`                   | pull request and push to `main`                              | Builds both apps and runs the server/client unit suites          |
 
-Neither workflow runs lint or the test suite. A green check does not mean the tests passed.
+No workflow runs lint. `ci.yml` runs the build and the server/client unit suites on pull requests and
+`main`, so a green check on its own still does not mean lint passed.
 
 ### Automated review
 

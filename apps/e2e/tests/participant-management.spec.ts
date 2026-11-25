@@ -42,6 +42,9 @@ test.describe('Participant Management', () => {
             voterContext = voterSession.voterContext;
             const { voterPage } = voterSession;
 
+            // The host observes, so the only active voter is the guest.
+            await expect(adminPage.getByText('0 of 1 voted (0%)')).toBeVisible();
+
             // Closing the page drops the socket; the participant becomes a ghost
             // instead of being removed from the roster outright.
             await voterPage.close();
@@ -50,7 +53,7 @@ test.describe('Participant Management', () => {
             await expect(adminPage.getByText('1 participant left')).toBeVisible();
             await expect(adminPage.getByText('Voter 1', { exact: true })).not.toBeVisible();
             // The progress denominator follows the online voters, not the ghosts.
-            await expect(adminPage.getByText('0 of 1 voted (0%)')).toBeVisible();
+            await expect(adminPage.getByText('0 of 0 voted (0%)')).toBeVisible();
 
             await adminPage.getByText('1 participant left').click();
             await expect(adminPage.getByText('Voter 1', { exact: true })).toBeVisible();
@@ -107,7 +110,13 @@ test.describe('Participant Management', () => {
             await expect(
                 voterPage.getByRole('button', { name: 'Select estimate 5', exact: true })
             ).toHaveCount(0);
-            await expect(voterPage.getByText('Spectator')).toBeVisible();
+            // The creator is a spectator too, so the tag is scoped to this row.
+            await expect(
+                voterPage
+                    .getByRole('listitem')
+                    .filter({ hasText: 'Voter 1' })
+                    .getByText('Spectator')
+            ).toBeVisible();
 
             await adminPage.getByRole('button', { name: 'Manage Voter 1' }).click();
             const makeVoterItem = adminPage.getByRole('menuitem', { name: 'Make Voter' });

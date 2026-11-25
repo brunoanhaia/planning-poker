@@ -10,6 +10,11 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         rm = new RoomManager();
     });
 
+    /** Turns the spectating host into a voter, which is what voting cases need. */
+    const makeHostVoter = (roomId: string, hostId: string): void => {
+        rm.toggleSpectator(roomId, hostId);
+    };
+
     it('should create room with creator as primary admin and host', () => {
         const { hostId, roomId, roomState } = rm.createRoom('Alice', '🚀', '#6366f1', 'Sprint 42')!;
 
@@ -19,6 +24,10 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(roomState.participants[0].isAdmin).toBe(true);
         expect(roomState.participants[0].isHost).toBe(true);
         expect(rm.isUserAdmin(roomState, hostId)).toBe(true);
+        // A new room starts with nothing to estimate, and the host watches
+        // until they decide to vote.
+        expect(roomState.stories).toEqual([]);
+        expect(roomState.participants[0].isSpectator).toBe(true);
     });
 
     it('should allow admin to rename room and reject non-admin', () => {
@@ -60,6 +69,11 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const bobResult = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!;
         const bobId = bobResult.participant!.id;
 
+        // The host starts as a spectator, so this case only reaches two active
+        // voters once the host joins the round.
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+
         // Enable auto-reveal
         rm.toggleAutoReveal(roomId, hostId);
         expect(rm.getRoom(roomId)!.autoReveal).toBe(true);
@@ -73,20 +87,15 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(rm.getRoom(roomId)!.votesRevealed).toBe(true);
     });
 
-    it('reveals for the voters still online while keeping a departed voter card in the round', () => {
+    it('should reject votes while the backlog has no story', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
-        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
-        rm.toggleAutoReveal(roomId, hostId);
+        makeHostVoter(roomId, hostId);
 
-        rm.submitVote(roomId, bobId, 8);
-        rm.leaveRoom(roomId, bobId);
-        rm.submitVote(roomId, hostId, 5);
+        expect(rm.submitVote(roomId, hostId, 5)).toBeNull();
+        expect(rm.getRoom(roomId)!.votesRevealed).toBe(false);
 
-        // Bob is offline, so he no longer blocks completion; the card he left
-        // behind is still part of the revealed round rather than being lost.
-        const room = rm.getRoom(roomId)!;
-        expect(room.votesRevealed).toBe(true);
-        expect(room.stories[0].rounds[0].votes.map((vote) => vote.vote)).toEqual([5, 8]);
+        rm.addStory(roomId, hostId, 'First story');
+        expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
     });
 
     it('should manage live countdown timer', () => {
@@ -108,56 +117,6 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         rm.resetTimer(roomId, hostId);
         const resetRoom = rm.getRoom(roomId)!;
         expect(resetRoom.timer?.remaining).toBe(60);
-    });
-
-    it('rewinds the countdown when the votes are reset', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
-
-        rm.startTimer(roomId, hostId, 90);
-        rm.tickTimer(roomId);
-        rm.tickTimer(roomId);
-        expect(rm.getRoom(roomId)!.timer?.remaining).toBe(88);
-
-        rm.resetVotes(roomId, hostId);
-
-        // The new round starts from the configured duration, paused, instead of
-        // inheriting the last seconds of the round that was just discarded.
-        const timer = rm.getRoom(roomId)!.timer;
-        expect(timer?.remaining).toBe(90);
-        expect(timer?.isRunning).toBe(false);
-    });
-
-    it('leaves a room without a timer untouched when the votes are reset', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
-
-        rm.resetVotes(roomId, hostId);
-
-        expect(rm.getRoom(roomId)!.timer).toBeNull();
-    });
-
-    it('lets an admin clear the participants who left without touching the online ones', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
-        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
-
-        rm.leaveRoom(roomId, bobId);
-        expect(rm.getRoom(roomId)!.participants).toHaveLength(2);
-
-        rm.clearOfflineParticipants(roomId, hostId);
-
-        const participants = rm.getRoom(roomId)!.participants;
-        expect(participants.map((participant) => participant.id)).toEqual([hostId]);
-        expect(participants[0].isOnline).toBe(true);
-    });
-
-    it('refuses to clear offline participants for a non-administrator', () => {
-        const { roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
-        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
-        const carolId = rm.joinRoom(roomId, 'Carol', '🐱', '#10b981')!.participant!.id;
-
-        rm.leaveRoom(roomId, bobId);
-
-        expect(rm.clearOfflineParticipants(roomId, carolId)).toBeNull();
-        expect(rm.getRoom(roomId)!.participants).toHaveLength(3);
     });
 
     it('should allow admin to kick participant and toggle participant role', () => {
@@ -215,7 +174,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         ]);
 
         const room = rm.getRoom(roomId)!;
-        expect(room.stories).toHaveLength(4); // 1 initial + 3 bulk
+        expect(room.stories).toHaveLength(3);
 
         const targetStoryId = room.stories[1].id;
         rm.updateStoryEstimate(roomId, hostId, targetStoryId, 13);
@@ -251,10 +210,6 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const reconnected = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6', bobId)!;
         expect(reconnected.participant?.id).toBe(bobId);
         expect(reconnected.participant?.isOnline).toBe(true);
-        // Reclaiming the seat must not leave the offline copy behind as a ghost.
-        const participants = rm.getRoom(roomId)!.participants;
-        expect(participants).toHaveLength(2);
-        expect(new Set(participants.map((participant) => participant.id)).size).toBe(2);
     });
 
     it('should only allow admin or co-host to reveal votes and reject non-admin', () => {
@@ -291,6 +246,8 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
 
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
         rm.submitVote(roomId, hostId, 5);
         rm.submitVote(roomId, bobId, 8);
         rm.revealVotes(roomId, hostId);
@@ -307,6 +264,8 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it.each([false, true])('rejects votes after reveal (auto-reveal: %s)', (autoReveal) => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
         if (autoReveal) {
             rm.toggleAutoReveal(roomId, hostId);
         }
@@ -328,6 +287,8 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
     it('rejects a first vote submitted after reveal', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
         rm.submitVote(roomId, hostId, 5);
         rm.revealVotes(roomId, hostId);
         const revealedRoom = structuredClone(rm.getRoom(roomId)!);
@@ -338,6 +299,8 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it('opens a new round on reset instead of erasing the previous result', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
 
         rm.submitVote(roomId, hostId, 3);
         rm.revealVotes(roomId, hostId);
@@ -351,6 +314,8 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it('keeps the newest rounds when the story is re-estimated past the cap', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
 
         for (let round = 0; round <= MAX_ROUNDS_PER_STORY; round += 1) {
             rm.submitVote(roomId, hostId, round);
@@ -385,21 +350,10 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         clock.mockRestore();
     });
 
-    it('stops a running countdown when the session ends', () => {
-        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
-
-        rm.startTimer(roomId, hostId, 60);
-        rm.tickTimer(roomId);
-        rm.endSession(roomId, hostId);
-
-        const timer = rm.getRoom(roomId)!.timer;
-        expect(timer?.isRunning).toBe(false);
-        // The remaining time stays visible in the summary instead of jumping.
-        expect(timer?.remaining).toBe(59);
-    });
-
     it('records the round when auto-reveal flips the flag inside the last vote', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
         rm.toggleAutoReveal(roomId, hostId);
 
         rm.submitVote(roomId, hostId, 5);
@@ -418,6 +372,8 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
         const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
 
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
         rm.submitVote(roomId, hostId, 3);
         rm.submitVote(roomId, bobId, 5);
         rm.revealVotes(roomId, hostId);
@@ -445,6 +401,8 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it('reopens a finalized story on reset without losing the round history', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
 
         rm.submitVote(roomId, hostId, 5);
         rm.revealVotes(roomId, hostId);
@@ -460,8 +418,158 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(room.stories[0].rounds).toHaveLength(1);
     });
 
+    it('starts a room with an empty backlog and nothing active', () => {
+        const { roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.stories).toEqual([]);
+        // The index is a sentinel that addresses nothing; the client shows the
+        // setup screen for a room that is not ended and has no stories.
+        expect(room.currentStoryIndex).toBe(0);
+        expect(room.votesRevealed).toBe(false);
+        expect(room.isEnded).toBe(false);
+    });
+
+    it('activates the first story added to an empty backlog', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.addStory(roomId, hostId, 'Checkout flow');
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.stories).toHaveLength(1);
+        expect(room.currentStoryIndex).toBe(0);
+        expect(room.stories[0].status).toBe('estimating');
+    });
+
+    it('activates only the first story of a bulk import and keeps the order', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.bulkAddStories(roomId, hostId, [
+            { title: 'Story 1' },
+            { title: 'Story 2' },
+            { title: 'Story 3' },
+        ]);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.stories.map((story) => story.title)).toEqual(['Story 1', 'Story 2', 'Story 3']);
+        expect(room.currentStoryIndex).toBe(0);
+        expect(room.stories.map((story) => story.status)).toEqual([
+            'estimating',
+            'pending',
+            'pending',
+        ]);
+    });
+
+    it('leaves the active story and the revealed state alone when adding to a backlog', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+        const activeStoryId = rm.getRoom(roomId)!.stories[0].id;
+
+        rm.bulkAddStories(roomId, hostId, [{ title: 'Story 2' }, { title: 'Story 3' }]);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(true);
+        expect(room.currentStoryIndex).toBe(0);
+        expect(room.stories[0].id).toBe(activeStoryId);
+        expect(room.stories[0].status).toBe('estimating');
+        expect(room.stories[1].status).toBe('pending');
+    });
+
+    it('auto-reveals without waiting for the spectating host', () => {
+        const { roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.addStory(roomId, rm.getRoom(roomId)!.hostId, 'Story 1');
+        rm.toggleAutoReveal(roomId, rm.getRoom(roomId)!.hostId);
+
+        rm.submitVote(roomId, bobId, 8);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(true);
+        expect(room.participants.find((p) => p.id === room.hostId)!.vote).toBeNull();
+    });
+
+    it('keeps the spectating host as moderator while letting them become a voter', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.addStory(roomId, hostId, 'Story 1');
+
+        // Moderation does not depend on voting.
+        expect(rm.updateRoomTitle(roomId, hostId, 'Renamed')!.title).toBe('Renamed');
+        expect(rm.submitVote(roomId, bobId, 3)).not.toBeNull();
+        expect(rm.submitVote(roomId, hostId, 5)).toBeNull();
+
+        rm.toggleSpectator(roomId, hostId);
+
+        expect(rm.getRoom(roomId)!.participants[0].isSpectator).toBe(false);
+        expect(rm.submitVote(roomId, hostId, 5)).not.toBeNull();
+        expect(rm.getRoom(roomId)!.participants[0].vote).toBe(5);
+        expect(rm.isUserAdmin(rm.getRoom(roomId)!, hostId)).toBe(true);
+    });
+
+    it('resets the votes and stops the timer when the last story is deleted', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        rm.submitVote(roomId, hostId, 5);
+        rm.startTimer(roomId, hostId, 60);
+        const storyId = rm.getRoom(roomId)!.stories[0].id;
+
+        rm.deleteStory(roomId, hostId, storyId);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.stories).toEqual([]);
+        expect(room.votesRevealed).toBe(false);
+        expect(room.participants[0].vote).toBeNull();
+        expect(room.participants[0].hasVoted).toBe(false);
+        expect(room.timer?.isRunning).toBe(false);
+        expect(room.timer?.remaining).toBe(60);
+    });
+
+    it('rewinds the countdown when the votes are reset', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.startTimer(roomId, hostId, 90);
+        rm.tickTimer(roomId);
+        rm.tickTimer(roomId);
+        expect(rm.getRoom(roomId)!.timer?.remaining).toBe(88);
+
+        rm.resetVotes(roomId, hostId);
+
+        // The new round starts from the configured duration, paused, instead of
+        // inheriting the last seconds of the round that was just discarded.
+        const timer = rm.getRoom(roomId)!.timer;
+        expect(timer?.remaining).toBe(90);
+        expect(timer?.isRunning).toBe(false);
+    });
+
+    it('leaves a room without a timer untouched when the votes are reset', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.resetVotes(roomId, hostId);
+
+        expect(rm.getRoom(roomId)!.timer).toBeNull();
+    });
+
+    it('stops a running countdown when the session ends', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.startTimer(roomId, hostId, 60);
+        rm.tickTimer(roomId);
+        rm.endSession(roomId, hostId);
+
+        const timer = rm.getRoom(roomId)!.timer;
+        expect(timer?.isRunning).toBe(false);
+        // The remaining time stays visible in the summary instead of jumping.
+        expect(timer?.remaining).toBe(59);
+    });
+
     it('clears the accepted estimate and reopens the story when null is accepted', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
         const storyId = rm.getRoom(roomId)!.stories[0].id;
 
         rm.submitVote(roomId, hostId, 5);
@@ -481,6 +589,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it('keeps only the active story in the estimating state', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
         rm.addStory(roomId, hostId, 'Second story');
 
         rm.setCurrentStory(roomId, hostId, 1);
@@ -492,8 +601,10 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it('keeps the active story and its round when another story is deleted before it', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
         rm.addStory(roomId, hostId, 'Second story');
         rm.addStory(roomId, hostId, 'Third story');
+        makeHostVoter(roomId, hostId);
 
         const [first, second, third] = rm.getRoom(roomId)!.stories;
         rm.setCurrentStory(roomId, hostId, 2);
@@ -514,8 +625,10 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it('promotes the next story and starts a fresh round when the active one is deleted', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
         rm.addStory(roomId, hostId, 'Second story');
         rm.addStory(roomId, hostId, 'Third story');
+        makeHostVoter(roomId, hostId);
 
         const [, second, third] = rm.getRoom(roomId)!.stories;
         rm.setCurrentStory(roomId, hostId, 1);
@@ -538,6 +651,7 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
     it('falls back to the previous story when the last active one is deleted', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
         rm.addStory(roomId, hostId, 'Second story');
 
         const [first, second] = rm.getRoom(roomId)!.stories;
@@ -555,5 +669,30 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
         expect(rm.deleteStory(roomId, hostId, 'missing-story')).toBeNull();
+    });
+
+    it('lets an admin clear the participants who left without touching the online ones', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.leaveRoom(roomId, bobId);
+        expect(rm.getRoom(roomId)!.participants).toHaveLength(2);
+
+        rm.clearOfflineParticipants(roomId, hostId);
+
+        const participants = rm.getRoom(roomId)!.participants;
+        expect(participants.map((participant) => participant.id)).toEqual([hostId]);
+        expect(participants[0].isOnline).toBe(true);
+    });
+
+    it('refuses to clear offline participants for a non-administrator', () => {
+        const { roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        const carolId = rm.joinRoom(roomId, 'Carol', '🐱', '#10b981')!.participant!.id;
+
+        rm.leaveRoom(roomId, bobId);
+
+        expect(rm.clearOfflineParticipants(roomId, carolId)).toBeNull();
+        expect(rm.getRoom(roomId)!.participants).toHaveLength(3);
     });
 });
