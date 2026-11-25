@@ -215,20 +215,20 @@ Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. On
     - Code quality: `clean-code-refactoring`
     - Typing: `typescript-advanced-types` (generics and conditional types for the shared socket contract)
     - Testing: `playwright-best-practices` (E2E including axe and WebSockets) and `vitest`
-    - Performance: `vercel-react-best-practices` — React 19 rules; skip the Next.js/RSC sections, which do not apply to this Vite client
+    - Performance: `vercel-react-best-practices` — React 19 rules. Skip the Next.js sections, including React Server Components (RSC), which do not apply to this Vite client
     - Accessibility audit: `accessibility` (WCAG 2.2 with Lighthouse/axe) — audit-time counterpart of `accessible-ui-components`
-    - Security: `security-review` (OWASP review for the Express and `ws` surface)
+    - Security: `security-review` — Open Worldwide Application Security Project (OWASP) review for the Express and `ws` surface
     - Real-time: `realtime-websocket-manager` (native WebSockets, not the `socket.io` package)
     - Efficiency: `token-usage-best-practices` (canonical source for token-saving principles)
 
-Skills are installed **at project scope**, so they are committed under `.agents/skills/` and available to the team and to CI. Do not install them with `-g`: a global copy is invisible to CI and drifts from the pinned version. The install, list and update commands live in [`TOOLS.md`](./TOOLS.md#skills).
+Skills are installed **at project scope**, so they are committed under `.agents/skills/` and available to the team and to CI. A global install (`-g`) is invisible to CI and drifts from the pinned version, so use it only where project scope is impossible. The install, list and update commands live in [`TOOLS.md`](./TOOLS.md#skills).
 
-The whole `.agents/skills/` tree is excluded from Prettier, ESLint, Codacy and Sonar. The files are upstream prompt material, not project code: reformatting one changes its `computedHash`, and the Markdown linters would otherwise report every upstream style choice as a new issue.
+The whole `.agents/skills/` tree is excluded from Prettier, ESLint, Codacy and Sonar. The files are upstream prompt material, not project code. Reformatting one changes its `computedHash`, and the Markdown linters would otherwise report every upstream style choice as a new issue.
 
-Each third-party skill is pinned in `skills-lock.json` (`commit` + `computedHash`). Three rules follow:
+Each third-party skill is pinned in `skills-lock.json` by `commit` and `computedHash`. Three rules follow:
 
-- Run `skills update` deliberately, never as part of another task. It rewrites the whole lockfile.
-- The v2 hash covers the whole skill folder. `skills add` has already left the `autofix` hash empty once; after any install or update, diff `skills-lock.json` and confirm every entry has a hash. Commit the downloaded `SKILL.md` files together with the lockfile.
+- Run `skills update` on its own, not as part of another task. It rewrites the whole lockfile.
+- The v2 hash covers the whole skill folder. `skills add` has already left the `autofix` hash empty once. After any install or update, diff `skills-lock.json` and confirm every entry has a hash. Commit the downloaded `SKILL.md` files together with the lockfile.
 - `.github/workflows/skills-lock.yml` fails when a vendored folder no longer matches its hash. Editing a `SKILL.md` by hand therefore needs a matching lockfile update, not just the file change.
 
 Version alignment matters: `ant-design` targets antd 6.x and React 18–19, `vitest` is generated from Vitest 5.1, and `antd` reads its metadata offline, so re-check a recommendation against the installed version before applying it.

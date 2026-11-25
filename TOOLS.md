@@ -97,13 +97,14 @@ docker compose up --build   # client :80, server :5000
 ## Skills
 
 ```bash
-npm exec -- skills add <owner/repo@skill>     # project scope; never -g
+npm exec -- skills add <owner/repo@skill>     # project scope (without -g)
 npm exec -- skills add <owner/repo@skill> -y  # non-interactive
 npm exec -- skills list                       # installed skills and lock state
 npm exec -- skills update                     # rewrites skills-lock.json
 ```
 
 - The CLI is a root devDependency, so `npm exec -- skills` runs the pinned 1.9 release. `npx skills` would fetch whatever is latest and can migrate the lockfile format.
+- `-g` installs the skill globally, outside the repository and invisible to CI.
 - Installs land in `.agents/skills/` and are pinned in `skills-lock.json`; commit both together.
 - `skills update` rewrites every lock entry. Run it on its own, then diff `skills-lock.json` and confirm no `computedHash` is empty.
 - `skills list` hashes the vendored folders locally; `.github/workflows/skills-lock.yml` fails the build when a skill differs from the lock. Run `npm exec -- skills list | grep "differs from the lock"` to reproduce it.
