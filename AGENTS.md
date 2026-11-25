@@ -212,6 +212,7 @@ Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. On
     - UI / architecture: `accessible-ui-components`, `isolated-component-design`, `modular-css-architecture`, `react-clean-architecture`
     - UI / Ant Design 6: `ant-design` (decision guide for tokens, theming, a11y, migration) and `antd` (offline `@ant-design/cli` lookups; needs `npm i -g @ant-design/cli`)
     - Code quality: `clean-code-refactoring`
+    - Typing: `typescript-advanced-types` (generics and conditional types for the shared socket contract)
     - Testing: `playwright-best-practices` (E2E including axe and WebSockets) and `vitest`
     - Performance: `vercel-react-best-practices` — React 19 rules; skip the Next.js/RSC sections, which do not apply to this Vite client
     - Accessibility audit: `accessibility` (WCAG 2.2 with Lighthouse/axe) — audit-time counterpart of `accessible-ui-components`
