@@ -49,6 +49,8 @@ test.describe('Participant Management', () => {
             await expect(adminPage.getByText('Participants (1 online / 2)')).toBeVisible();
             await expect(adminPage.getByText('1 participant left')).toBeVisible();
             await expect(adminPage.getByText('Voter 1', { exact: true })).not.toBeVisible();
+            // The progress denominator follows the online voters, not the ghosts.
+            await expect(adminPage.getByText('0 of 1 voted (0%)')).toBeVisible();
 
             await adminPage.getByText('1 participant left').click();
             await expect(adminPage.getByText('Voter 1', { exact: true })).toBeVisible();

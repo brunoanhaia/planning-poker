@@ -251,6 +251,10 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         const reconnected = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6', bobId)!;
         expect(reconnected.participant?.id).toBe(bobId);
         expect(reconnected.participant?.isOnline).toBe(true);
+        // Reclaiming the seat must not leave the offline copy behind as a ghost.
+        const participants = rm.getRoom(roomId)!.participants;
+        expect(participants).toHaveLength(2);
+        expect(new Set(participants.map((participant) => participant.id)).size).toBe(2);
     });
 
     it('should only allow admin or co-host to reveal votes and reject non-admin', () => {
