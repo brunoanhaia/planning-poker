@@ -5,20 +5,14 @@ import React, { useState } from 'react';
 import { useSocket } from '../../context/socket-context/use-socket';
 import { deckLabelKey } from '../../i18n/dictionary';
 import { useTranslation } from '../../i18n/use-translation';
+import {
+    CustomDeckError,
+    parseCustomDeck,
+    translateCustomDeckError,
+} from '../../utils/custom-deck';
 
 /** Fallback cards offered when a custom deck parses to nothing usable. */
 const FALLBACK_CUSTOM_DECK: (number | string)[] = [1, 2, 3, 5, 8];
-
-/** Parses the comma separated custom deck into numbers where possible. */
-const parseCustomDeck = (raw: string): (number | string)[] => {
-    const parsed = raw
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0)
-        .map((entry) => (Number.isNaN(Number(entry)) ? entry : Number(entry)));
-
-    return parsed.length > 0 ? parsed : FALLBACK_CUSTOM_DECK;
-};
 
 export interface RoomSettingsModalProps {
     /** Closes the modal without applying anything. */
@@ -48,6 +42,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
     const [titleDraft, setTitleDraft] = useState<null | string>(null);
     const [deckTypeDraft, setDeckTypeDraft] = useState<null | DeckType>(null);
     const [customDeckDraft, setCustomDeckDraft] = useState<null | string>(null);
+    const [customDeckError, setCustomDeckError] = useState<CustomDeckError | null>(null);
 
     if (!roomState || !isAdmin) {
         return null;
@@ -63,12 +58,20 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         customDeckDraft ?? roomState.customDeck?.join(', ') ?? FALLBACK_CUSTOM_DECK.join(', ');
 
     const handleSave = () => {
+        // Validate before dispatching anything: a rejected deck must not apply
+        // the title change on the way out and leave the dialog half-applied.
+        const parsedCustomDeck = deckType === 'custom' ? parseCustomDeck(customDeck) : null;
+        if (parsedCustomDeck?.error) {
+            setCustomDeckError(parsedCustomDeck.error);
+            return;
+        }
+
         if (title.trim() && title.trim() !== roomState.title) {
             updateRoomTitle(title.trim());
         }
 
-        if (deckType === 'custom') {
-            const cards = parseCustomDeck(customDeck);
+        if (parsedCustomDeck) {
+            const { cards } = parsedCustomDeck;
             const hasSameCards =
                 cards.length === roomState.customDeck?.length &&
                 cards.every((card, index) => card === roomState.customDeck?.[index]);
@@ -85,6 +88,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         setTitleDraft(null);
         setDeckTypeDraft(null);
         setCustomDeckDraft(null);
+        setCustomDeckError(null);
         onClose();
     };
 
@@ -123,7 +127,10 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <label htmlFor="room-settings-deck">{t('settings.deck')}</label>
                     <Select<DeckType>
                         id="room-settings-deck"
-                        onChange={setDeckTypeDraft}
+                        onChange={(value) => {
+                            setDeckTypeDraft(value);
+                            setCustomDeckError(null);
+                        }}
                         options={DECK_TYPES.map((option) => ({
                             label: t(deckLabelKey(option)),
                             value: option,
@@ -139,11 +146,27 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                             {t('settings.customCards')}
                         </label>
                         <Input
+                            aria-describedby={
+                                customDeckError ? 'room-settings-custom-deck-error' : undefined
+                            }
+                            aria-invalid={Boolean(customDeckError)}
                             id="room-settings-custom-deck"
-                            onChange={(event) => setCustomDeckDraft(event.target.value)}
+                            onChange={(event) => {
+                                setCustomDeckDraft(event.target.value);
+                                setCustomDeckError(null);
+                            }}
                             placeholder={t('settings.customCards.placeholder')}
                             value={customDeck}
                         />
+                        {customDeckError && (
+                            <Typography.Text
+                                id="room-settings-custom-deck-error"
+                                role="alert"
+                                type="danger"
+                            >
+                                {translateCustomDeckError(customDeckError, t)}
+                            </Typography.Text>
+                        )}
                     </div>
                 ) : (
                     <Typography.Text type="secondary">

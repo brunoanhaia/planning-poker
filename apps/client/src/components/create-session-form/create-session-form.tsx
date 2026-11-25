@@ -1,17 +1,14 @@
-import {
-    DECK_TYPES,
-    DeckType,
-    MAX_CUSTOM_DECK_SIZE,
-    MAX_NAME_LENGTH,
-    MAX_TITLE_LENGTH,
-    MIN_CUSTOM_DECK_SIZE,
-    PRESET_DECKS,
-} from '@planitpoker/shared';
+import { DECK_TYPES, DeckType, MAX_TITLE_LENGTH, PRESET_DECKS } from '@planitpoker/shared';
 import { Button, Flex, Input, Select, Typography } from 'antd';
 import React, { useState } from 'react';
 
 import { deckLabelKey } from '../../i18n/dictionary';
 import { useTranslation } from '../../i18n/use-translation';
+import {
+    CustomDeckError,
+    parseCustomDeck,
+    translateCustomDeckError,
+} from '../../utils/custom-deck';
 
 /** Renders the card list preview for the selected deck. */
 const renderDeckPreview = (deckType: DeckType, customLabel: string): string => {
@@ -36,7 +33,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
     const [roomTitle, setRoomTitle] = useState('');
     const [deckType, setDeckType] = useState<DeckType>('fibonacci');
     const [customDeck, setCustomDeck] = useState('');
-    const [customDeckError, setCustomDeckError] = useState('');
+    const [customDeckError, setCustomDeckError] = useState<CustomDeckError | null>(null);
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
@@ -45,30 +42,14 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
             return;
         }
 
-        const cards = customDeck
-            .split(',')
-            .map((entry) => entry.trim())
-            .filter(Boolean)
-            .map((entry) => (Number.isNaN(Number(entry)) ? entry : Number(entry)));
-        if (cards.length < MIN_CUSTOM_DECK_SIZE || cards.length > MAX_CUSTOM_DECK_SIZE) {
-            setCustomDeckError(
-                t('create.error.count', { max: MAX_CUSTOM_DECK_SIZE, min: MIN_CUSTOM_DECK_SIZE })
-            );
+        // The shared parser applies the same rules as the server schema, so a
+        // deck that reaches `onSubmit` is one the room will actually accept.
+        const { cards, error } = parseCustomDeck(customDeck);
+        if (error) {
+            setCustomDeckError(error);
             return;
         }
-        if (
-            cards.some((card) =>
-                typeof card === 'number' ? !Number.isFinite(card) : card.length > MAX_NAME_LENGTH
-            )
-        ) {
-            setCustomDeckError(t('create.error.label', { max: MAX_NAME_LENGTH }));
-            return;
-        }
-        if (new Set(cards.map(String)).size !== cards.length) {
-            setCustomDeckError(t('create.error.duplicate'));
-            return;
-        }
-        setCustomDeckError('');
+        setCustomDeckError(null);
         onSubmit(roomTitle.trim(), deckType, cards);
     };
 
@@ -116,7 +97,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                             id="create-session-custom-deck"
                             onChange={(event) => {
                                 setCustomDeck(event.target.value);
-                                setCustomDeckError('');
+                                setCustomDeckError(null);
                             }}
                             placeholder={t('create.customDeck.placeholder')}
                             value={customDeck}
@@ -127,7 +108,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                                 role="alert"
                                 type="danger"
                             >
-                                {customDeckError}
+                                {translateCustomDeckError(customDeckError, t)}
                             </Typography.Text>
                         )}
                     </div>
