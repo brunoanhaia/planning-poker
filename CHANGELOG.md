@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/brunoanhaia/planning-poker/compare/v1.1.0...v1.2.0) (2026-11-04)
+
+
+### Features
+
+* **room:** open new rooms on a setup screen with an observing host ([#58](https://github.com/brunoanhaia/planning-poker/issues/58)) ([fdb3806](https://github.com/brunoanhaia/planning-poker/commit/fdb3806902af2f9e6295add08e776540faed7869))
+
 ## [1.1.0](https://github.com/brunoanhaia/planning-poker/compare/v1.0.0...v1.1.0) (2026-11-04)
 
 
