@@ -2,6 +2,7 @@ import { MAX_ROUNDS_PER_STORY } from '@planitpoker/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
+import { sessionService } from '../src/sessionService.js';
 
 describe('RoomManager Administrator Suite Unit Tests', () => {
     let rm: RoomManager;
@@ -665,6 +666,30 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(room.stories[0].status).toBe('estimating');
     });
 
+    it('reopens a promoted completed story with a fresh score', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
+        rm.addStory(roomId, hostId, 'Second story');
+        makeHostVoter(roomId, hostId);
+
+        const [first, second] = rm.getRoom(roomId)!.stories;
+        rm.setCurrentStory(roomId, hostId, 1);
+        rm.submitVote(roomId, hostId, 8);
+        rm.revealVotes(roomId, hostId);
+        rm.updateStoryEstimate(roomId, hostId, second.id, 8);
+        expect(rm.getRoom(roomId)!.stories[1].status).toBe('completed');
+
+        // Make the completed story the successor of the active one, then remove
+        // that active story: the promoted row must reopen, not keep its score.
+        rm.setCurrentStory(roomId, hostId, 0);
+        rm.deleteStory(roomId, hostId, first.id);
+
+        const promoted = rm.getRoom(roomId)!.stories[0];
+        expect(promoted.id).toBe(second.id);
+        expect(promoted.status).toBe('estimating');
+        expect(promoted.finalEstimate).toBeNull();
+    });
+
     it('rejects deleting a story that no longer exists', () => {
         const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
 
@@ -694,5 +719,21 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
 
         expect(rm.clearOfflineParticipants(roomId, carolId)).toBeNull();
         expect(rm.getRoom(roomId)!.participants).toHaveLength(3);
+    });
+
+    it('revokes the session token of a cleared participant', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        const bobToken = sessionService.issue(roomId, bobId);
+
+        rm.leaveRoom(roomId, bobId);
+        rm.clearOfflineParticipants(roomId, hostId);
+
+        // The row is gone and the credential goes with it; a returning browser
+        // is admitted as a newcomer instead of holding a stale identity.
+        expect(rm.getRoom(roomId)!.participants.map((participant) => participant.id)).toEqual([
+            hostId,
+        ]);
+        expect(sessionService.resolve(bobToken)).toBeNull();
     });
 });

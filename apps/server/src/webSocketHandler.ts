@@ -900,7 +900,26 @@ export class WebSocketHandler {
         if (!session) {
             return;
         }
+
+        const room = roomManager.getRoom(session.roomId);
+        const offlineIds =
+            room?.participants
+                .filter((participant) => !participant.isOnline)
+                .map((participant) => participant.id) ?? [];
         const updated = roomManager.clearOfflineParticipants(session.roomId, session.userId);
+        if (updated) {
+            // Audit one record per removed identity, so the log names the rows
+            // that a destructive cleanup erased without storing their names.
+            offlineIds.forEach((offlineId) =>
+                auditLog({
+                    action: 'participant.cleared',
+                    outcome: 'allowed',
+                    roomId: session.roomId,
+                    userId: offlineId,
+                })
+            );
+        }
+
         this.broadcastOrError(
             ws,
             session.roomId,

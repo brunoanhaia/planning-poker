@@ -337,6 +337,10 @@ export class RoomManager {
     /**
      * Drops every participant who is no longer connected (admin-only).
      *
+     * The session tokens bound to those rows are revoked with them: a cleared
+     * participant may rejoin as a newcomer, but the token from the removed row
+     * must not be left behind in the in-memory token map.
+     *
      * @param roomId - The room identifier.
      * @param userId - ID of the admin or co-host requesting the cleanup.
      * @returns Updated RoomState or null if unauthorized.
@@ -346,7 +350,13 @@ export class RoomManager {
         if (!room || !this.isUserAdmin(room, userId)) {
             return null;
         }
-        return clearOfflineParticipantsFromRoom(room);
+
+        const offlineIds = room.participants
+            .filter((participant) => !participant.isOnline)
+            .map((participant) => participant.id);
+        const updated = clearOfflineParticipantsFromRoom(room);
+        offlineIds.forEach((offlineId) => sessionService.revokeByUser(roomId, offlineId));
+        return updated;
     }
 
     /**
@@ -800,6 +810,12 @@ export class RoomManager {
         const currentStoryId = updated.stories[updated.currentStoryIndex]?.id ?? null;
         if (currentStoryId !== previousStoryId) {
             this.resetRoomVotes(room);
+            const currentStory = updated.stories[updated.currentStoryIndex];
+            if (currentStory) {
+                // The promoted story is now the estimation target; a score it
+                // carried as a completed story would contradict its status.
+                currentStory.finalEstimate = null;
+            }
             if (room.stories.length === 0) {
                 if (room.timer) {
                     room.timer.isRunning = false;
