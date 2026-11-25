@@ -230,6 +230,19 @@ To format all files in the repository:
 npm run format
 ```
 
+### Agent Tooling
+
+[`AGENTS.md`](./AGENTS.md) is the source of truth for coding agents, and the root `opencode.jsonc` loads the rule playbooks from `.agents/rules/` so every session follows them.
+
+On-demand skills live in `.agents/skills/` and are pinned in `skills-lock.json`. Manage them with the pinned CLI:
+
+```bash
+npm exec -- skills list    # installed skills and lock state
+npm exec -- skills add <owner/repo@skill>
+```
+
+The `Skills lock` workflow fails when a vendored skill no longer matches its hash, so commit the `SKILL.md` files and the lockfile together.
+
 ## Deployment (Production)
 
 Deployment is done via **containers**: `apps/server/Dockerfile` (Node 24) and

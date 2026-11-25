@@ -60,6 +60,7 @@ The devcontainer pins a Node 24 LTS (Long Term Support) image, the same major as
 - **TypeScript is held at 6.x**: `typescript-eslint` 8.x peers on `>=4.8.4 <6.1.0`. Adoption of 7.x waits until the plugin widens that range.
 - **Vitest 5** for the unit suites and **Playwright 1.64** for e2e; the browser build is pinned per version.
 - **`release-please` 5** owns the release and changelog flow. It reads the Conventional Commit messages and keeps a release pull request; merging it writes the changelog, version and manifest, then publishes the tag and the GitHub release.
+- **`skills` 1.9** is a root devDependency, not an unpinned `npx` download. The CLI rewrites `skills-lock.json` on install, and running the latest release silently migrated the file from v1 to v2 once. Update it deliberately.
 
 ## Versioning & Commits
 
@@ -222,10 +223,11 @@ Custom skills live in `.agents/skills/` and custom rules in `.agents/rules/`. On
 
 Skills are installed **at project scope**, so they are committed under `.agents/skills/` and available to the team and to CI. Do not install them with `-g`: a global copy is invisible to CI and drifts from the pinned version. The install, list and update commands live in [`TOOLS.md`](./TOOLS.md#skills).
 
-Each third-party skill is pinned in `skills-lock.json` (`commit` + `computedHash`). Two rules follow:
+Each third-party skill is pinned in `skills-lock.json` (`commit` + `computedHash`). Three rules follow:
 
 - Run `skills update` deliberately, never as part of another task. It rewrites the whole lockfile.
 - The v2 hash covers the whole skill folder. `skills add` has already left the `autofix` hash empty once; after any install or update, diff `skills-lock.json` and confirm every entry has a hash. Commit the downloaded `SKILL.md` files together with the lockfile.
+- `.github/workflows/skills-lock.yml` fails when a vendored folder no longer matches its hash. Editing a `SKILL.md` by hand therefore needs a matching lockfile update, not just the file change.
 
 Version alignment matters: `ant-design` targets antd 6.x and React 18–19, `vitest` is generated from Vitest 5.1, and `antd` reads its metadata offline, so re-check a recommendation against the installed version before applying it.
 

@@ -97,14 +97,16 @@ docker compose up --build   # client :80, server :5000
 ## Skills
 
 ```bash
-npx skills add <owner/repo@skill>     # project scope; never -g
-npx skills add <owner/repo@skill> -y  # non-interactive
-npx skills list                       # installed skills and lock state
-npx skills update                     # rewrites skills-lock.json
+npm exec -- skills add <owner/repo@skill>     # project scope; never -g
+npm exec -- skills add <owner/repo@skill> -y  # non-interactive
+npm exec -- skills list                       # installed skills and lock state
+npm exec -- skills update                     # rewrites skills-lock.json
 ```
 
+- The CLI is a root devDependency, so `npm exec -- skills` runs the pinned 1.9 release. `npx skills` would fetch whatever is latest and can migrate the lockfile format.
 - Installs land in `.agents/skills/` and are pinned in `skills-lock.json`; commit both together.
-- `npx skills update` rewrites every lock entry. Run it on its own, then diff `skills-lock.json` and confirm no `computedHash` is empty.
+- `skills update` rewrites every lock entry. Run it on its own, then diff `skills-lock.json` and confirm no `computedHash` is empty.
+- `skills list` hashes the vendored folders locally; `.github/workflows/skills-lock.yml` fails the build when a skill differs from the lock. Run `npm exec -- skills list | grep "differs from the lock"` to reproduce it.
 - The `antd` skill calls `antd` from `@ant-design/cli`, which has to be installed globally: `npm i -g @ant-design/cli`.
 
 ## Lint, Format and Commits
@@ -130,5 +132,5 @@ codacy patterns <provider> <org> <repo> <toolName>    # per-pattern state and pa
 ```
 
 - Re-analysis happens on push, so `codacy issues` shows the last analysed commit, not local edits.
-- GitHub Actions runs CodeQL, dependency review, conventional commits and the release workflow (`.github/workflows/`); no workflow calls the `gh` CLI.
+- GitHub Actions runs CodeQL, dependency review, conventional commits, the release workflow and the skills-lock check (`.github/workflows/`); no workflow calls the `gh` CLI.
 - Once the branch is pushed, `codacy pull-request <number>` shows its analysis.
