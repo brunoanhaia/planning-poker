@@ -75,7 +75,38 @@ describe('useEstimationStats', () => {
         const { result } = renderHook(() => useEstimationStats({ ...room, votesRevealed: false }));
 
         expect(result.current.totalVotes).toBe(1);
-        expect(result.current.votedParticipants).toHaveLength(1);
+    });
+
+    it('reads a revealed round so a cleared voter card survives in the statistics', () => {
+        const room = buildRoom([buildVoter('user_1', 5)]);
+        const withRound: RoomState = {
+            ...room,
+            stories: [
+                {
+                    id: 'story_1',
+                    rounds: [
+                        {
+                            id: 'round_1',
+                            revealedAt: 1,
+                            votes: [
+                                { name: 'user_1', participantId: 'user_1', vote: 5 },
+                                { name: 'user_2', participantId: 'user_2', vote: 8 },
+                            ],
+                        },
+                    ],
+                    status: 'estimating',
+                    title: 'Story 1',
+                },
+            ],
+        };
+
+        const { result } = renderHook(() => useEstimationStats(withRound));
+
+        // user_2 was cleared from the live roster, but the recorded round keeps
+        // their card in the revealed results.
+        expect(result.current.totalVotes).toBe(2);
+        expect(result.current.averageText).toBe('6.5');
+        expect(result.current.medianText).toBe('6.5');
     });
 
     it('keeps a spectator card that was cast before the reveal', () => {

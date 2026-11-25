@@ -56,7 +56,6 @@ export const ResultsPanel: React.FC = () => {
         outliers,
         totalVotes,
         voteCounts,
-        votedParticipants,
     } = useEstimationStats(roomState);
 
     const currentStory = roomState?.stories[roomState.currentStoryIndex ?? 0];
@@ -68,7 +67,7 @@ export const ResultsPanel: React.FC = () => {
         return null;
     }
 
-    if (votedParticipants.length === 0) {
+    if (totalVotes === 0) {
         return (
             <Card>
                 <Typography.Text type="secondary">{t('results.noVotes')}</Typography.Text>
