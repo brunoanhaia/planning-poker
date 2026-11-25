@@ -736,4 +736,45 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         ]);
         expect(sessionService.resolve(bobToken)).toBeNull();
     });
+
+    it('keeps a departed voter card when the admin clears them before the reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.submitVote(roomId, bobId, 8);
+        rm.leaveRoom(roomId, bobId);
+        rm.clearOfflineParticipants(roomId, hostId);
+        expect(rm.getRoom(roomId)!.participants.map((participant) => participant.id)).toEqual([
+            hostId,
+        ]);
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+
+        // Removing the row must not remove the card it had already cast.
+        const votes = rm.getRoom(roomId)!.stories[0].rounds[0].votes;
+        expect(votes.map((vote) => vote.vote).sort()).toEqual([5, 8]);
+        expect(votes.map((vote) => vote.participantId)).toContain(bobId);
+    });
+
+    it('auto-reveals when the last unvoted online voter disconnects', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+        expect(rm.getRoom(roomId)!.votesRevealed).toBe(false);
+
+        // Bob disconnects without voting: Alice is the only online voter left
+        // and has voted, so the round must close instead of stalling at 100%.
+        rm.leaveRoom(roomId, bobId);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(true);
+        expect(room.stories[0].rounds[0].votes.map((vote) => vote.vote)).toEqual([5]);
+    });
 });

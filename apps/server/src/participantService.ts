@@ -146,6 +146,29 @@ export const joinParticipant = (
 };
 
 /**
+ * Decides whether the room's current round should reveal automatically.
+ *
+ * Completion is measured against the people who are still connected. An
+ * offline voter keeps their card for the reveal, but a disconnected browser
+ * must not block the round indefinitely. The predicate is shared by the vote
+ * path and the disconnect/leave path so the progress bar and the actual reveal
+ * cannot disagree.
+ *
+ * @param room - The active room state.
+ * @returns True when auto-reveal is enabled and every online voter has voted.
+ */
+export const shouldAutoReveal = (room: RoomState): boolean => {
+    if (!room.autoReveal || room.votesRevealed || room.stories.length === 0) {
+        return false;
+    }
+
+    const activeVoters = room.participants.filter(
+        (participant) => !participant.isSpectator && participant.isOnline
+    );
+    return activeVoters.length > 0 && activeVoters.every((participant) => participant.hasVoted);
+};
+
+/**
  * Handles participant disconnection and promotes a new host if the primary host leaves.
  *
  * @param room - The active room state.
@@ -170,6 +193,13 @@ export const leaveParticipant = (room: RoomState, userId: string): RoomState => 
             nextHost.isAdmin = true;
             room.hostId = nextHost.id;
         }
+    }
+
+    // The last unvoted online voter may be the one disconnecting. Re-evaluate
+    // completion here, not only when a vote arrives, or the progress bar can
+    // show 100% while the cards stay hidden.
+    if (shouldAutoReveal(room)) {
+        room.votesRevealed = true;
     }
 
     return room;
@@ -248,15 +278,8 @@ export const submitVoteForParticipant = (
     participant.vote = vote;
     participant.hasVoted = true;
 
-    if (room.autoReveal) {
-        // Completion is measured against the people who are still here. A voter
-        // who closed the tab keeps their card for the reveal, but waiting on a
-        // disconnected browser would block the round indefinitely.
-        const activeVoters = room.participants.filter((p) => !p.isSpectator && p.isOnline);
-        const allVoted = activeVoters.length > 0 && activeVoters.every((p) => p.hasVoted);
-        if (allVoted) {
-            room.votesRevealed = true;
-        }
+    if (shouldAutoReveal(room)) {
+        room.votesRevealed = true;
     }
 
     return room;

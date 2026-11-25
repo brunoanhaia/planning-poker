@@ -16,6 +16,7 @@ import {
     PRESET_DECKS,
     ROOM_IDLE_TTL_MS,
     RoomState,
+    RoundVote,
 } from '@planitpoker/shared';
 
 import { DEFAULT_AVATAR, DEFAULT_HOST_COLOR, DEFAULT_TIMER_DURATION_SECONDS } from './constants.js';
@@ -55,6 +56,14 @@ export class RoomManager {
     private readonly rooms: Map<string, RoomState> = new Map();
     /** Last time a room was touched by a client, in milliseconds. */
     private readonly roomTouchedAt: Map<string, number> = new Map();
+    /**
+     * Cards cast by participants who were removed before the reveal.
+     *
+     * The roster no longer carries those identities, but the round still has to
+     * record the cards as they stood at reveal time. Kept out of `RoomState` on
+     * purpose: a detached card must never be broadcast before the reveal.
+     */
+    private readonly detachedVotes = new Map<string, { storyId: string; votes: RoundVote[] }>();
 
     /**
      * Resets the voting state of a room for a new round.
@@ -63,10 +72,49 @@ export class RoomManager {
      */
     private resetRoomVotes(room: RoomState): void {
         room.votesRevealed = false;
+        this.detachedVotes.delete(room.id);
         room.participants.forEach((participant) => {
             participant.vote = null;
             participant.hasVoted = false;
         });
+    }
+
+    /**
+     * Keeps the cards of participants who are about to leave the roster.
+     *
+     * Clearing or moving a participant removes their row from `RoomState`, but a
+     * card they cast before the reveal still belongs to the round. The snapshot
+     * lives beside the room until `recordRound` consumes it, so it is never
+     * broadcast before the cards are public.
+     *
+     * @param room - The room whose round is still open.
+     * @param participants - Participants about to be removed from the roster.
+     */
+    private captureDetachedVotes(room: RoomState, participants: Participant[]): void {
+        const story = room.stories[room.currentStoryIndex];
+        if (!story || room.votesRevealed) {
+            return;
+        }
+
+        const votes = participants
+            .filter(
+                (participant) =>
+                    !participant.isSpectator &&
+                    participant.vote !== null &&
+                    participant.vote !== undefined
+            )
+            .map((participant) => ({
+                name: participant.name,
+                participantId: participant.id,
+                vote: participant.vote as CardValue,
+            }));
+        if (votes.length === 0) {
+            return;
+        }
+
+        const existing = this.detachedVotes.get(room.id);
+        const previous = existing?.storyId === story.id ? existing.votes : [];
+        this.detachedVotes.set(room.id, { storyId: story.id, votes: [...previous, ...votes] });
     }
 
     /**
@@ -287,6 +335,7 @@ export class RoomManager {
             }
             this.rooms.delete(roomId);
             this.roomTouchedAt.delete(roomId);
+            this.detachedVotes.delete(roomId);
             sessionService.revokeByRoom(roomId);
             dropped.push(roomId);
         });
@@ -315,7 +364,15 @@ export class RoomManager {
         if (!room) {
             return null;
         }
-        return leaveParticipant(room, userId);
+
+        const wasRevealed = room.votesRevealed;
+        const updated = leaveParticipant(room, userId);
+        // Leaving can complete the round when the last unvoted online voter
+        // disconnects, so the snapshot is recorded here, not only on submit.
+        if (!wasRevealed && updated.votesRevealed) {
+            this.recordRound(updated);
+        }
+        return updated;
     }
 
     /**
@@ -331,7 +388,17 @@ export class RoomManager {
         if (!room) {
             return null;
         }
-        return removeParticipant(room, userId);
+
+        const leaving = room.participants.find((participant) => participant.id === userId);
+        if (leaving) {
+            this.captureDetachedVotes(room, [leaving]);
+        }
+        const wasRevealed = room.votesRevealed;
+        const updated = removeParticipant(room, userId);
+        if (!wasRevealed && updated.votesRevealed) {
+            this.recordRound(updated);
+        }
+        return updated;
     }
 
     /**
@@ -351,9 +418,11 @@ export class RoomManager {
             return null;
         }
 
-        const offlineIds = room.participants
-            .filter((participant) => !participant.isOnline)
-            .map((participant) => participant.id);
+        const offlineParticipants = room.participants.filter(
+            (participant) => !participant.isOnline
+        );
+        const offlineIds = offlineParticipants.map((participant) => participant.id);
+        this.captureDetachedVotes(room, offlineParticipants);
         const updated = clearOfflineParticipantsFromRoom(room);
         offlineIds.forEach((offlineId) => sessionService.revokeByUser(roomId, offlineId));
         return updated;
@@ -575,6 +644,13 @@ export class RoomManager {
                 participantId: participant.id,
                 vote: participant.vote as CardValue,
             }));
+
+        const detached = this.detachedVotes.get(room.id);
+        if (detached?.storyId === story.id) {
+            votes.push(...detached.votes);
+        }
+        // The snapshot is consumed by this reveal and by no other story.
+        this.detachedVotes.delete(room.id);
 
         story.rounds.push({ id: generateRoundId(), revealedAt: Date.now(), votes });
         if (story.rounds.length > MAX_ROUNDS_PER_STORY) {
@@ -920,6 +996,9 @@ export class RoomManager {
         if (room.timer) {
             room.timer.isRunning = false;
         }
+        // No reveal can happen after the end, so a pending detached snapshot is
+        // no longer reachable.
+        this.detachedVotes.delete(roomId);
         return room;
     }
 
