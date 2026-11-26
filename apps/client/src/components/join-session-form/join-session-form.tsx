@@ -9,6 +9,8 @@ const ROOM_CODE_LENGTH = 8;
 export interface JoinSessionFormProps {
     /** Pre-fills the field from a `#ABC123` deep link. */
     initialRoomCode: string;
+    /** Shows the pending-transport spinner while the join request is queued or in flight. */
+    loading?: boolean;
     /** Called with the uppercase room code once a session is joined. */
     onSubmit: (roomCode: string) => void;
 }
@@ -16,7 +18,11 @@ export interface JoinSessionFormProps {
 /**
  * Step 2 of the "join a room" flow: nothing but the eight character room code.
  */
-export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({ initialRoomCode, onSubmit }) => {
+export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({
+    initialRoomCode,
+    loading = false,
+    onSubmit,
+}) => {
     const { t } = useTranslation();
     const [roomCode, setRoomCode] = useState(initialRoomCode);
 
@@ -44,7 +50,14 @@ export const JoinSessionForm: React.FC<JoinSessionFormProps> = ({ initialRoomCod
                     />
                 </div>
 
-                <Button block htmlType="submit" size="large" type="primary" disabled={!isComplete}>
+                <Button
+                    block
+                    disabled={!isComplete}
+                    htmlType="submit"
+                    loading={loading}
+                    size="large"
+                    type="primary"
+                >
                     {t('join.submit')}
                 </Button>
             </Flex>

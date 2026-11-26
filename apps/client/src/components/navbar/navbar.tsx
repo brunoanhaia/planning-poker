@@ -7,7 +7,6 @@ import {
 } from '@ant-design/icons';
 import {
     Avatar,
-    Badge,
     Button,
     Flex,
     Input,
@@ -66,7 +65,6 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
         colorModeToggle,
         handleCopyLink,
         isAdmin,
-        isConnected,
         isEditingTitle,
         isSpectator,
         leaveRoom,
@@ -176,12 +174,9 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             </Tooltip>
                         )}
 
-                        {/* The live region stays mounted: a region inserted with
-                            its content already inside is often skipped by screen
-                            readers, so only the badge is conditional. */}
-                        <span aria-live="polite" role="status">
-                            {!isConnected && <Badge status="error" text={t('error.offline')} />}
-                        </span>
+                        {/* The connection banner in the content area is the
+                            single live region for transport changes, so the
+                            header does not announce the same outage twice. */}
 
                         <Tooltip title={t('nav.leave')}>
                             <Button

@@ -33,7 +33,7 @@ The client renders entirely with [Ant Design](https://ant.design) 6 components â
 - **Global theme**: `apps/client/src/theme/app-theme.ts` is the single `ConfigProvider` configuration. It switches the design-token algorithm per colour scheme and carries the only token overrides in the project, each a documented WCAG AA contrast correction.
 - **Per-component tokens**: components consume the active theme through `theme.useToken()` rather than hard-coded colours.
 - **Component layout**: one component per folder, kebab-case, under `apps/client/src/components/`. Logic lives in colocated hooks or `.utils.ts` files; only the component itself lives in the `.tsx`.
-- **Accessibility**: `apps/e2e/tests/overlap-axe.spec.ts` scans the lobby, the room and the revealed results on four viewports in both colour schemes, asserting zero axe violations and zero overlapping text or interactive elements.
+- **Accessibility**: `apps/e2e/tests/overlap-axe.spec.ts` scans the lobby, setup, room and revealed results on eight viewports from 320 px to 4K in both colour schemes, asserting zero axe violations, zero overlapping text or interactive elements, and zero horizontal overflow.
 
 ### Internationalization
 
@@ -98,6 +98,7 @@ The application supports multiple users connecting to a single room to vote on t
     - **Result statistics**: average, median, consensus, top vote, voters and population standard deviation, plus the voters whose card falls outside 1.5 interquartile ranges.
     - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it. The ended room is read-only: the server refuses content changes with `SESSION_ENDED` and stops a running countdown.
     - **Interface languages**: English, Brazilian Portuguese and Spanish, switchable from the application bar and remembered across reloads.
+    - **Resilient connection**: a create or join issued while the WebSocket is opening is queued and runs once it connects. The UI announces connecting, reconnecting, waking and offline states, offers a retry after a bounded cold-start wait, and a double click cannot create two rooms or participants.
     - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
 
 - **Administrative Features** (Restricted to Admin and Co-host):

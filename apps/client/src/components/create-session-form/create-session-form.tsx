@@ -9,6 +9,8 @@ import { parseCustomDeck, validateCustomDeck } from '../deck-select/deck-select.
 export interface CreateSessionFormProps {
     /** Disables the submit button until a display name has been captured. */
     disabled: boolean;
+    /** Shows the pending-transport spinner while the create request is queued or in flight. */
+    loading?: boolean;
     /** Called with the trimmed session title (possibly empty) and the selected deck, including custom cards when selected. */
     onSubmit: (title: string, deckType: DeckType, customDeck?: (number | string)[]) => void;
 }
@@ -16,7 +18,11 @@ export interface CreateSessionFormProps {
 /**
  * Step 2 of the "create a room" flow: the optional session title and the deck.
  */
-export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, onSubmit }) => {
+export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({
+    disabled,
+    loading = false,
+    onSubmit,
+}) => {
     const { t } = useTranslation();
     const [roomTitle, setRoomTitle] = useState('');
     const [deckType, setDeckType] = useState<DeckType>('fibonacci');
@@ -80,6 +86,7 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                     block
                     disabled={disabled}
                     htmlType="submit"
+                    loading={loading}
                     size="large"
                     style={{ height: 44, overflow: 'hidden' }}
                     styles={{

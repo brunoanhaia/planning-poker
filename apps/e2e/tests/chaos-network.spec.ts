@@ -46,11 +46,11 @@ test.describe('Chaos Network & WebSocket Interception', () => {
             expect(currentRoute).not.toBeNull();
             await currentRoute!.close();
 
-            await expect(voterPage.getByText('Connection to server lost. Retrying...')).toBeVisible(
-                { timeout: 5000 }
-            );
+            await expect(voterPage.getByText(/Connection lost\. Reconnecting/)).toBeVisible({
+                timeout: 5000,
+            });
 
-            await expect(voterPage.getByText('Connection to server lost. Retrying...')).toBeHidden({
+            await expect(voterPage.getByText(/Connection lost\. Reconnecting/)).toBeHidden({
                 timeout: 10000,
             });
             await expect(voterPage.getByText('Participants (2)')).toBeVisible();

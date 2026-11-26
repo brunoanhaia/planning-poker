@@ -46,7 +46,6 @@ export interface NavbarModel {
     colorModeToggle: NavbarIconLabel;
     handleCopyLink: () => Promise<void>;
     isAdmin: boolean;
-    isConnected: boolean;
     isEditingTitle: boolean;
     isSpectator: boolean;
     leaveRoom: () => void;
@@ -69,15 +68,8 @@ export interface NavbarModel {
  * @returns The room snapshot, the derived labels and the handlers to bind.
  */
 export const useNavbar = (colorMode: ColorMode): NavbarModel => {
-    const {
-        currentUserId,
-        isAdmin,
-        isConnected,
-        leaveRoom,
-        roomState,
-        toggleSpectator,
-        updateRoomTitle,
-    } = useSocket();
+    const { currentUserId, isAdmin, leaveRoom, roomState, toggleSpectator, updateRoomTitle } =
+        useSocket();
     const { t } = useTranslation();
     const { message } = AntApp.useApp();
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -121,7 +113,6 @@ export const useNavbar = (colorMode: ColorMode): NavbarModel => {
         colorModeToggle: getColorModeToggle(colorMode, t),
         handleCopyLink,
         isAdmin,
-        isConnected,
         isEditingTitle,
         isSpectator: Boolean(currentUser?.isSpectator),
         leaveRoom,

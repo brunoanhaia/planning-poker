@@ -31,7 +31,7 @@ const readRoomCodeFromHash = (): string => {
  * shared by both flows, and only the second step changes with the active tab.
  */
 export const Home: React.FC = () => {
-    const { createRoom, joinRoom, error, clearError } = useSocket();
+    const { createRoom, joinRoom, error, clearError, pendingEntry } = useSocket();
     const { t } = useTranslation();
     const { token } = theme.useToken();
 
@@ -156,6 +156,7 @@ export const Home: React.FC = () => {
                                         children: (
                                             <CreateSessionForm
                                                 disabled={!hasDisplayName}
+                                                loading={pendingEntry === 'create'}
                                                 onSubmit={handleCreate}
                                             />
                                         ),
@@ -166,6 +167,7 @@ export const Home: React.FC = () => {
                                         children: (
                                             <JoinSessionForm
                                                 initialRoomCode={roomCodeFromHash}
+                                                loading={pendingEntry === 'join'}
                                                 onSubmit={handleJoin}
                                             />
                                         ),
