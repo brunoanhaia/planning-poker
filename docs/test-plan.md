@@ -275,7 +275,8 @@ Rules:
 
 ## 8. Implementation status
 
-- [x] C5: the primary lobby action wraps instead of clipping at 320 px, covered in
+- [x] C5: the primary lobby action is short in pt-BR ("Entrar na Sala"), wraps instead of
+      clipping in the longer locales, keeps a 44 px touch target and is covered in
       `content-stress` for en/pt-BR/es.
 - [ ] C1/C2: connection lifecycle, action queue and cold-start feedback.
 - [ ] C3: public-origin health contract and deployment smoke.

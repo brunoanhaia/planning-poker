@@ -74,13 +74,15 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
 
                 {/* The primary action must stay fully readable on a narrow
                     phone: wrapping is preferable to clipping the label, which
-                    would hide what the button actually does. */}
+                    would hide what the button actually does. `height: auto`
+                    lets it grow with a second line; the explicit minimum keeps
+                    the touch target comfortable when the label fits on one. */}
                 <Button
                     block
                     disabled={disabled}
                     htmlType="submit"
                     size="large"
-                    style={{ height: 'auto', whiteSpace: 'normal' }}
+                    style={{ height: 'auto', minHeight: 44, whiteSpace: 'normal' }}
                     type="primary"
                 >
                     {t('create.submit')}

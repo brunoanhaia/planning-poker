@@ -134,7 +134,7 @@ export const createRoom = async (
         }
         await adminPage
             .getByRole('button', {
-                name: /Start Session & Generate Room Code|Iniciar Sessão e Gerar Código da Sala/i,
+                name: /^(Start Session & Generate Room Code|Entrar na Sala)$/i,
             })
             .click();
 

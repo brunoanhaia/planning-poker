@@ -13,15 +13,19 @@ test.describe('Content Stress', () => {
                 await page.goto('/');
 
                 const submit = page.getByRole('button', {
-                    name: /Start Session|Iniciar Sessão|Iniciar Sesión/i,
+                    name: /^(Start Session & Generate Room Code|Entrar na Sala|Iniciar Sesión y Generar Código de Sala)$/i,
                 });
                 await expect(submit).toBeVisible();
 
                 const metrics = await submit.evaluate((element) => ({
                     clientWidth: element.clientWidth,
+                    height: element.getBoundingClientRect().height,
                     scrollWidth: element.scrollWidth,
                 }));
                 expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+                // A primary touch target stays comfortable even when the label
+                // fits on a single line.
+                expect(metrics.height).toBeGreaterThanOrEqual(44);
 
                 const box = await submit.boundingBox();
                 expect(box).not.toBeNull();
