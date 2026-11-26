@@ -261,7 +261,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
      * so a double tap cannot create two rooms or two participants.
      */
     const enqueueEntry = useCallback(
-        (kind: 'create' | 'join', type: WSMessageType, payload: unknown) => {
+        (
+            kind: 'create' | 'join',
+            type: WSMessageType,
+            payload: unknown,
+            attemptedRoomId: null | string
+        ) => {
             // Once a request is in flight, any further entry must wait for its
             // answer; a queued request may still be replaced by the latest one.
             if (entryInFlightRef.current !== null) {
@@ -270,6 +275,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (pendingEntryRef.current?.kind === kind) {
                 return;
             }
+            // Only an accepted request may move the room the next
+            // `ROOM_NOT_FOUND` is compared against.
+            lastJoinRoomIdRef.current = attemptedRoomId;
             pendingEntryRef.current = { kind, payload, type };
             setPendingEntry(kind);
             if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -689,16 +697,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             deckType: DeckType = 'fibonacci',
             customDeck?: (number | string)[]
         ) => {
-            lastJoinRoomIdRef.current = null;
-            enqueueEntry('create', 'CREATE_ROOM', {
-                avatar,
-                color,
-                customDeck,
-                deckType,
-                name,
-                previousRoomToken: previousRoomTokenFor(''),
-                title,
-            });
+            enqueueEntry(
+                'create',
+                'CREATE_ROOM',
+                {
+                    avatar,
+                    color,
+                    customDeck,
+                    deckType,
+                    name,
+                    previousRoomToken: previousRoomTokenFor(''),
+                    title,
+                },
+                null
+            );
         },
         [enqueueEntry]
     );
@@ -711,17 +723,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // code misses the token and mints a second participant.
             const normalizedRoomId = roomId.trim().toUpperCase();
 
-            lastJoinRoomIdRef.current = normalizedRoomId;
-            enqueueEntry('join', 'JOIN_ROOM', {
-                avatar,
-                color,
-                name,
-                previousRoomToken: previousRoomTokenFor(normalizedRoomId),
-                roomId: normalizedRoomId,
-                sessionToken:
-                    sessionTokenRef.current ?? localStorage.getItem(roomTokenKey(normalizedRoomId)),
-                userId: currentUserId,
-            });
+            enqueueEntry(
+                'join',
+                'JOIN_ROOM',
+                {
+                    avatar,
+                    color,
+                    name,
+                    previousRoomToken: previousRoomTokenFor(normalizedRoomId),
+                    roomId: normalizedRoomId,
+                    sessionToken:
+                        sessionTokenRef.current ??
+                        localStorage.getItem(roomTokenKey(normalizedRoomId)),
+                    userId: currentUserId,
+                },
+                normalizedRoomId
+            );
         },
         [currentUserId, enqueueEntry]
     );

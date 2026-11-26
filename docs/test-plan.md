@@ -67,7 +67,8 @@ These are the contracts the new suites must assert.
 - The waiting state for a participant who joins before the setup is complete is explicit.
 - Before offering to re-enter a stored room, the client confirms it still exists
   (`CHECK_ROOM`/`ROOM_STATUS`). A room the server lost is forgotten without a switch dialog,
-  while a live room still asks before switching.
+  while a live room still asks before switching. An unknown check consumes the same
+  per-address failed-join budget as a failed join; a barred address gets no existence answer.
 
 ### C5 — Responsive layout
 

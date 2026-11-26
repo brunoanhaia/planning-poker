@@ -903,4 +903,58 @@ describe('SocketProvider reconnection', () => {
             screen.getByText('This room was opened in another tab. This tab stopped updating.')
         ).toBeInTheDocument();
     });
+
+    it('restarts the wake grace period when online finds a dial still connecting', () => {
+        renderProbe();
+
+        act(() => {
+            window.dispatchEvent(new Event('offline'));
+        });
+        act(() => {
+            window.dispatchEvent(new Event('online'));
+        });
+        act(() => {
+            vi.advanceTimersByTime(4000);
+        });
+
+        // The socket never left CONNECTING; the online event must give it a
+        // fresh deadline instead of leaving the lobby without a retry.
+        expect(screen.getByTestId('connection')).toHaveTextContent('waking');
+    });
+
+    it('does not track a join rejected by the in-flight guard', () => {
+        localStorage.setItem('planit_active_room', 'ROOM01');
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        sessionStorage.setItem('planit_session_token', 'tok-room');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+        act(() => {
+            socket.receive({
+                payload: { exists: true, roomId: 'ROOM01' },
+                type: 'ROOM_STATUS',
+            });
+        });
+        act(() => {
+            screen.getByRole('button', { name: 'join' }).click();
+        });
+        // The second join is rejected while the first is in flight; it must not
+        // replace the room the eventual ROOM_NOT_FOUND is compared against.
+        act(() => {
+            screen.getByRole('button', { name: 'join-other' }).click();
+        });
+        act(() => {
+            socket.receive({
+                payload: { code: 'ROOM_NOT_FOUND', message: 'Room not found.' },
+                type: 'ERROR',
+            });
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBeNull();
+        expect(
+            screen.getByText('That session no longer exists. Start a new one.')
+        ).toBeInTheDocument();
+    });
 });
