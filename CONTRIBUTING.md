@@ -4,10 +4,11 @@ Thanks for taking the time to contribute.
 
 This document covers **process**: branches, commits, pull requests, and review. It also includes setup, build, and test commands used when contributing. For full development and tooling documentation, see the references below.
 
-| For                                                   | See                        |
-| ----------------------------------------------------- | -------------------------- |
-| Install, run, devcontainers, testing, deployment      | [`README.md`](./README.md) |
-| Monorepo layout, exact commands, conventions, gotchas | [`AGENTS.md`](./AGENTS.md) |
+| For                                                           | See                                                                                          |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Product behavior: roles, voting, limits, security, deployment | [the project wiki](https://github.com/brunoanhaia/planning-poker/wiki) — the source of truth |
+| Install, run, devcontainers, testing                          | [`README.md`](./README.md) and [`TOOLS.md`](./TOOLS.md)                                      |
+| Monorepo layout, exact commands, conventions, gotchas         | [`AGENTS.md`](./AGENTS.md)                                                                   |
 
 If something here disagrees with `AGENTS.md`, follow `AGENTS.md`.
 
