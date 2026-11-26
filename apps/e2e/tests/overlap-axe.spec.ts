@@ -20,9 +20,13 @@ interface OverlapIssue {
 
 const VIEWPORTS: ViewportConfig[] = [
     { name: 'Mobile (320px)', width: 320, height: 640 },
+    { name: 'Mobile Large (375px)', width: 375, height: 812 },
     { name: 'Tablet (768px)', width: 768, height: 1024 },
+    { name: 'Laptop (1024px)', width: 1024, height: 768 },
     { name: 'Desktop (1280px)', width: 1280, height: 800 },
     { name: 'Wide (1920px)', width: 1920, height: 1080 },
+    { name: 'Ultra-wide (2560px)', width: 2560, height: 1440 },
+    { name: '4K (3840px)', width: 3840, height: 2160 },
 ];
 
 /** Both design-token schemes the application ships, exercised on every viewport. */
@@ -231,6 +235,14 @@ const expectCleanLayout = async (page: Page, viewportName: string, state: string
             2
         )}`
     ).toEqual([]);
+
+    const horizontalOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(
+        horizontalOverflow,
+        `Horizontal overflow in the ${state} state on ${viewportName}`
+    ).toBeLessThanOrEqual(1);
 };
 
 test.describe('UI Overlap & Text Visibility Validation', () => {

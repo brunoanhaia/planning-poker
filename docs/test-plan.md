@@ -277,7 +277,8 @@ Rules:
 
 - [x] C5: the primary lobby action uses the same short label in every locale ("Enter Room" /
       "Entrar na Sala" / "Entrar en la Sala"), stays on one line, ellipsizes any longer label
-      and keeps a 44 px touch target; covered in `content-stress` for en/pt-BR/es.
+      and keeps a 44 px touch target; covered in `content-stress` at 320 px and in
+      `overlap-axe` across 320, 375, 768, 1024, 1280, 1920, 2560 and 3840 px in both schemes.
 - [ ] C1/C2: connection lifecycle, action queue and cold-start feedback.
 - [ ] C3: public-origin health contract and deployment smoke.
 - [ ] C4/C6: setup discovery, keyboard journeys and per-state axe.
