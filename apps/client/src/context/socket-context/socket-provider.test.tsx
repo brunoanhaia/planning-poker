@@ -91,13 +91,30 @@ const room: RoomState = {
 
 /** Renders the connection state the provider exposes. */
 const Probe = () => {
-    const { error, joinRoom, leaveRoom, roomState } = useSocket();
+    const {
+        connectionStatus,
+        createRoom,
+        error,
+        joinRoom,
+        leaveRoom,
+        pendingEntry,
+        retryConnection,
+        roomState,
+    } = useSocket();
     return (
         <>
             <span>{roomState ? 'room' : 'lobby'}</span>
             <span>{error ?? ''}</span>
+            <span data-testid="connection">{connectionStatus}</span>
+            <span data-testid="pending">{pendingEntry ?? 'none'}</span>
             <button onClick={leaveRoom} type="button">
                 leave
+            </button>
+            <button onClick={() => createRoom('Ana', 'avatar-1', '#1890ff')} type="button">
+                create
+            </button>
+            <button onClick={retryConnection} type="button">
+                retry
             </button>
             <button onClick={() => joinRoom('ROOM01', 'Ana', 'avatar-1', '#1890ff')} type="button">
                 join
@@ -508,5 +525,154 @@ describe('SocketProvider reconnection', () => {
 
         expect(screen.getByText('room')).toBeInTheDocument();
         expect(screen.queryByText('Room not found. Please check the room code.')).toBeNull();
+    });
+
+    it('queues a create while connecting and sends it once when the socket opens', () => {
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+
+        expect(socket.sent).toHaveLength(0);
+        expect(screen.getByTestId('pending')).toHaveTextContent('create');
+
+        // A double click while the request is queued must not enqueue another.
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+        act(() => {
+            socket.open();
+        });
+
+        const frames = socket.sent.map((frame) => JSON.parse(frame));
+        expect(frames).toHaveLength(1);
+        expect(frames[0].type).toBe('CREATE_ROOM');
+
+        // The spinner stays until the server confirms the room.
+        expect(screen.getByTestId('pending')).toHaveTextContent('create');
+        act(() => {
+            socket.receive({
+                payload: { currentUserId: 'u1', roomState: room },
+                type: 'ROOM_STATE',
+            });
+        });
+        expect(screen.getByTestId('pending')).toHaveTextContent('none');
+    });
+
+    it('ignores a second create after the first one is in flight', () => {
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+
+        expect(socket.sent).toHaveLength(1);
+    });
+
+    it('keeps a queued create across a drop before it is sent', () => {
+        renderProbe();
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+        const first = FakeWebSocket.instances[0];
+
+        act(() => {
+            first.drop();
+        });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+
+        const second = FakeWebSocket.instances[1];
+        act(() => {
+            second.open();
+        });
+
+        expect(second.sent).toHaveLength(1);
+        expect(JSON.parse(second.sent[0]).type).toBe('CREATE_ROOM');
+    });
+
+    it('clears the pending entry when the server rejects the queued action', () => {
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+        act(() => {
+            socket.open();
+        });
+
+        act(() => {
+            socket.receive({
+                payload: { code: 'ROOM_LIMIT_REACHED', message: 'limit' },
+                type: 'ERROR',
+            });
+        });
+
+        expect(screen.getByTestId('pending')).toHaveTextContent('none');
+        expect(screen.getByText('The server is at capacity. Try again later.')).toBeInTheDocument();
+    });
+
+    it('reports a slow connection as a cold start and clears it once open', () => {
+        renderProbe();
+        expect(screen.getByTestId('connection')).toHaveTextContent('connecting');
+
+        act(() => {
+            vi.advanceTimersByTime(4000);
+        });
+        expect(screen.getByTestId('connection')).toHaveTextContent('waking');
+
+        act(() => {
+            FakeWebSocket.instances[0].open();
+        });
+        expect(screen.getByTestId('connection')).toHaveTextContent('connected');
+    });
+
+    it('retries a socket that is stuck connecting', () => {
+        renderProbe();
+        const first = FakeWebSocket.instances[0];
+        act(() => {
+            vi.advanceTimersByTime(4000);
+        });
+        expect(screen.getByTestId('connection')).toHaveTextContent('waking');
+
+        act(() => {
+            screen.getByRole('button', { name: 'retry' }).click();
+        });
+
+        expect(FakeWebSocket.instances).toHaveLength(2);
+        expect(first.readyState).toBe(FakeWebSocket.CLOSED);
+        const second = FakeWebSocket.instances[1];
+        act(() => {
+            second.open();
+        });
+        expect(screen.getByTestId('connection')).toHaveTextContent('connected');
+    });
+
+    it('reports reconnecting after a drop and connected after the retry opens', () => {
+        renderProbe();
+        const first = enterRoom();
+        act(() => {
+            first.drop();
+        });
+        expect(screen.getByTestId('connection')).toHaveTextContent('reconnecting');
+
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        const second = FakeWebSocket.instances[1];
+        act(() => {
+            second.open();
+        });
+        expect(screen.getByTestId('connection')).toHaveTextContent('connected');
     });
 });

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useSocket } from '../../context/socket-context/use-socket';
 import { useTranslation } from '../../i18n/use-translation';
 import { ColorMode } from '../../theme/app-theme';
+import { ConnectionBanner } from '../connection-banner/connection-banner';
 import { EstimationPanel } from '../estimation-panel/estimation-panel';
 import { Home } from '../home/home';
 import { Navbar } from '../navbar/navbar';
@@ -84,6 +85,8 @@ export const MainContent: React.FC<MainContentProps> = ({ colorMode, onToggleCol
             />
 
             <Layout.Content style={CONTENT_PADDING}>
+                <ConnectionBanner />
+
                 {roomState && isConnected && error && (
                     // Server rejections (a rate limit, a stale vote) used to be
                     // rendered only on the lobby, leaving an error invisible to

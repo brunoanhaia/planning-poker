@@ -279,7 +279,11 @@ Rules:
       "Entrar na Sala" / "Entrar en la Sala"), stays on one line, ellipsizes any longer label
       and keeps a 44 px touch target; covered in `content-stress` at 320 px and in
       `overlap-axe` across 320, 375, 768, 1024, 1280, 1920, 2560 and 3840 px in both schemes.
-- [ ] C1/C2: connection lifecycle, action queue and cold-start feedback.
+- [x] C1/C2: connection lifecycle, action queue and cold-start feedback, covered by
+      `connectivity.spec.ts` (queued create exactly once, waking/retry, offline recovery) and
+      the provider unit tests.
+- [x] Phase 1: `support/connection.ts` provides the delayed-open helper used to simulate a
+      cold backend without delaying the real server connection.
 - [ ] C3: public-origin health contract and deployment smoke.
 - [ ] C4/C6: setup discovery, keyboard journeys and per-state axe.
 - [ ] C7: remaining dialog and snapshot regression matrix.

@@ -18,10 +18,18 @@ import { useTranslation } from '../../i18n/use-translation';
 import { forgetActiveRoom, readActiveRoom, rememberActiveRoom } from '../../utils/active-room';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
 import { resolveSocketUrl } from '../../utils/socket-url';
-import { SocketContext, SocketContextValue } from './socket-context';
+import { ConnectionStatus, SocketContext, SocketContextValue } from './socket-context';
 
 /** Reconnection delay applied whenever the socket drops. */
 const RECONNECT_DELAY_MS = 2000;
+
+/**
+ * How long a connection may stay unopened before the UI calls it a cold start.
+ *
+ * A free-tier backend can take tens of seconds to wake, so the form must say
+ * so instead of looking frozen.
+ */
+const WAKE_GRACE_MS = 4000;
 
 /** Session storage key holding the token that survives a page reload. */
 const SESSION_TOKEN_STORAGE_KEY = 'planit_session_token';
@@ -112,13 +120,25 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const { t } = useTranslation();
     const [roomState, setRoomState] = useState<null | RoomState>(null);
     const [currentUserId, setCurrentUserId] = useState<null | string>(null);
-    const [isConnected, setIsConnected] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(() =>
+        typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'connecting'
+    );
+    const [pendingEntry, setPendingEntry] = useState<null | 'create' | 'join'>(null);
     const [errorNotice, setErrorNotice] = useState<ErrorNotice | null>(null);
     const [isKicked, setIsKicked] = useState(false);
     const socketRef = useRef<null | WebSocket>(null);
     const sessionTokenRef = useRef<null | string>(null);
     const roomStateRef = useRef<null | RoomState>(null);
     const currentUserIdRef = useRef<null | string>(null);
+    const pendingEntryRef = useRef<null | {
+        kind: 'create' | 'join';
+        payload: unknown;
+        type: WSMessageType;
+    }>(null);
+    const entryInFlightRef = useRef<null | 'create' | 'join'>(null);
+    const wasConnectedRef = useRef(false);
+    const browserOfflineRef = useRef(false);
+    const connectRef = useRef<null | (() => void)>(null);
 
     useEffect(() => {
         sessionTokenRef.current = sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
@@ -160,34 +180,104 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, [forgetStoredToken, releaseRoom]);
 
-    const send = useCallback((type: WSMessageType, payload: unknown) => {
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ payload, type }));
-        } else {
-            setErrorNotice({ key: 'error.offline' });
+    const transmit = useCallback((type: WSMessageType, payload: unknown) => {
+        socketRef.current?.send(JSON.stringify({ payload, type }));
+    }, []);
+
+    /** Clears the in-flight marker, keeping a still-queued entry for the next open. */
+    const resolveEntry = useCallback(() => {
+        entryInFlightRef.current = null;
+        if (!pendingEntryRef.current) {
+            setPendingEntry(null);
         }
     }, []);
 
-    /** Applies a `ROOM_STATE` broadcast: refs, rendered state, token, entry notice and self id. */
-    const applyRoomState = useCallback((payload: RoomStatePayload) => {
-        const isEnteringRoom = roomStateRef.current === null;
-        roomStateRef.current = payload.roomState;
-        setRoomState(payload.roomState);
-        if (sessionTokenRef.current) {
-            persistRoomToken(payload.roomState.id, sessionTokenRef.current);
-        }
-        rememberActiveRoom(payload.roomState.id);
-        if (isEnteringRoom) {
-            // A notice raised on the lobby (a stale room code, a
-            // rate limit) must not follow the user into the room
-            // they just entered; notices raised inside a room stay.
-            setErrorNotice(null);
-        }
-        if (payload.currentUserId) {
-            currentUserIdRef.current = payload.currentUserId;
-            setCurrentUserId(payload.currentUserId);
-        }
+    /** Drops both the queued and the in-flight entry once it has been answered. */
+    const clearEntry = useCallback(() => {
+        pendingEntryRef.current = null;
+        entryInFlightRef.current = null;
+        setPendingEntry(null);
     }, []);
+
+    /** Sends the queued create/join exactly once, as soon as the socket is open. */
+    const flushPendingEntry = useCallback(() => {
+        const entry = pendingEntryRef.current;
+        if (!entry || socketRef.current?.readyState !== WebSocket.OPEN) {
+            return;
+        }
+        pendingEntryRef.current = null;
+        entryInFlightRef.current = entry.kind;
+        transmit(entry.type, entry.payload);
+    }, [transmit]);
+
+    /**
+     * Queues a create/join until the transport opens.
+     *
+     * A second click while the first request is queued or in flight is ignored,
+     * so a double tap cannot create two rooms or two participants.
+     */
+    const enqueueEntry = useCallback(
+        (kind: 'create' | 'join', type: WSMessageType, payload: unknown) => {
+            // Once a request is in flight, any further entry must wait for its
+            // answer; a queued request may still be replaced by the latest one.
+            if (entryInFlightRef.current !== null) {
+                return;
+            }
+            if (pendingEntryRef.current?.kind === kind) {
+                return;
+            }
+            pendingEntryRef.current = { kind, payload, type };
+            setPendingEntry(kind);
+            if (socketRef.current?.readyState === WebSocket.OPEN) {
+                flushPendingEntry();
+                return;
+            }
+            if (browserOfflineRef.current || navigator.onLine === false) {
+                setConnectionStatus('offline');
+            } else {
+                setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+            }
+            connectRef.current?.();
+        },
+        [flushPendingEntry]
+    );
+
+    const send = useCallback(
+        (type: WSMessageType, payload: unknown) => {
+            if (socketRef.current?.readyState === WebSocket.OPEN) {
+                transmit(type, payload);
+            } else {
+                setErrorNotice({ key: 'error.offline' });
+            }
+        },
+        [transmit]
+    );
+
+    /** Applies a `ROOM_STATE` broadcast: refs, rendered state, token, entry notice and self id. */
+    const applyRoomState = useCallback(
+        (payload: RoomStatePayload) => {
+            const isEnteringRoom = roomStateRef.current === null;
+            roomStateRef.current = payload.roomState;
+            setRoomState(payload.roomState);
+            if (sessionTokenRef.current) {
+                persistRoomToken(payload.roomState.id, sessionTokenRef.current);
+            }
+            rememberActiveRoom(payload.roomState.id);
+            if (isEnteringRoom) {
+                // A notice raised on the lobby (a stale room code, a
+                // rate limit) must not follow the user into the room
+                // they just entered; notices raised inside a room stay.
+                setErrorNotice(null);
+            }
+            if (payload.currentUserId) {
+                currentUserIdRef.current = payload.currentUserId;
+                setCurrentUserId(payload.currentUserId);
+            }
+            // A room state means the queued create/join was accepted.
+            clearEntry();
+        },
+        [clearEntry]
+    );
 
     /** Applies a `SESSION` message: the issued token and the participant it was bound to. */
     const applySession = useCallback((payload: SessionPayload) => {
@@ -205,6 +295,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     /** Surfaces an `ERROR` notice and drops the session when its code means the session is gone. */
     const applyServerError = useCallback(
         (payload: ErrorPayload) => {
+            // The server answered the entry request, so its spinner must stop
+            // even when the answer is a rejection the user has to correct.
+            clearEntry();
             setErrorNotice({
                 code: payload.code,
                 message: payload.message,
@@ -221,14 +314,40 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 forgetSession();
             }
         },
-        [forgetSession]
+        [clearEntry, forgetSession]
     );
 
     useEffect(() => {
         let isMounted = true;
         let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+        let wakingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        const clearWakingTimeout = () => {
+            if (wakingTimeout) {
+                clearTimeout(wakingTimeout);
+                wakingTimeout = null;
+            }
+        };
+
+        const scheduleWaking = () => {
+            clearWakingTimeout();
+            wakingTimeout = setTimeout(() => {
+                if (!isMounted) {
+                    return;
+                }
+                setConnectionStatus((current) =>
+                    current === 'connected' || current === 'offline' ? current : 'waking'
+                );
+            }, WAKE_GRACE_MS);
+        };
 
         const connect = () => {
+            if (!isMounted) {
+                return;
+            }
+            if (browserOfflineRef.current || navigator.onLine === false) {
+                return;
+            }
             if (
                 socketRef.current &&
                 (socketRef.current.readyState === WebSocket.OPEN ||
@@ -245,13 +364,20 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
             const ws = new WebSocket(wsUrl);
             socketRef.current = ws;
+            scheduleWaking();
 
             ws.onopen = () => {
-                if (!isMounted) {
+                if (!isMounted || socketRef.current !== ws) {
                     return;
                 }
-                setIsConnected(true);
+                clearWakingTimeout();
+                wasConnectedRef.current = true;
+                setConnectionStatus('connected');
                 setErrorNotice(null);
+
+                // The action the user took while the socket was opening runs
+                // now, exactly once.
+                flushPendingEntry();
 
                 const room = roomStateRef.current;
                 const userId = currentUserIdRef.current;
@@ -270,7 +396,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             };
 
             ws.onmessage = (event) => {
-                if (!isMounted) {
+                if (!isMounted || socketRef.current !== ws) {
                     return;
                 }
                 try {
@@ -291,14 +417,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             };
 
             ws.onclose = (event) => {
-                if (!isMounted) {
+                if (!isMounted || socketRef.current !== ws) {
                     return;
                 }
-                setIsConnected(false);
+                clearWakingTimeout();
+                resolveEntry();
+                if (browserOfflineRef.current) {
+                    // The online event owns the next dial; reconnecting in the
+                    // background while the browser is offline only spins.
+                    setConnectionStatus('offline');
+                    return;
+                }
                 if (event.code === SESSION_REPLACED_CLOSE_CODE) {
                     // Another tab of this browser took the participant over. Hand
                     // the room over, keep the stored token for the tab that owns
                     // it, and stay put instead of fighting for the socket.
+                    setConnectionStatus('offline');
                     releaseRoom();
                     setErrorNotice({ key: 'session.replaced' });
                     return;
@@ -308,11 +442,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // server removed this participant: the token this tab holds is
                     // dead and must not be replayed. The room that took over owns
                     // `planit_active_room`, so that record stays untouched.
+                    setConnectionStatus('offline');
                     forgetStoredToken();
                     releaseRoom();
                     setErrorNotice({ key: 'session.moved' });
                     return;
                 }
+                setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+                scheduleWaking();
                 reconnectTimeout = setTimeout(() => {
                     if (isMounted) {
                         connect();
@@ -321,20 +458,54 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             };
 
             ws.onerror = (err) => {
-                console.error('WebSocket connection error:', err);
-                if (isMounted) {
-                    setIsConnected(false);
+                if (!isMounted || socketRef.current !== ws) {
+                    return;
                 }
+                console.error('WebSocket connection error:', err);
+                if (browserOfflineRef.current) {
+                    setConnectionStatus('offline');
+                    return;
+                }
+                setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+                scheduleWaking();
             };
         };
 
+        connectRef.current = connect;
+
+        const handleOffline = () => {
+            browserOfflineRef.current = true;
+            if (isMounted) {
+                setConnectionStatus('offline');
+            }
+        };
+
+        const handleOnline = () => {
+            browserOfflineRef.current = false;
+            if (!isMounted) {
+                return;
+            }
+            if (socketRef.current?.readyState === WebSocket.OPEN) {
+                setConnectionStatus('connected');
+                return;
+            }
+            setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+            connect();
+        };
+
+        window.addEventListener('offline', handleOffline);
+        window.addEventListener('online', handleOnline);
         connect();
 
         return () => {
             isMounted = false;
+            connectRef.current = null;
+            window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('online', handleOnline);
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
             }
+            clearWakingTimeout();
             if (socketRef.current) {
                 socketRef.current.close();
             }
@@ -343,9 +514,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         applyRoomState,
         applyServerError,
         applySession,
+        flushPendingEntry,
         forgetSession,
         forgetStoredToken,
         releaseRoom,
+        resolveEntry,
         send,
     ]);
 
@@ -358,7 +531,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             deckType: DeckType = 'fibonacci',
             customDeck?: (number | string)[]
         ) => {
-            send('CREATE_ROOM', {
+            enqueueEntry('create', 'CREATE_ROOM', {
                 avatar,
                 color,
                 customDeck,
@@ -368,7 +541,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 title,
             });
         },
-        [send]
+        [enqueueEntry]
     );
 
     const joinRoom = useCallback(
@@ -379,7 +552,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // code misses the token and mints a second participant.
             const normalizedRoomId = roomId.trim().toUpperCase();
 
-            send('JOIN_ROOM', {
+            enqueueEntry('join', 'JOIN_ROOM', {
                 avatar,
                 color,
                 name,
@@ -390,7 +563,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 userId: currentUserId,
             });
         },
-        [currentUserId, send]
+        [currentUserId, enqueueEntry]
     );
 
     const updateRoomTitle = useCallback(
@@ -537,6 +710,34 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const clearError = useCallback(() => setErrorNotice(null), []);
     const clearKickedMessage = useCallback(() => setIsKicked(false), []);
 
+    /**
+     * Abandons the current dial and starts a fresh one.
+     *
+     * A WebSocket that stays in `CONNECTING` on a sleeping backend can sit
+     * there for a long time; the retry gives the user a way out without a
+     * reload. The stale socket's handlers are ignored by the identity guard in
+     * the connection effect.
+     */
+    const retryConnection = useCallback(() => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            setConnectionStatus('offline');
+            return;
+        }
+        const socket = socketRef.current;
+        if (socket?.readyState === WebSocket.OPEN) {
+            return;
+        }
+        socketRef.current = null;
+        try {
+            socket?.close();
+        } catch {
+            // Closing a socket that is still connecting can throw; the fresh
+            // dial below is what matters.
+        }
+        setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+        connectRef.current?.();
+    }, []);
+
     /** Asks the server to drop every participant who is no longer connected. */
     const clearOfflineParticipants = useCallback(() => {
         send('CLEAR_OFFLINE_PARTICIPANTS', {});
@@ -549,6 +750,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const host = roomState?.hostId === currentUserId;
         const currentParticipant = roomState?.participants.find((p) => p.id === currentUserId);
         const error = translateNotice(errorNotice, t);
+        const isConnected = connectionStatus === 'connected';
         const kickedMessage = isKicked ? t('notice.kicked') : null;
 
         return {
@@ -558,6 +760,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             clearError,
             clearKickedMessage,
             clearOfflineParticipants,
+            connectionStatus,
             createRoom,
             currentUserId,
             deleteStory,
@@ -571,9 +774,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             kickParticipant,
             leaveRoom,
             pauseTimer,
+            pendingEntry,
             promoteCoAdmin,
             resetTimer,
             resetVotes,
+            retryConnection,
             revealVotes,
             roomState,
             setCurrentStory,
@@ -594,20 +799,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         clearError,
         clearKickedMessage,
         clearOfflineParticipants,
+        connectionStatus,
         createRoom,
         currentUserId,
         deleteStory,
         endSession,
         errorNotice,
-        isConnected,
         isKicked,
         joinRoom,
         kickParticipant,
         leaveRoom,
         pauseTimer,
+        pendingEntry,
         promoteCoAdmin,
         resetTimer,
         resetVotes,
+        retryConnection,
         revealVotes,
         roomState,
         setCurrentStory,
