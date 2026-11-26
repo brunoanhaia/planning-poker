@@ -13,6 +13,7 @@ The application uses a client-server model communicating over WebSockets for rea
 - **`packages/shared`**: A shared library containing TypeScript interfaces, enums, and constants used by both the client and server.
 - **`docs/security-review.md`**: the penetration test of the HTTP and WebSocket surface, its findings and the abuse controls that answered them.
 - **`docs/regression-playbook.md`**: the release regression gate — automated inventory, chaos experiments and exploratory charters.
+- **`docs/test-plan.md`**: the ideal-behaviour test strategy — connectivity, cold start, deployment contract, responsiveness, accessibility and the suites still to add.
 
 ### Security Model
 

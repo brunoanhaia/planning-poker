@@ -5,6 +5,10 @@ experiments that prove the transport and deployment survive faults, and the expl
 charters that cover what no assertion owns. Run it before a release and after any change to
 the real-time surface.
 
+The ideal-behaviour test strategy and the suites still to add are documented in
+[`docs/test-plan.md`](./test-plan.md). The playbook remains the executable release gate; the
+plan defines the contracts that gate must eventually assert.
+
 - **Last executed:** 2026-10-30 on `test/launch-regression` (started from `d6bb70c`,
   every gate rerun after the review fixes)
 - **Status legend:** PASS (observed) · FAIL (fixed at root cause, gate rerun) · BLOCKED
