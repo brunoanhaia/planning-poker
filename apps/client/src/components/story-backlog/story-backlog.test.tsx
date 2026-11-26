@@ -8,6 +8,18 @@ import * as SocketContextModule from '../../context/socket-context/use-socket';
 import { createMockSocketValue } from '../../tests/socket-context.mock';
 import { StoryBacklog } from './story-backlog';
 
+// The real modal keeps its content mounted while the leave animation runs,
+// which jsdom never completes. Render only the open modal so the ended-session
+// gate can be asserted deterministically.
+vi.mock('antd', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('antd')>();
+    const { createElement } = await import('react');
+    const MockModal = (props: React.ComponentProps<typeof actual.Modal>) =>
+        props.open ? createElement(actual.Modal, props) : null;
+
+    return { ...actual, Modal: Object.assign(MockModal, actual.Modal) };
+});
+
 // The capacity tests only need the boundary, not 200 rendered Ant Design rows.
 // The real ceiling stays enforced and tested on the server.
 vi.mock('@planitpoker/shared', async (importOriginal) => {
@@ -73,6 +85,95 @@ describe('StoryBacklog bulk import', () => {
         ).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Delete Story 0' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Export backlog to CSV' })).toBeInTheDocument();
+    });
+
+    it('closes an open import dialog when the session ends', async () => {
+        const socketSpy = vi
+            .spyOn(SocketContextModule, 'useSocket')
+            .mockReturnValue(createMockSocketValue({ roomState: roomWithStories(2) }));
+        const view = render(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        fireEvent.click(view.getByRole('button', { name: 'Bulk import stories' }));
+        expect(
+            await view.findByRole('dialog', { name: 'Bulk Import User Stories' })
+        ).toBeInTheDocument();
+
+        socketSpy.mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...roomWithStories(2), isEnded: true },
+            })
+        );
+        view.rerender(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        expect(
+            view.queryByRole('dialog', { name: 'Bulk Import User Stories' })
+        ).not.toBeInTheDocument();
+    });
+
+    it('closes an open score dialog when the session ends', async () => {
+        const socketSpy = vi
+            .spyOn(SocketContextModule, 'useSocket')
+            .mockReturnValue(createMockSocketValue({ roomState: roomWithStories(2) }));
+        const view = render(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        fireEvent.click(view.getByRole('button', { name: 'Edit score for Story 0' }));
+        expect(await view.findByRole('dialog', { name: 'Edit Story Score' })).toBeInTheDocument();
+
+        socketSpy.mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...roomWithStories(2), isEnded: true },
+            })
+        );
+        view.rerender(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        expect(view.queryByRole('dialog', { name: 'Edit Story Score' })).not.toBeInTheDocument();
+    });
+
+    it('closes an open story-change dialog when the session ends', async () => {
+        const socketSpy = vi
+            .spyOn(SocketContextModule, 'useSocket')
+            .mockReturnValue(createMockSocketValue({ roomState: roomWithStories(2) }));
+        const view = render(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        fireEvent.click(view.getByRole('button', { name: 'Estimate Story 1' }));
+        expect(
+            await view.findByRole('dialog', { name: 'Confirm Story Change' })
+        ).toBeInTheDocument();
+
+        socketSpy.mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...roomWithStories(2), isEnded: true },
+            })
+        );
+        view.rerender(
+            <AntApp>
+                <StoryBacklog />
+            </AntApp>
+        );
+
+        expect(
+            view.queryByRole('dialog', { name: 'Confirm Story Change' })
+        ).not.toBeInTheDocument();
     });
 
     it('sends a small paste as one import', () => {

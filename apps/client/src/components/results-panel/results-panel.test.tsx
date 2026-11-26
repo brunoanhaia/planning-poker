@@ -8,6 +8,18 @@ import * as SocketContextModule from '../../context/socket-context/use-socket';
 import { createMockSocketValue } from '../../tests/socket-context.mock';
 import { ResultsPanel } from './results-panel';
 
+// The real modal keeps its content mounted while the leave animation runs,
+// which jsdom never completes. Render only the open modal so the session gate
+// can be asserted deterministically.
+vi.mock('antd', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('antd')>();
+    const { createElement } = await import('react');
+    const MockModal = (props: React.ComponentProps<typeof actual.Modal>) =>
+        props.open ? createElement(actual.Modal, props) : null;
+
+    return { ...actual, Modal: Object.assign(MockModal, actual.Modal) };
+});
+
 const mockRevealedRoomState: RoomState = {
     activeDeck: [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, '?', '☕'],
     autoReveal: false,
@@ -90,6 +102,68 @@ describe('ResultsPanel', () => {
         fireEvent.click(screen.getByRole('button', { name: /Save & Advance/i }));
 
         expect(socket.updateStoryEstimate).toHaveBeenCalledWith('story_1', 5);
+    });
+
+    it('closes the confirmation dialog when the session ends', async () => {
+        const socket = createMockSocketValue({ roomState: mockRevealedRoomState });
+        const socketSpy = vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        const view = render(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
+
+        fireEvent.click(view.getByRole('button', { name: /Accept Avg/i }));
+        expect(
+            await view.findByRole('dialog', { name: /Confirm Story Change/i })
+        ).toBeInTheDocument();
+
+        socketSpy.mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...mockRevealedRoomState, isEnded: true },
+            })
+        );
+        view.rerender(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
+
+        expect(
+            view.queryByRole('dialog', { name: /Confirm Story Change/i })
+        ).not.toBeInTheDocument();
+        expect(socket.updateStoryEstimate).not.toHaveBeenCalled();
+    });
+
+    it('closes the custom-score dialog when the session ends', async () => {
+        const socket = createMockSocketValue({ roomState: mockRevealedRoomState });
+        const socketSpy = vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        const view = render(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
+
+        fireEvent.click(view.getByRole('button', { name: /Custom Score/i }));
+        expect(
+            await view.findByRole('dialog', { name: /Set Custom Story Score/i })
+        ).toBeInTheDocument();
+
+        socketSpy.mockReturnValue(
+            createMockSocketValue({
+                roomState: { ...mockRevealedRoomState, isEnded: true },
+            })
+        );
+        view.rerender(
+            <AntApp>
+                <ResultsPanel />
+            </AntApp>
+        );
+
+        expect(
+            view.queryByRole('dialog', { name: /Set Custom Story Score/i })
+        ).not.toBeInTheDocument();
+        expect(socket.updateStoryEstimate).not.toHaveBeenCalled();
     });
 
     it('hides the accept action from non-admin participants', () => {
