@@ -56,7 +56,7 @@
     "create.error.count": "Informe entre {{min}} e {{max}} cartas.",
     "create.error.duplicate": "As cartas personalizadas devem ser únicas.",
     "create.error.label": "Use números finitos ou rótulos de até {{max}} caracteres.",
-    "create.submit": "Iniciar Sessão e Gerar Código da Sala",
+    "create.submit": "Entrar na Sala",
     "create.title": "Título da Sessão / Projeto (Opcional)",
     "create.title.placeholder": "ex.: Estimativa da Sprint 42",
     "deck.aria.cards": "Cartas de estimativa",

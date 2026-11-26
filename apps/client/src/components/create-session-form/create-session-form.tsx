@@ -72,7 +72,28 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                     }}
                 />
 
-                <Button block disabled={disabled} htmlType="submit" size="large" type="primary">
+                {/* The primary action always stays on one line. A label that
+                    does not fit is ellipsized instead of growing the button or
+                    spilling outside it; the full text remains the accessible
+                    name and is exposed through the native title. */}
+                <Button
+                    block
+                    disabled={disabled}
+                    htmlType="submit"
+                    size="large"
+                    style={{ height: 44, overflow: 'hidden' }}
+                    styles={{
+                        content: {
+                            display: 'block',
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        },
+                    }}
+                    title={t('create.submit')}
+                    type="primary"
+                >
                     {t('create.submit')}
                 </Button>
             </Flex>

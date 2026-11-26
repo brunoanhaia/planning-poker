@@ -38,8 +38,10 @@ const CSV_COLUMNS = ['ID', 'Title', 'Description', 'Status', 'Final Estimate'] a
 /** Padding applied to each area of the backlog, in pixels. */
 const PANEL_PADDING = 16;
 
-/** Width of a story title before it collapses to an ellipsis. */
-const STORY_TITLE_MAX_WIDTH = '28ch';
+/** Width of a story title before it collapses to an ellipsis.
+ *  The pixel cap keeps the layout stable when a fallback font has wide digit
+ *  glyphs, since `ch` is derived from that glyph's advance. */
+const STORY_TITLE_MAX_WIDTH = 'min(28ch, 220px)';
 
 /** The story whose score is currently being edited, plus its draft value. */
 interface ScoreDraft {

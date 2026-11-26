@@ -35,8 +35,10 @@ const HEADER_PADDING_BLOCK = 12;
 /** Maximum characters accepted for a room title. */
 const ROOM_TITLE_MAX_LENGTH = 80;
 
-/** Width of the inline room title before it collapses to an ellipsis. */
-const ROOM_TITLE_MAX_WIDTH = '26ch';
+/** Width of the inline room title before it collapses to an ellipsis.
+ *  The pixel cap keeps the layout stable when a fallback font has wide digit
+ *  glyphs, since `ch` is derived from that glyph's advance. */
+const ROOM_TITLE_MAX_WIDTH = 'min(26ch, 200px)';
 
 export interface NavbarProps {
     /** Currently rendered colour scheme. */

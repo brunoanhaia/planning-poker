@@ -7,9 +7,7 @@ test.describe('Admin Management', () => {
         await adminPage.goto('/');
 
         await adminPage.getByLabel(/Your Display Name/i).fill('Admin');
-        await adminPage
-            .getByRole('button', { name: /Start Session & Generate Room Code/i })
-            .click();
+        await adminPage.getByRole('button', { name: /^Enter Room$/i }).click();
 
         // Verify Settings is accessible
         // Both the navbar icon and the setup screen expose this name; either

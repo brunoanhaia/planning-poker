@@ -94,9 +94,7 @@ test.describe('Deployment chaos', () => {
             await expect(voterPage.getByText(/^Room: /i)).toHaveCount(0);
 
             await voterPage.getByLabel(/Your Display Name/i).fill('Voter 1');
-            await voterPage
-                .getByRole('button', { name: /Start Session & Generate Room Code/i })
-                .click();
+            await voterPage.getByRole('button', { name: /^Enter Room$/i }).click();
             await expect(voterPage.getByText(/^Room: /i).first()).toBeVisible();
         } finally {
             await voterContext?.close();

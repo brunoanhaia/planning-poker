@@ -2,6 +2,88 @@ import { expect, test } from '@playwright/test';
 import { createRoom } from './support/room-session';
 
 test.describe('Content Stress', () => {
+    test('the lobby primary action stays on one line at 320 px in every locale', async ({
+        browser,
+    }) => {
+        for (const locale of ['en-US', 'pt-BR', 'es-ES']) {
+            const context = await browser.newContext({
+                locale,
+                viewport: { height: 640, width: 320 },
+            });
+            try {
+                const page = await context.newPage();
+                await page.goto('/');
+
+                const submit = page.getByRole('button', {
+                    name: /^(Enter Room|Entrar na Sala|Entrar en la Sala)$/i,
+                });
+                await expect(submit).toBeVisible();
+
+                const metrics = await submit.evaluate((element) => ({
+                    clientWidth: element.clientWidth,
+                    height: element.getBoundingClientRect().height,
+                    scrollWidth: element.scrollWidth,
+                }));
+                expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+                // One line, never a second row, and a comfortable touch target.
+                expect(metrics.height).toBeGreaterThanOrEqual(44);
+                expect(metrics.height).toBeLessThanOrEqual(46);
+
+                const content = submit.locator('span').first();
+                const contentMetrics = await content.evaluate((element) => ({
+                    clientWidth: element.clientWidth,
+                    scrollWidth: element.scrollWidth,
+                    textOverflow: getComputedStyle(element).textOverflow,
+                    whiteSpace: getComputedStyle(element).whiteSpace,
+                }));
+                expect(contentMetrics.textOverflow).toBe('ellipsis');
+                expect(contentMetrics.whiteSpace).toBe('nowrap');
+                // Every shipped locale uses the same short concept, so the
+                // label fits instead of being hidden.
+                expect(contentMetrics.scrollWidth).toBeLessThanOrEqual(
+                    contentMetrics.clientWidth + 1
+                );
+
+                const box = await submit.boundingBox();
+                expect(box).not.toBeNull();
+                if (box) {
+                    expect(box.width).toBeLessThanOrEqual(320);
+                }
+
+                await expect
+                    .poll(async () =>
+                        page.evaluate(
+                            () =>
+                                document.documentElement.scrollWidth <=
+                                document.documentElement.clientWidth
+                        )
+                    )
+                    .toBe(true);
+
+                // A future translation may be longer than the current short
+                // labels. Prove the one-line contract still holds: the label is
+                // ellipsized inside the button and the button does not grow.
+                const longLabel = await content.evaluate((element) => {
+                    element.textContent =
+                        'A much longer translated label that cannot fit on 320 px';
+                    return {
+                        buttonHeight: element.closest('button')?.getBoundingClientRect().height,
+                        clientWidth: element.clientWidth,
+                        scrollWidth: element.scrollWidth,
+                        textOverflow: getComputedStyle(element).textOverflow,
+                        whiteSpace: getComputedStyle(element).whiteSpace,
+                    };
+                });
+                expect(longLabel.textOverflow).toBe('ellipsis');
+                expect(longLabel.whiteSpace).toBe('nowrap');
+                expect(longLabel.scrollWidth).toBeGreaterThan(longLabel.clientWidth);
+                expect(longLabel.buttonHeight).toBeLessThanOrEqual(46);
+            } finally {
+                await context.close();
+            }
+        }
+    });
+
     test('long content stays inside a 320 px viewport', async ({ browser }) => {
         test.setTimeout(90_000);
 
