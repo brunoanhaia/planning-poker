@@ -9,15 +9,11 @@ import { createMockSocketValue } from '../../tests/socket-context.mock';
 import { ResultsPanel } from './results-panel';
 
 // The real modal keeps its content mounted while the leave animation runs,
-// which jsdom never completes. Render only the open modal so the session gate
-// can be asserted deterministically.
+// which jsdom never completes. Shared helper renders only the open modal.
 vi.mock('antd', async (importOriginal) => {
     const actual = await importOriginal<typeof import('antd')>();
-    const { createElement } = await import('react');
-    const MockModal = (props: React.ComponentProps<typeof actual.Modal>) =>
-        props.open ? createElement(actual.Modal, props) : null;
-
-    return { ...actual, Modal: Object.assign(MockModal, actual.Modal) };
+    const { withOpenOnlyModal } = await import('../../tests/antd-modal-mock');
+    return withOpenOnlyModal(actual);
 });
 
 const mockRevealedRoomState: RoomState = {
@@ -104,7 +100,10 @@ describe('ResultsPanel', () => {
         expect(socket.updateStoryEstimate).toHaveBeenCalledWith('story_1', 5);
     });
 
-    it('closes the confirmation dialog when the session ends', async () => {
+    it.each([
+        { dialog: /Confirm Story Change/i, label: 'confirmation', trigger: /Accept Avg/i },
+        { dialog: /Set Custom Story Score/i, label: 'custom-score', trigger: /Custom Score/i },
+    ])('closes the $label dialog when the session ends', async ({ dialog, trigger }) => {
         const socket = createMockSocketValue({ roomState: mockRevealedRoomState });
         const socketSpy = vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
         const view = render(
@@ -113,10 +112,8 @@ describe('ResultsPanel', () => {
             </AntApp>
         );
 
-        fireEvent.click(view.getByRole('button', { name: /Accept Avg/i }));
-        expect(
-            await view.findByRole('dialog', { name: /Confirm Story Change/i })
-        ).toBeInTheDocument();
+        fireEvent.click(view.getByRole('button', { name: trigger }));
+        expect(await view.findByRole('dialog', { name: dialog })).toBeInTheDocument();
 
         socketSpy.mockReturnValue(
             createMockSocketValue({
@@ -129,40 +126,7 @@ describe('ResultsPanel', () => {
             </AntApp>
         );
 
-        expect(
-            view.queryByRole('dialog', { name: /Confirm Story Change/i })
-        ).not.toBeInTheDocument();
-        expect(socket.updateStoryEstimate).not.toHaveBeenCalled();
-    });
-
-    it('closes the custom-score dialog when the session ends', async () => {
-        const socket = createMockSocketValue({ roomState: mockRevealedRoomState });
-        const socketSpy = vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
-        const view = render(
-            <AntApp>
-                <ResultsPanel />
-            </AntApp>
-        );
-
-        fireEvent.click(view.getByRole('button', { name: /Custom Score/i }));
-        expect(
-            await view.findByRole('dialog', { name: /Set Custom Story Score/i })
-        ).toBeInTheDocument();
-
-        socketSpy.mockReturnValue(
-            createMockSocketValue({
-                roomState: { ...mockRevealedRoomState, isEnded: true },
-            })
-        );
-        view.rerender(
-            <AntApp>
-                <ResultsPanel />
-            </AntApp>
-        );
-
-        expect(
-            view.queryByRole('dialog', { name: /Set Custom Story Score/i })
-        ).not.toBeInTheDocument();
+        expect(view.queryByRole('dialog', { name: dialog })).not.toBeInTheDocument();
         expect(socket.updateStoryEstimate).not.toHaveBeenCalled();
     });
 

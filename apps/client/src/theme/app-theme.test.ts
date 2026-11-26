@@ -29,31 +29,22 @@ const tokenOf = (mode: ColorMode, name: 'colorError' | 'colorErrorActive' | 'col
 };
 
 describe('danger palette contrast', () => {
-    it('keeps the light error text readable on white and on the solid button', () => {
-        const background = '#ffffff';
-        const base = tokenOf('light', 'colorError');
-        const hover = tokenOf('light', 'colorErrorHover');
-        const active = tokenOf('light', 'colorErrorActive');
+    it.each([
+        { background: '#ffffff', label: 'light', mode: 'light' as const, solidText: '#ffffff' },
+        { background: '#141414', label: 'dark', mode: 'dark' as const, solidText: '#141414' },
+    ])(
+        'keeps the $label danger palette readable as text and on the solid button',
+        ({ background, mode, solidText }) => {
+            const colors = [
+                tokenOf(mode, 'colorError'),
+                tokenOf(mode, 'colorErrorHover'),
+                tokenOf(mode, 'colorErrorActive'),
+            ];
 
-        expect(contrast(base, background)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(hover, background)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(active, background)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(background, base)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(background, hover)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(background, active)).toBeGreaterThanOrEqual(4.5);
-    });
-
-    it('keeps the dark error text readable on the layout and on the solid button', () => {
-        const background = '#141414';
-        const base = tokenOf('dark', 'colorError');
-        const hover = tokenOf('dark', 'colorErrorHover');
-        const active = tokenOf('dark', 'colorErrorActive');
-
-        expect(contrast(base, background)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(hover, background)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(active, background)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(background, base)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(background, hover)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(background, active)).toBeGreaterThanOrEqual(4.5);
-    });
+            colors.forEach((color) => {
+                expect(contrast(color, background)).toBeGreaterThanOrEqual(4.5);
+                expect(contrast(solidText, color)).toBeGreaterThanOrEqual(4.5);
+            });
+        }
+    );
 });
