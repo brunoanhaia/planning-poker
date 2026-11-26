@@ -49,6 +49,9 @@ export const CardDeck: React.FC = () => {
                         <Button
                             aria-label={t('deck.aria.select', { value })}
                             aria-pressed={isSelected}
+                            // A closed session takes no more votes; the server
+                            // rejects them, so the deck stops offering them.
+                            disabled={roomState.isEnded}
                             key={String(value)}
                             onClick={() => submitVote(value)}
                             type={isSelected ? 'primary' : 'default'}

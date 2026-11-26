@@ -62,6 +62,30 @@ export interface WebSocketHandlerOptions {
 type MessageHandler = (ws: ExtendedWebSocket, payload: unknown) => void;
 
 /**
+ * Actions that change room content and are refused once the session has ended.
+ *
+ * Presence, moderation, the summary and the idempotent `END_SESSION` stay
+ * available: the room becomes read-only, not unreachable. Voting is checked
+ * separately so its rejection keeps the vote-specific wording.
+ */
+const FROZEN_AFTER_END: ReadonlySet<WSMessageType> = new Set<WSMessageType>([
+    'ADD_STORY',
+    'BULK_ADD_STORIES',
+    'CHANGE_DECK',
+    'DELETE_STORY',
+    'PAUSE_TIMER',
+    'RESET_TIMER',
+    'RESET_VOTES',
+    'REVEAL_VOTES',
+    'SET_CURRENT_STORY',
+    'START_TIMER',
+    'TOGGLE_AUTO_REVEAL',
+    'TOGGLE_LOCK_ROOM',
+    'UPDATE_ROOM_TITLE',
+    'UPDATE_STORY_ESTIMATE',
+]);
+
+/**
  * Handles real-time WebSocket connections, message routing, and room state broadcasting.
  */
 export class WebSocketHandler {
@@ -70,6 +94,7 @@ export class WebSocketHandler {
         BULK_ADD_STORIES: (ws, payload) =>
             this.handleBulkAddStories(ws, payload as BulkAddStoriesPayload),
         CHANGE_DECK: (ws, payload) => this.handleChangeDeck(ws, payload as ChangeDeckPayload),
+        CLEAR_OFFLINE_PARTICIPANTS: (ws) => this.handleClearOfflineParticipants(ws),
         CREATE_ROOM: (ws, payload) => this.handleCreateRoom(ws, payload as CreateRoomPayload),
         DELETE_STORY: (ws, payload) => this.handleDeleteStory(ws, payload as DeleteStoryPayload),
         END_SESSION: (ws) => this.handleEndSession(ws),
@@ -374,7 +399,42 @@ export class WebSocketHandler {
             return;
         }
 
+        if (this.rejectFrozenAfterEnd(ws, msg.type)) {
+            return;
+        }
+
         handler(ws, validation.data);
+    }
+
+    /**
+     * Refuses a content-changing action once the room's session has ended.
+     *
+     * The check lives at the dispatch boundary rather than in every handler, so
+     * a new mutating message cannot forget it. Actions outside
+     * {@link FROZEN_AFTER_END} — presence, moderation, the summary and the
+     * idempotent `END_SESSION` — still reach their handler.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param type - The action being dispatched.
+     * @returns True when the action was refused and an error was sent.
+     */
+    private rejectFrozenAfterEnd(ws: ExtendedWebSocket, type: WSMessageType): boolean {
+        if (!FROZEN_AFTER_END.has(type)) {
+            return false;
+        }
+
+        const session = this.sessions.sessionFor(ws);
+        const room = session ? roomManager.getRoom(session.roomId) : null;
+        if (!room?.isEnded) {
+            return false;
+        }
+
+        this.sendError(
+            ws,
+            'This session has ended, so room changes are no longer accepted.',
+            'SESSION_ENDED'
+        );
+        return true;
     }
 
     /**
@@ -830,6 +890,42 @@ export class WebSocketHandler {
                 clientWs.userId = undefined;
             }
         });
+    }
+
+    /**
+     * Handles removing every participant who is offline from the roster.
+     */
+    private handleClearOfflineParticipants(ws: ExtendedWebSocket): void {
+        const session = this.requireSession(ws);
+        if (!session) {
+            return;
+        }
+
+        const room = roomManager.getRoom(session.roomId);
+        const offlineIds =
+            room?.participants
+                .filter((participant) => !participant.isOnline)
+                .map((participant) => participant.id) ?? [];
+        const updated = roomManager.clearOfflineParticipants(session.roomId, session.userId);
+        if (updated) {
+            // Audit one record per removed identity, so the log names the rows
+            // that a destructive cleanup erased without storing their names.
+            offlineIds.forEach((offlineId) =>
+                auditLog({
+                    action: 'participant.cleared',
+                    outcome: 'allowed',
+                    roomId: session.roomId,
+                    userId: offlineId,
+                })
+            );
+        }
+
+        this.broadcastOrError(
+            ws,
+            session.roomId,
+            updated,
+            'Only administrators can remove offline participants.'
+        );
     }
 
     /**

@@ -13,17 +13,17 @@ import {
     Badge,
     Button,
     Card,
-    Divider,
     Empty,
     Flex,
     Input,
     Modal,
     Space,
     Tag,
+    theme,
     Tooltip,
     Typography,
 } from 'antd';
-import React, { Fragment, useState } from 'react';
+import React, { useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
 import { Translate } from '../../i18n/i18n-context';
@@ -99,7 +99,10 @@ interface StoryRowProps {
     index: number;
     isActive: boolean;
     isAdmin: boolean;
+    isEnded: boolean;
     isFirst: boolean;
+    /** Colour of the separator drawn above a row that follows another one. */
+    separatorColor: string;
     showDelete: boolean;
     story: Story;
     t: Translate;
@@ -111,7 +114,9 @@ const renderStoryRow = ({
     index,
     isActive,
     isAdmin,
+    isEnded,
     isFirst,
+    separatorColor,
     showDelete,
     story,
     t,
@@ -119,100 +124,101 @@ const renderStoryRow = ({
     const hasEstimate = story.finalEstimate !== undefined && story.finalEstimate !== null;
 
     return (
-        <Fragment key={story.id}>
-            {!isFirst && <Divider style={{ margin: 0 }} />}
-            <Flex
-                align="center"
-                component="li"
-                gap={8}
-                justify="space-between"
-                style={{ padding: PANEL_PADDING }}
-                wrap
-            >
-                <Flex gap={4} style={{ flex: 1, minWidth: 0 }} vertical>
-                    <Space align="center" size={4} wrap>
-                        <Typography.Text
-                            ellipsis={{ tooltip: story.title }}
-                            strong
-                            style={{ maxWidth: STORY_TITLE_MAX_WIDTH }}
-                        >
-                            {`${index + 1}. ${story.title}`}
-                        </Typography.Text>
-                        {renderStoryStatus(story.status, t)}
-                        {hasEstimate && (
-                            <Tag>
-                                {t('backlog.score', {
-                                    value: String(story.finalEstimate),
-                                })}
-                            </Tag>
-                        )}
-                        {story.rounds.length > 0 && (
-                            <Tag>
-                                {t('backlog.rounds', {
-                                    count: story.rounds.length,
-                                })}
-                            </Tag>
-                        )}
-                    </Space>
-                    {story.description && (
-                        <Typography.Text type="secondary">{story.description}</Typography.Text>
+        <Flex
+            align="center"
+            component="li"
+            gap={8}
+            justify="space-between"
+            key={story.id}
+            style={{
+                borderTop: isFirst ? undefined : `1px solid ${separatorColor}`,
+                padding: PANEL_PADDING,
+            }}
+            wrap
+        >
+            <Flex gap={4} style={{ flex: 1, minWidth: 0 }} vertical>
+                <Space align="center" size={4} wrap>
+                    <Typography.Text
+                        ellipsis={{ tooltip: story.title }}
+                        strong
+                        style={{ maxWidth: STORY_TITLE_MAX_WIDTH }}
+                    >
+                        {`${index + 1}. ${story.title}`}
+                    </Typography.Text>
+                    {renderStoryStatus(story.status, t)}
+                    {hasEstimate && (
+                        <Tag>
+                            {t('backlog.score', {
+                                value: String(story.finalEstimate),
+                            })}
+                        </Tag>
                     )}
-                </Flex>
+                    {story.rounds.length > 0 && (
+                        <Tag>
+                            {t('backlog.rounds', {
+                                count: story.rounds.length,
+                            })}
+                        </Tag>
+                    )}
+                </Space>
+                {story.description && (
+                    <Typography.Text type="secondary">{story.description}</Typography.Text>
+                )}
+            </Flex>
 
-                <Space size={4}>
-                    <Tooltip title={t('backlog.breakdown')}>
-                        <Button
-                            aria-label={t('backlog.breakdown')}
-                            icon={<ProfileOutlined />}
-                            onClick={() => actions.onBreakdown(story.id)}
-                            size="small"
-                            type="text"
-                        />
-                    </Tooltip>
+            <Space size={4}>
+                <Tooltip title={t('backlog.breakdown')}>
+                    <Button
+                        aria-label={t('backlog.breakdown')}
+                        icon={<ProfileOutlined />}
+                        onClick={() => actions.onBreakdown(story.id)}
+                        size="small"
+                        type="text"
+                    />
+                </Tooltip>
 
-                    {isAdmin && (
-                        <>
-                            <Tooltip title={t('backlog.edit.aria', { title: story.title })}>
+                {isAdmin && !isEnded && (
+                    <>
+                        <Tooltip title={t('backlog.edit.aria', { title: story.title })}>
+                            <Button
+                                aria-label={t('backlog.edit.aria', { title: story.title })}
+                                icon={<EditOutlined />}
+                                onClick={() => actions.onEdit(story)}
+                                size="small"
+                                type="text"
+                            />
+                        </Tooltip>
+                        {!isActive && (
+                            <Tooltip title={t('backlog.estimate.aria', { title: story.title })}>
                                 <Button
-                                    aria-label={t('backlog.edit.aria', { title: story.title })}
-                                    icon={<EditOutlined />}
-                                    onClick={() => actions.onEdit(story)}
+                                    aria-label={t('backlog.estimate.aria', {
+                                        title: story.title,
+                                    })}
+                                    icon={<PlayCircleOutlined />}
+                                    onClick={() => actions.onEstimate(index)}
                                     size="small"
                                     type="text"
                                 />
                             </Tooltip>
-                            {!isActive && (
-                                <Tooltip title={t('backlog.estimate.aria', { title: story.title })}>
-                                    <Button
-                                        aria-label={t('backlog.estimate.aria', {
-                                            title: story.title,
-                                        })}
-                                        icon={<PlayCircleOutlined />}
-                                        onClick={() => actions.onEstimate(index)}
-                                        size="small"
-                                        type="text"
-                                    />
-                                </Tooltip>
-                            )}
-                            {showDelete && (
-                                <Tooltip title={t('backlog.delete.aria', { title: story.title })}>
-                                    <Button
-                                        aria-label={t('backlog.delete.aria', {
-                                            title: story.title,
-                                        })}
-                                        danger
-                                        icon={<DeleteOutlined />}
-                                        onClick={() => actions.onDelete(story.id)}
-                                        size="small"
-                                        type="text"
-                                    />
-                                </Tooltip>
-                            )}
-                        </>
-                    )}
-                </Space>
-            </Flex>
-        </Fragment>
+                        )}
+                        {showDelete && (
+                            <Tooltip title={t('backlog.delete.aria', { title: story.title })}>
+                                <Button
+                                    aria-label={t('backlog.delete.aria', {
+                                        title: story.title,
+                                    })}
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    onClick={() => actions.onDelete(story.id)}
+                                    size="small"
+                                    type="text"
+                                />
+                            </Tooltip>
+                        )}
+                    </>
+                )}
+            </Space>
+        </Flex>
     );
 };
 
@@ -234,6 +240,7 @@ export const StoryBacklog: React.FC = () => {
     } = useSocket();
     const { message } = AntApp.useApp();
     const { t } = useTranslation();
+    const { token } = theme.useToken();
 
     const [isAdding, setIsAdding] = useState(false);
     const [title, setTitle] = useState('');
@@ -255,9 +262,12 @@ export const StoryBacklog: React.FC = () => {
         setDescription('');
     };
 
+    // The server freezes content changes at the end; the dialogs and their
+    // submit callbacks mirror that so an already-open dialog cannot report a
+    // successful mutation the server refused.
     const handleCreateStory = (event: React.FormEvent) => {
         event.preventDefault();
-        if (!title.trim()) {
+        if (roomState.isEnded || !title.trim()) {
             return;
         }
         addStory(title.trim(), description.trim() || undefined);
@@ -265,6 +275,9 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const handleBulkImport = () => {
+        if (roomState.isEnded) {
+            return;
+        }
         const parsed = parseBulkStories(bulkText);
         // A room holds a bounded backlog, and the import travels as a bounded
         // number of frames, so the paste is capped at what the room can still
@@ -299,6 +312,9 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const openScoreDraft = (story: Story) => {
+        if (roomState.isEnded) {
+            return;
+        }
         setScoreDraft({ currentScore: story.finalEstimate, id: story.id, title: story.title });
         setEditScoreValue(
             story.finalEstimate !== undefined && story.finalEstimate !== null
@@ -313,7 +329,7 @@ export const StoryBacklog: React.FC = () => {
     };
 
     const saveScoreDraft = () => {
-        if (!scoreDraft || !editScoreValue.trim()) {
+        if (roomState.isEnded || !scoreDraft || !editScoreValue.trim()) {
             return;
         }
         updateStoryEstimate(scoreDraft.id, toFinalEstimate(editScoreValue.trim()));
@@ -338,7 +354,7 @@ export const StoryBacklog: React.FC = () => {
                 }
             >
                 <Flex gap={8} style={{ padding: PANEL_PADDING }} wrap>
-                    {isAdmin && (
+                    {isAdmin && !roomState.isEnded && (
                         <>
                             <Button
                                 icon={<PlusOutlined />}
@@ -366,7 +382,7 @@ export const StoryBacklog: React.FC = () => {
                     </Tooltip>
                 </Flex>
 
-                {isAdding && isAdmin && (
+                {isAdding && isAdmin && !roomState.isEnded && (
                     <form onSubmit={handleCreateStory}>
                         <Flex gap={8} style={{ padding: PANEL_PADDING }} vertical>
                             <Typography.Text strong>{t('backlog.new')}</Typography.Text>
@@ -419,7 +435,9 @@ export const StoryBacklog: React.FC = () => {
                                 index,
                                 isActive: index === roomState.currentStoryIndex,
                                 isAdmin,
+                                isEnded: roomState.isEnded,
                                 isFirst: index === 0,
+                                separatorColor: token.colorSplit,
                                 showDelete: roomState.stories.length > 1,
                                 story,
                                 t,
@@ -434,9 +452,9 @@ export const StoryBacklog: React.FC = () => {
                     <Flex gap={8} justify="space-between" wrap>
                         <Button
                             danger
-                            disabled={scoreDraft?.currentScore == null}
+                            disabled={scoreDraft?.currentScore == null || roomState.isEnded}
                             onClick={() => {
-                                if (scoreDraft) {
+                                if (scoreDraft && !roomState.isEnded) {
                                     updateStoryEstimate(scoreDraft.id, null);
                                     closeScoreDraft();
                                 }
@@ -457,7 +475,7 @@ export const StoryBacklog: React.FC = () => {
                     </Flex>
                 }
                 onCancel={closeScoreDraft}
-                open={Boolean(scoreDraft)}
+                open={Boolean(scoreDraft) && !roomState.isEnded}
                 title={t('backlog.edit.title')}
             >
                 <Flex gap={12} vertical>
@@ -488,7 +506,7 @@ export const StoryBacklog: React.FC = () => {
                 okText={t('backlog.import.button')}
                 onCancel={() => setIsBulkOpen(false)}
                 onOk={handleBulkImport}
-                open={isBulkOpen}
+                open={isBulkOpen && !roomState.isEnded}
                 title={t('backlog.import.title')}
             >
                 <Flex gap={12} vertical>
@@ -511,12 +529,12 @@ export const StoryBacklog: React.FC = () => {
                 okText={t('backlog.change.ok')}
                 onCancel={() => setPendingStoryIndex(null)}
                 onOk={() => {
-                    if (pendingStoryIndex !== null) {
+                    if (pendingStoryIndex !== null && !roomState.isEnded) {
                         setCurrentStory(pendingStoryIndex);
                         setPendingStoryIndex(null);
                     }
                 }}
-                open={pendingStoryIndex !== null}
+                open={pendingStoryIndex !== null && !roomState.isEnded}
                 title={t('backlog.change.title')}
             >
                 <Typography.Paragraph>{t('backlog.change.body')}</Typography.Paragraph>

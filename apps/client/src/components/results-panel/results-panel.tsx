@@ -56,7 +56,6 @@ export const ResultsPanel: React.FC = () => {
         outliers,
         totalVotes,
         voteCounts,
-        votedParticipants,
     } = useEstimationStats(roomState);
 
     const currentStory = roomState?.stories[roomState.currentStoryIndex ?? 0];
@@ -68,7 +67,7 @@ export const ResultsPanel: React.FC = () => {
         return null;
     }
 
-    if (votedParticipants.length === 0) {
+    if (totalVotes === 0) {
         return (
             <Card>
                 <Typography.Text type="secondary">{t('results.noVotes')}</Typography.Text>
@@ -80,13 +79,18 @@ export const ResultsPanel: React.FC = () => {
     // number the server validates, not the formatted string.
     const suggestedEstimate = hasNumeric ? Number(averageText) : (modeVote ?? '-');
 
+    // A session can end while a dialog is open; the trigger and the confirmation
+    // are both gated so the server's refusal never becomes a false success.
     const promptSaveEstimate = (customEstimate?: number | string) => {
+        if (roomState.isEnded) {
+            return;
+        }
         setPendingEstimate(customEstimate);
         setIsConfirmOpen(true);
     };
 
     const confirmSaveEstimate = () => {
-        if (!currentStory || !isAdmin) {
+        if (!currentStory || !isAdmin || roomState.isEnded) {
             return;
         }
 
@@ -109,7 +113,7 @@ export const ResultsPanel: React.FC = () => {
     };
 
     const resetManualScore = () => {
-        if (currentStory) {
+        if (currentStory && !roomState.isEnded) {
             updateStoryEstimate(currentStory.id, null);
         }
         setIsManualEditOpen(false);
@@ -139,7 +143,11 @@ export const ResultsPanel: React.FC = () => {
                             </Tag>
                         </Flex>
                     ) : (
-                        isAdmin && (
+                        // A closed session is read-only: the accepted score is
+                        // final, so neither a manual override nor a new accept
+                        // would be applied by the server.
+                        isAdmin &&
+                        !roomState.isEnded && (
                             <Flex gap={8} justify="end" wrap>
                                 <Button
                                     icon={<EditOutlined />}
@@ -302,7 +310,7 @@ export const ResultsPanel: React.FC = () => {
                     </Flex>
                 }
                 onCancel={() => setIsManualEditOpen(false)}
-                open={isManualEditOpen}
+                open={isManualEditOpen && !roomState.isEnded}
                 title={t('results.custom.title')}
             >
                 <Flex gap={12} vertical>
@@ -332,7 +340,7 @@ export const ResultsPanel: React.FC = () => {
                 okText={t('results.confirm.ok')}
                 onCancel={() => setIsConfirmOpen(false)}
                 onOk={confirmSaveEstimate}
-                open={isConfirmOpen}
+                open={isConfirmOpen && !roomState.isEnded}
                 title={t('results.confirm.title')}
             >
                 <Typography.Paragraph>{t('results.confirm.body')}</Typography.Paragraph>

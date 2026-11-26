@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
-import { createRoom, joinRoom } from './support/room-session';
+import AxeBuilder from '@axe-core/playwright';
+import { castVote, createRoom, joinRoom } from './support/room-session';
 
 test.use({ locale: 'en-US' });
 
@@ -27,6 +28,71 @@ test.describe('Participant Management', () => {
 
             await expect(adminPage.getByText('Participants (1)')).toBeVisible();
             await expect(adminPage.getByText('Voter 1', { exact: true })).not.toBeVisible();
+        } finally {
+            await voterContext?.close();
+            await adminContext.close();
+        }
+    });
+
+    test('shows departed participants and lets the host clear them', async ({ browser }) => {
+        const { adminContext, adminPage, roomCode } = await createRoom(
+            browser,
+            'Admin',
+            undefined,
+            {
+                viewport: { height: 640, width: 320 },
+            }
+        );
+        let voterContext: BrowserContext | undefined;
+
+        try {
+            const voterSession = await joinRoom(browser, roomCode, 'Voter 1');
+            voterContext = voterSession.voterContext;
+            const { voterPage } = voterSession;
+
+            // The host observes, so the only active voter is the guest. Voting
+            // before leaving is what distinguishes a departed voter from a row
+            // that simply never had a card.
+            await castVote(voterPage, 5);
+            await expect(adminPage.getByText('Voted', { exact: true })).toBeVisible();
+            await expect(adminPage.getByText('1 of 1 voted (100%)')).toBeVisible();
+
+            // Closing the page drops the socket; the participant becomes a ghost
+            // instead of being removed from the roster outright.
+            await voterPage.close();
+
+            await expect(adminPage.getByText('Participants (1 online / 2)')).toBeVisible();
+            await expect(adminPage.getByText('Show 1 participant who left')).toBeVisible();
+            await expect(adminPage.getByText('Voter 1', { exact: true })).toHaveCount(0);
+            // The progress denominator follows the online voters, not the ghosts.
+            await expect(adminPage.getByText('0 of 0 voted (0%)')).toBeVisible();
+            // A departed voter keeps `hasVoted` on the server, but not the label.
+            await expect(adminPage.getByText('Voted', { exact: true })).toHaveCount(0);
+
+            const disclosure = adminPage.getByRole('button', {
+                name: 'Show 1 participant who left',
+                exact: true,
+            });
+            await disclosure.click();
+            await expect(adminPage.getByText('Voter 1', { exact: true })).toBeVisible();
+            await expect(adminPage.getByText('Left', { exact: true })).toBeVisible();
+
+            // The new disclosure, the departed row and the cleanup action must
+            // stay inside the narrow viewport without overlap or axe findings.
+            expect(
+                await adminPage.evaluate(
+                    () => document.documentElement.scrollWidth > window.innerWidth
+                )
+            ).toBe(false);
+            const accessibility = await new AxeBuilder({ page: adminPage })
+                .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa'])
+                .analyze();
+            expect(accessibility.violations).toEqual([]);
+
+            await adminPage.getByRole('button', { name: 'Clear left participants' }).click();
+
+            await expect(adminPage.getByText('Participants (1)')).toBeVisible();
+            await expect(adminPage.getByText('Voter 1', { exact: true })).toHaveCount(0);
         } finally {
             await voterContext?.close();
             await adminContext.close();

@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { createRoom, endSessionViaSettings, joinRoom } from './support/room-session';
 
 test.use({ locale: 'en-US' });
@@ -29,9 +30,9 @@ test.describe('Session Closure', () => {
             await newPage.getByLabel(/Your Display Name/i).fill('New Voter');
             await newPage.getByRole('button', { name: /Join Room Now/i }).click();
 
-            await expect(newPage.getByRole('alert')).toContainText(
-                'This session has ended, so no further votes are accepted.'
-            );
+            await expect(
+                newPage.getByRole('alert').filter({ hasText: 'This session has ended' })
+            ).toBeVisible();
             await expect(
                 newPage.getByRole('heading', { name: 'Planit Poker Real-Time' })
             ).toBeVisible();
@@ -46,6 +47,10 @@ test.describe('Session Closure', () => {
     });
 
     test('a participant already inside reconnects after the end', async ({ browser }) => {
+        // This scenario performs a full reload and reconnect while the parallel
+        // dev server is still compiling; give the two contexts room to settle.
+        test.setTimeout(60_000);
+
         const { adminContext, adminPage, roomCode } = await createRoom(browser);
         let voterContext: BrowserContext | undefined;
 
@@ -60,6 +65,35 @@ test.describe('Session Closure', () => {
             await expect(adminSummary).toBeVisible();
             await adminSummary.getByRole('button', { name: /Close/i }).click();
             await expect(adminSummary).toBeHidden();
+
+            // The ended room refuses every content action, not only votes.
+            await expect(adminPage.getByRole('button', { name: /Reveal Votes/i })).toHaveCount(0);
+            await expect(adminPage.getByRole('button', { name: /Reset Votes/i })).toHaveCount(0);
+            await expect(adminPage.getByRole('button', { name: /Start Timer/i })).toHaveCount(0);
+            await expect(adminPage.getByRole('button', { name: 'Add Story' })).toHaveCount(0);
+
+            await adminPage.getByRole('button', { name: /Room Settings/i }).click();
+            const readOnlySettings = adminPage.getByRole('dialog', {
+                name: /Room & Session Settings/i,
+            });
+            await expect(readOnlySettings).toBeVisible();
+            await expect(
+                readOnlySettings.getByRole('button', { name: 'Apply Settings' })
+            ).toBeDisabled();
+            await expect(readOnlySettings.getByLabel('Room / Sprint Title')).toBeDisabled();
+            await expect(
+                readOnlySettings.getByText(
+                    'This session has ended, so these settings are read-only.'
+                )
+            ).toBeVisible();
+
+            const accessibility = await new AxeBuilder({ page: adminPage })
+                .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa'])
+                .analyze();
+            expect(accessibility.violations).toEqual([]);
+
+            await readOnlySettings.getByRole('button', { name: 'Cancel' }).click();
+            await expect(readOnlySettings).toBeHidden();
 
             await voterPage.reload();
             await voterPage.getByRole('tab', { name: /Join Session/i }).click();
@@ -78,6 +112,10 @@ test.describe('Session Closure', () => {
 
             await expect(voterPage.getByText('Participants (2)')).toBeVisible();
             await expect(voterPage.getByText('Voter 1', { exact: true })).toHaveCount(1);
+            // An ended room is read-only: the deck is visible but cannot vote.
+            await expect(
+                voterPage.getByRole('button', { name: 'Select estimate 5', exact: true })
+            ).toBeDisabled();
         } finally {
             await voterContext?.close();
             await adminContext.close();

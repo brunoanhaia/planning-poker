@@ -7,6 +7,7 @@ export type AuditAction =
     | 'join.rejected.rate-limited'
     | 'join.rejected.token-missing'
     | 'message.throttled'
+    | 'participant.cleared'
     | 'room.created'
     | 'room.dropped.idle'
     | 'room.creation.rejected.limit'

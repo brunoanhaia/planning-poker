@@ -1,4 +1,4 @@
-import { EyeOutlined, MoreOutlined } from '@ant-design/icons';
+import { DisconnectOutlined, EyeOutlined, MoreOutlined } from '@ant-design/icons';
 import { Participant } from '@planitpoker/shared';
 import {
     Avatar,
@@ -105,11 +105,19 @@ export const ParticipantRosterRow: React.FC<ParticipantRosterRowProps> = ({
             </Flex>
 
             <Space size={4}>
-                {participant.hasVoted && !participant.isSpectator && (
+                {!participant.isOnline && (
+                    <Space size={4}>
+                        <DisconnectOutlined aria-hidden />
+                        <Typography.Text type="secondary">
+                            {t('participants.offline')}
+                        </Typography.Text>
+                    </Space>
+                )}
+                {participant.isOnline && participant.hasVoted && !participant.isSpectator && (
                     <Badge status="success" text={t('participants.voted')} />
                 )}
                 {participant.isSpectator && (
-                    <Tag icon={<EyeOutlined />}>{t('participants.spectator')}</Tag>
+                    <Tag icon={<EyeOutlined aria-hidden />}>{t('participants.spectator')}</Tag>
                 )}
 
                 {canManage && (

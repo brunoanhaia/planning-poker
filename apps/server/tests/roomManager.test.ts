@@ -2,6 +2,7 @@ import { MAX_ROUNDS_PER_STORY } from '@planitpoker/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RoomManager } from '../src/roomManager.js';
+import { sessionService } from '../src/sessionService.js';
 
 describe('RoomManager Administrator Suite Unit Tests', () => {
     let rm: RoomManager;
@@ -526,5 +527,310 @@ describe('RoomManager Administrator Suite Unit Tests', () => {
         expect(room.participants[0].hasVoted).toBe(false);
         expect(room.timer?.isRunning).toBe(false);
         expect(room.timer?.remaining).toBe(60);
+    });
+
+    it('rewinds the countdown when the votes are reset', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.startTimer(roomId, hostId, 90);
+        rm.tickTimer(roomId);
+        rm.tickTimer(roomId);
+        expect(rm.getRoom(roomId)!.timer?.remaining).toBe(88);
+
+        rm.resetVotes(roomId, hostId);
+
+        // The new round starts from the configured duration, paused, instead of
+        // inheriting the last seconds of the round that was just discarded.
+        const timer = rm.getRoom(roomId)!.timer;
+        expect(timer?.remaining).toBe(90);
+        expect(timer?.isRunning).toBe(false);
+    });
+
+    it('leaves a room without a timer untouched when the votes are reset', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.resetVotes(roomId, hostId);
+
+        expect(rm.getRoom(roomId)!.timer).toBeNull();
+    });
+
+    it('stops a running countdown when the session ends', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        rm.startTimer(roomId, hostId, 60);
+        rm.tickTimer(roomId);
+        rm.endSession(roomId, hostId);
+
+        const timer = rm.getRoom(roomId)!.timer;
+        expect(timer?.isRunning).toBe(false);
+        // The remaining time stays visible in the summary instead of jumping.
+        expect(timer?.remaining).toBe(59);
+    });
+
+    it('clears the accepted estimate and reopens the story when null is accepted', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const storyId = rm.getRoom(roomId)!.stories[0].id;
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+        rm.updateStoryEstimate(roomId, hostId, storyId, 5);
+
+        // `null` is a legitimate final estimate: it withdraws the accepted
+        // score instead of storing a value the deck cannot represent.
+        rm.updateStoryEstimate(roomId, hostId, storyId, null);
+
+        const story = rm.getRoom(roomId)!.stories[0];
+        expect(story.finalEstimate).toBeNull();
+        expect(story.status).toBe('pending');
+        // Clearing the estimate does not erase the revealed round.
+        expect(story.rounds).toHaveLength(1);
+    });
+
+    it('keeps only the active story in the estimating state', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
+        rm.addStory(roomId, hostId, 'Second story');
+
+        rm.setCurrentStory(roomId, hostId, 1);
+
+        const stories = rm.getRoom(roomId)!.stories;
+        expect(stories[0].status).toBe('pending');
+        expect(stories[1].status).toBe('estimating');
+    });
+
+    it('keeps the active story and its round when another story is deleted before it', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
+        rm.addStory(roomId, hostId, 'Second story');
+        rm.addStory(roomId, hostId, 'Third story');
+        makeHostVoter(roomId, hostId);
+
+        const [first, second, third] = rm.getRoom(roomId)!.stories;
+        rm.setCurrentStory(roomId, hostId, 2);
+        rm.submitVote(roomId, hostId, 8);
+        rm.startTimer(roomId, hostId, 60);
+        rm.tickTimer(roomId);
+
+        rm.deleteStory(roomId, hostId, second.id);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.stories.map((story) => story.id)).toEqual([first.id, third.id]);
+        expect(room.currentStoryIndex).toBe(1);
+        expect(room.stories[1].id).toBe(third.id);
+        // The round belongs to the story that is still active.
+        expect(room.participants[0].vote).toBe(8);
+        expect(room.timer?.remaining).toBe(59);
+    });
+
+    it('promotes the next story and starts a fresh round when the active one is deleted', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
+        rm.addStory(roomId, hostId, 'Second story');
+        rm.addStory(roomId, hostId, 'Third story');
+        makeHostVoter(roomId, hostId);
+
+        const [, second, third] = rm.getRoom(roomId)!.stories;
+        rm.setCurrentStory(roomId, hostId, 1);
+        rm.submitVote(roomId, hostId, 5);
+        rm.startTimer(roomId, hostId, 60);
+        rm.tickTimer(roomId);
+
+        rm.deleteStory(roomId, hostId, second.id);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.currentStoryIndex).toBe(1);
+        expect(room.stories[1].id).toBe(third.id);
+        expect(room.stories[1].status).toBe('estimating');
+        // The deleted story's round does not leak into its successor.
+        expect(room.participants[0].vote).toBeNull();
+        expect(room.participants[0].hasVoted).toBe(false);
+        expect(room.timer?.remaining).toBe(60);
+        expect(room.timer?.isRunning).toBe(false);
+    });
+
+    it('falls back to the previous story when the last active one is deleted', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
+        rm.addStory(roomId, hostId, 'Second story');
+
+        const [first, second] = rm.getRoom(roomId)!.stories;
+        rm.setCurrentStory(roomId, hostId, 1);
+
+        rm.deleteStory(roomId, hostId, second.id);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.currentStoryIndex).toBe(0);
+        expect(room.stories[0].id).toBe(first.id);
+        expect(room.stories[0].status).toBe('estimating');
+    });
+
+    it('reopens a promoted completed story with a fresh score', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        rm.addStory(roomId, hostId, 'First story');
+        rm.addStory(roomId, hostId, 'Second story');
+        makeHostVoter(roomId, hostId);
+
+        const [first, second] = rm.getRoom(roomId)!.stories;
+        rm.setCurrentStory(roomId, hostId, 1);
+        rm.submitVote(roomId, hostId, 8);
+        rm.revealVotes(roomId, hostId);
+        rm.updateStoryEstimate(roomId, hostId, second.id, 8);
+        expect(rm.getRoom(roomId)!.stories[1].status).toBe('completed');
+
+        // Make the completed story the successor of the active one, then remove
+        // that active story: the promoted row must reopen, not keep its score.
+        rm.setCurrentStory(roomId, hostId, 0);
+        rm.deleteStory(roomId, hostId, first.id);
+
+        const promoted = rm.getRoom(roomId)!.stories[0];
+        expect(promoted.id).toBe(second.id);
+        expect(promoted.status).toBe('estimating');
+        expect(promoted.finalEstimate).toBeNull();
+    });
+
+    it('rejects deleting a story that no longer exists', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+
+        expect(rm.deleteStory(roomId, hostId, 'missing-story')).toBeNull();
+    });
+
+    it('lets an admin clear the participants who left without touching the online ones', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.leaveRoom(roomId, bobId);
+        expect(rm.getRoom(roomId)!.participants).toHaveLength(2);
+
+        rm.clearOfflineParticipants(roomId, hostId);
+
+        const participants = rm.getRoom(roomId)!.participants;
+        expect(participants.map((participant) => participant.id)).toEqual([hostId]);
+        expect(participants[0].isOnline).toBe(true);
+    });
+
+    it('refuses to clear offline participants for a non-administrator', () => {
+        const { roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        const carolId = rm.joinRoom(roomId, 'Carol', '🐱', '#10b981')!.participant!.id;
+
+        rm.leaveRoom(roomId, bobId);
+
+        expect(rm.clearOfflineParticipants(roomId, carolId)).toBeNull();
+        expect(rm.getRoom(roomId)!.participants).toHaveLength(3);
+    });
+
+    it('revokes the session token of a cleared participant', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        const bobToken = sessionService.issue(roomId, bobId);
+
+        rm.leaveRoom(roomId, bobId);
+        rm.clearOfflineParticipants(roomId, hostId);
+
+        // The row is gone and the credential goes with it; a returning browser
+        // is admitted as a newcomer instead of holding a stale identity.
+        expect(rm.getRoom(roomId)!.participants.map((participant) => participant.id)).toEqual([
+            hostId,
+        ]);
+        expect(sessionService.resolve(bobToken)).toBeNull();
+    });
+
+    it('keeps a departed voter card when the admin clears them before the reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.submitVote(roomId, bobId, 8);
+        rm.leaveRoom(roomId, bobId);
+        rm.clearOfflineParticipants(roomId, hostId);
+        expect(rm.getRoom(roomId)!.participants.map((participant) => participant.id)).toEqual([
+            hostId,
+        ]);
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.revealVotes(roomId, hostId);
+
+        // Removing the row must not remove the card it had already cast.
+        const votes = rm.getRoom(roomId)!.stories[0].rounds[0].votes;
+        expect(votes.map((vote) => vote.vote).sort()).toEqual([5, 8]);
+        expect(votes.map((vote) => vote.participantId)).toContain(bobId);
+    });
+
+    it('auto-reveals when the last unvoted online voter disconnects', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+        expect(rm.getRoom(roomId)!.votesRevealed).toBe(false);
+
+        // Bob disconnects without voting: Alice is the only online voter left
+        // and has voted, so the round must close instead of stalling at 100%.
+        rm.leaveRoom(roomId, bobId);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(true);
+        expect(room.stories[0].rounds[0].votes.map((vote) => vote.vote)).toEqual([5]);
+    });
+
+    it('does not auto-reveal when the session ends before a disconnect', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.endSession(roomId, hostId);
+        rm.leaveRoom(roomId, bobId);
+
+        // An ended session is read-only: a late disconnect cannot reveal or
+        // append a round after the summary was closed.
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(false);
+        expect(room.stories[0].rounds).toHaveLength(0);
+    });
+
+    it('does not auto-reveal when a participant is removed after the session ends', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+        rm.toggleAutoReveal(roomId, hostId);
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.endSession(roomId, hostId);
+        rm.removeParticipant(roomId, bobId);
+
+        // The room-removal path shares the same completion predicate, so it
+        // must also stay frozen once the session has ended.
+        const room = rm.getRoom(roomId)!;
+        expect(room.votesRevealed).toBe(false);
+        expect(room.stories[0].rounds).toHaveLength(0);
+        expect(room.participants.map((participant) => participant.id)).toEqual([hostId]);
+    });
+
+    it('keeps the recorded round when a voter is cleared after the reveal', () => {
+        const { hostId, roomId } = rm.createRoom('Alice', '🚀', '#6366f1')!;
+        makeHostVoter(roomId, hostId);
+        rm.addStory(roomId, hostId, 'Story 1');
+        const bobId = rm.joinRoom(roomId, 'Bob', '🎨', '#3b82f6')!.participant!.id;
+
+        rm.submitVote(roomId, hostId, 5);
+        rm.submitVote(roomId, bobId, 8);
+        rm.revealVotes(roomId, hostId);
+        const revealedVotes = structuredClone(rm.getRoom(roomId)!.stories[0].rounds[0].votes);
+
+        rm.leaveRoom(roomId, bobId);
+        rm.clearOfflineParticipants(roomId, hostId);
+
+        const room = rm.getRoom(roomId)!;
+        expect(room.participants.map((participant) => participant.id)).toEqual([hostId]);
+        expect(room.stories[0].rounds[0].votes).toEqual(revealedVotes);
     });
 });

@@ -40,6 +40,7 @@ const TIMER_ENDING_THRESHOLD = 10;
 interface VoteActionsArgs {
     activeVoterCount: number;
     isAdmin: boolean;
+    isEnded: boolean;
     onResetVotes: () => void;
     onRevealVotes: () => void;
     votedCount: number;
@@ -48,6 +49,7 @@ interface VoteActionsArgs {
 
 interface TimerControlsArgs {
     isAdmin: boolean;
+    isEnded: boolean;
     isRunning: boolean;
     onPause: () => void;
     onReset: () => void;
@@ -59,6 +61,7 @@ interface TimerControlsArgs {
 interface VotingProgressArgs {
     activeVoterCount: number;
     isAdmin: boolean;
+    isEnded: boolean;
     onResetVotes: () => void;
     onRevealVotes: () => void;
     progress: number;
@@ -107,6 +110,7 @@ const renderTimerTag = (timer: null | TimerState, t: Translate): React.ReactNode
 /** Renders the host's countdown controls: start (with presets), pause and reset. */
 const renderTimerControls = ({
     isAdmin,
+    isEnded,
     isRunning,
     onPause,
     onReset,
@@ -114,7 +118,7 @@ const renderTimerControls = ({
     t,
     timer,
 }: TimerControlsArgs): React.ReactNode => {
-    if (!isAdmin) {
+    if (!isAdmin || isEnded) {
         return null;
     }
 
@@ -157,12 +161,19 @@ const renderTimerControls = ({
 const renderVoteActions = ({
     activeVoterCount,
     isAdmin,
+    isEnded,
     onResetVotes,
     onRevealVotes,
     votedCount,
     votesRevealed,
     t,
 }: VoteActionsArgs & { t: Translate }): React.ReactNode => {
+    if (isEnded) {
+        // The session is read-only: the ended banner already explains why no
+        // further reveal or reset is offered.
+        return null;
+    }
+
     if (!votesRevealed) {
         if (!isAdmin) {
             return <Tag>{t('estimation.waiting')}</Tag>;
@@ -233,6 +244,7 @@ const renderEndedBanner = (onOpenSummary: () => void, t: Translate): React.React
 const renderVotingProgress = ({
     activeVoterCount,
     isAdmin,
+    isEnded,
     onResetVotes,
     onRevealVotes,
     progress,
@@ -256,6 +268,7 @@ const renderVotingProgress = ({
             {renderVoteActions({
                 activeVoterCount,
                 isAdmin,
+                isEnded,
                 onResetVotes,
                 onRevealVotes,
                 t,
@@ -296,6 +309,9 @@ export const EstimationPanel: React.FC = () => {
     }
 
     const currentStory = roomState.stories[roomState.currentStoryIndex ?? 0];
+    // Offline voters sit outside both sides of the ratio: their recorded card
+    // still appears in the revealed round, but a closed laptop must not keep the
+    // round open or make the progress bar disagree with the roster.
     const activeVoters = (roomState.participants ?? []).filter((p) => !p.isSpectator && p.isOnline);
     const votedCount = activeVoters.filter((p) => p.hasVoted).length;
     const votingProgress = activeVoters.length > 0 ? (votedCount / activeVoters.length) * 100 : 0;
@@ -314,6 +330,7 @@ export const EstimationPanel: React.FC = () => {
                             {renderTimerTag(roomState.timer, t)}
                             {renderTimerControls({
                                 isAdmin,
+                                isEnded: roomState.isEnded,
                                 isRunning: roomState.timer?.isRunning === true,
                                 onPause: pauseTimer,
                                 onReset: resetTimer,
@@ -341,6 +358,7 @@ export const EstimationPanel: React.FC = () => {
                     {renderVotingProgress({
                         activeVoterCount: activeVoters.length,
                         isAdmin,
+                        isEnded: roomState.isEnded,
                         onResetVotes: resetVotes,
                         onRevealVotes: revealVotes,
                         progress: votingProgress,

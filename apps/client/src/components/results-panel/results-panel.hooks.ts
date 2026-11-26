@@ -1,8 +1,13 @@
-import { CardValue, Participant, RoomState } from '@planitpoker/shared';
+import { CardValue, RoomState } from '@planitpoker/shared';
 import confetti from 'canvas-confetti';
 import { useEffect, useMemo } from 'react';
 
-import { VoteStats, computeVoteStats, formatStatValue } from '../../utils/estimation-stats';
+import {
+    VoteInput,
+    VoteStats,
+    computeVoteStats,
+    formatStatValue,
+} from '../../utils/estimation-stats';
 
 /** Particle count and spread used for the full-consensus celebration. */
 const CONFETTI_OPTIONS: confetti.Options = {
@@ -32,42 +37,50 @@ export interface EstimationStats extends VoteStats {
     medianText: string;
     /** Standard deviation rendered for display, or `N/A` without numbers. */
     deviationText: string;
-    /** Participants whose vote counts towards this story. */
-    votedParticipants: Participant[];
 }
 
 /**
  * Aggregates the revealed votes of the active story and fires a celebration on
  * unanimity.
  *
+ * A revealed round comes from the recorded snapshot, not from the live roster:
+ * an administrator may clear an offline participant after the reveal, and the
+ * card they showed must remain part of the statistics. Before the reveal there
+ * is no snapshot yet, so the live cards are used.
+ *
  * @param roomState - The live room, or `null` before a room is joined.
  * @returns The aggregate statistics for the current story.
  */
 export const useEstimationStats = (roomState: null | RoomState): EstimationStats => {
-    const votedParticipants = useMemo(() => {
+    const votes = useMemo<VoteInput[]>(() => {
         if (!roomState) {
             return [];
         }
-        return roomState.participants.filter((p) => {
-            if (p.vote === null || p.vote === undefined) {
-                return false;
-            }
-            // A revealed round is frozen: a voter who switches to spectator afterwards
-            // keeps the card they showed, so the role only filters the cards still being cast.
-            return roomState.votesRevealed || !p.isSpectator;
-        });
+
+        const story = roomState.stories[roomState.currentStoryIndex ?? 0];
+        const revealedRound = roomState.votesRevealed
+            ? story?.rounds[story.rounds.length - 1]
+            : undefined;
+        if (revealedRound) {
+            return revealedRound.votes.map((vote) => ({ name: vote.name, vote: vote.vote }));
+        }
+
+        return roomState.participants
+            .filter((p) => {
+                if (p.vote === null || p.vote === undefined) {
+                    return false;
+                }
+                // A revealed round is frozen: a voter who switches to spectator afterwards
+                // keeps the card they showed, so the role only filters the cards still being cast.
+                return roomState.votesRevealed || !p.isSpectator;
+            })
+            .map((participant) => ({
+                name: participant.name,
+                vote: participant.vote as CardValue,
+            }));
     }, [roomState]);
 
-    const stats = useMemo(
-        () =>
-            computeVoteStats(
-                votedParticipants.map((participant) => ({
-                    name: participant.name,
-                    vote: participant.vote as CardValue,
-                }))
-            ),
-        [votedParticipants]
-    );
+    const stats = useMemo(() => computeVoteStats(votes), [votes]);
 
     const isFullConsensus =
         stats.totalVotes >= MIN_CONSENSUS_VOTERS &&
@@ -89,6 +102,5 @@ export const useEstimationStats = (roomState: null | RoomState): EstimationStats
         hasNumeric: stats.numericVotes.length > 0,
         isFullConsensus,
         medianText: formatStatValue(stats.median, DECIMALS_MEAN),
-        votedParticipants,
     };
 };

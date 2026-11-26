@@ -1,3 +1,5 @@
+import { buildCsvFilename } from '../../utils/csv-filename';
+
 /**
  * Characters that spreadsheet applications interpret as the start of a formula.
  * Cells beginning with any of these are prefixed with a single quote to neutralize
@@ -28,22 +30,14 @@ export const escapeCsvCell = (value: CsvCellValue): string => {
 /**
  * Builds a safe, predictable CSV filename from an arbitrary room title.
  *
- * Strips path separators and control characters, collapses whitespace, and always
- * appends a fixed `.csv` extension so the title cannot influence the file type.
+ * Delegates the sanitization to {@link buildCsvFilename} and fixes the export
+ * marker, so a backlog export stays distinct from a session summary.
  *
  * @param roomTitle - The (untrusted) room title.
  * @returns A filesystem-safe filename ending in `.csv`.
  */
-export const buildBacklogCsvFilename = (roomTitle: null | string | undefined): string => {
-    const slug = (roomTitle || '')
-        .normalize('NFKD')
-        .replace(/[^\w\s-]/g, '')
-        .trim()
-        .replace(/\s+/g, '_')
-        .slice(0, 60);
-
-    return `${slug || 'backlog'}_Backlog_Estimates.csv`;
-};
+export const buildBacklogCsvFilename = (roomTitle: null | string | undefined): string =>
+    buildCsvFilename(roomTitle, 'Backlog_Estimates', 'backlog');
 
 /**
  * Parses pasted bulk-import text into stories.

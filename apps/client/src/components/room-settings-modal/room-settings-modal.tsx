@@ -1,11 +1,28 @@
 import { DECK_TYPES, DeckType, PRESET_DECKS } from '@planitpoker/shared';
-import { Button, Divider, Flex, Input, Modal, Popconfirm, Select, Switch, Typography } from 'antd';
-import React, { useState } from 'react';
+import {
+    Alert,
+    Button,
+    Divider,
+    Flex,
+    Input,
+    InputRef,
+    Modal,
+    Popconfirm,
+    Select,
+    Switch,
+    Typography,
+} from 'antd';
+import React, { useRef, useState } from 'react';
 
 import { useSocket } from '../../context/socket-context/use-socket';
 import { deckLabelKey } from '../../i18n/dictionary';
 import { useTranslation } from '../../i18n/use-translation';
-import { hasSameCards, parseCustomDeck } from '../deck-select/deck-select.utils';
+import {
+    CustomDeckError,
+    hasSameCards,
+    parseCustomDeck,
+    validateCustomDeck,
+} from '../deck-select/deck-select.utils';
 
 /** Fallback cards offered when a custom deck parses to nothing usable. */
 const FALLBACK_CUSTOM_DECK: (number | string)[] = [1, 2, 3, 5, 8];
@@ -38,10 +55,16 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
     const [titleDraft, setTitleDraft] = useState<null | string>(null);
     const [deckTypeDraft, setDeckTypeDraft] = useState<null | DeckType>(null);
     const [customDeckDraft, setCustomDeckDraft] = useState<null | string>(null);
+    const [customDeckError, setCustomDeckError] = useState<CustomDeckError | null>(null);
+    const customDeckInputRef = useRef<InputRef>(null);
 
     if (!roomState || !isAdmin) {
         return null;
     }
+
+    // The server freezes every content change once the session ends; the
+    // dialog mirrors that instead of offering actions that would be refused.
+    const isReadOnly = roomState.isEnded;
 
     // The fields fall back to the live room, so a value changed elsewhere — a
     // room renamed from the navbar, a deck switched by another administrator —
@@ -53,15 +76,32 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         customDeckDraft ?? roomState.customDeck?.join(', ') ?? FALLBACK_CUSTOM_DECK.join(', ');
 
     const handleSave = () => {
+        if (isReadOnly) {
+            return;
+        }
+
+        // Validate before dispatching anything: a rejected deck must not apply
+        // the title change on the way out and leave the dialog half-applied.
+        const parsedCustomDeck = deckType === 'custom' ? parseCustomDeck(customDeck) : null;
+        const customDeckRule = parsedCustomDeck ? validateCustomDeck(parsedCustomDeck) : null;
+        if (customDeckRule) {
+            setCustomDeckError(customDeckRule);
+            // The alert is announced, and focus moves to the field that needs
+            // fixing so keyboard and screen-reader users land on the cause.
+            customDeckInputRef.current?.focus();
+            return;
+        }
+
         if (title.trim() && title.trim() !== roomState.title) {
             updateRoomTitle(title.trim());
         }
 
-        if (deckType === 'custom') {
-            const parsedCards = parseCustomDeck(customDeck);
-            const cards = parsedCards.length > 0 ? parsedCards : FALLBACK_CUSTOM_DECK;
-            if (deckType !== roomState.deckType || !hasSameCards(cards, roomState.customDeck)) {
-                changeDeck('custom', cards);
+        if (parsedCustomDeck) {
+            if (
+                deckType !== roomState.deckType ||
+                !hasSameCards(parsedCustomDeck, roomState.customDeck)
+            ) {
+                changeDeck('custom', parsedCustomDeck);
             }
         } else if (deckType !== roomState.deckType) {
             changeDeck(deckType);
@@ -73,6 +113,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         setTitleDraft(null);
         setDeckTypeDraft(null);
         setCustomDeckDraft(null);
+        setCustomDeckError(null);
         onClose();
     };
 
@@ -81,26 +122,35 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
         onClose();
     };
 
+    /** Dismisses the dialog and drops a validation error from the previous attempt. */
+    const handleCancel = () => {
+        setCustomDeckError(null);
+        onClose();
+    };
+
     return (
         <Modal
             footer={
                 <Flex gap={8} justify="end">
-                    <Button onClick={onClose}>{t('common.cancel')}</Button>
-                    <Button onClick={handleSave} type="primary">
+                    <Button onClick={handleCancel}>{t('common.cancel')}</Button>
+                    <Button disabled={isReadOnly} onClick={handleSave} type="primary">
                         {t('settings.apply')}
                     </Button>
                 </Flex>
             }
-            onCancel={onClose}
+            onCancel={handleCancel}
             open={open}
             title={t('settings.title')}
         >
             <Flex gap={12} vertical>
                 <Typography.Text type="secondary">{t('settings.description')}</Typography.Text>
 
+                {isReadOnly && <Alert showIcon title={t('settings.readOnly')} type="info" />}
+
                 <div>
                     <label htmlFor="room-settings-title">{t('nav.roomTitle')}</label>
                     <Input
+                        disabled={isReadOnly}
                         id="room-settings-title"
                         onChange={(event) => setTitleDraft(event.target.value)}
                         value={title}
@@ -110,8 +160,12 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                 <div>
                     <label htmlFor="room-settings-deck">{t('settings.deck')}</label>
                     <Select<DeckType>
+                        disabled={isReadOnly}
                         id="room-settings-deck"
-                        onChange={setDeckTypeDraft}
+                        onChange={(value) => {
+                            setDeckTypeDraft(value);
+                            setCustomDeckError(null);
+                        }}
                         options={DECK_TYPES.map((option) => ({
                             label: t(deckLabelKey(option)),
                             value: option,
@@ -127,11 +181,31 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                             {t('settings.customCards')}
                         </label>
                         <Input
+                            aria-describedby={
+                                customDeckError ? 'room-settings-custom-deck-error' : undefined
+                            }
+                            aria-invalid={Boolean(customDeckError)}
+                            disabled={isReadOnly}
                             id="room-settings-custom-deck"
-                            onChange={(event) => setCustomDeckDraft(event.target.value)}
+                            onChange={(event) => {
+                                setCustomDeckDraft(event.target.value);
+                                setCustomDeckError(null);
+                            }}
                             placeholder={t('settings.customCards.placeholder')}
+                            ref={customDeckInputRef}
+                            status={customDeckError ? 'error' : undefined}
                             value={customDeck}
                         />
+                        {/* The live region stays mounted: a region inserted with
+                            its content already inside is often skipped by screen
+                            readers, so only the message is conditional. */}
+                        <Typography.Text
+                            id="room-settings-custom-deck-error"
+                            role="alert"
+                            type="danger"
+                        >
+                            {customDeckError ? t(customDeckError.key, customDeckError.params) : ''}
+                        </Typography.Text>
                     </div>
                 ) : (
                     <Typography.Text type="secondary">
@@ -151,6 +225,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <Switch
                         aria-label={t('settings.autoReveal')}
                         checked={roomState.autoReveal}
+                        disabled={isReadOnly}
                         onChange={toggleAutoReveal}
                     />
                 </Flex>
@@ -165,6 +240,7 @@ export const RoomSettingsModal: React.FC<RoomSettingsModalProps> = ({ onClose, o
                     <Switch
                         aria-label={t('settings.lock')}
                         checked={roomState.isLocked}
+                        disabled={isReadOnly}
                         onChange={toggleLockRoom}
                     />
                 </Flex>

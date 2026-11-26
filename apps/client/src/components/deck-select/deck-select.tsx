@@ -1,6 +1,6 @@
 import { DECK_TYPES, DeckType } from '@planitpoker/shared';
-import { Input, Select, Typography } from 'antd';
-import React from 'react';
+import { Input, InputRef, Select, Typography } from 'antd';
+import React, { useEffect, useRef } from 'react';
 
 import { deckLabelKey } from '../../i18n/dictionary';
 import { useTranslation } from '../../i18n/use-translation';
@@ -46,6 +46,15 @@ export const DeckSelect: React.FC<DeckSelectProps> = ({
 }) => {
     const { t } = useTranslation();
     const errorId = `${customDeckId}-error`;
+    const customDeckInputRef = useRef<InputRef>(null);
+
+    // The parent sets the error after a submit; focus the field so keyboard and
+    // screen-reader users land on the value that needs fixing.
+    useEffect(() => {
+        if (customDeckError) {
+            customDeckInputRef.current?.focus();
+        }
+    }, [customDeckError]);
 
     return (
         <>
@@ -82,13 +91,16 @@ export const DeckSelect: React.FC<DeckSelectProps> = ({
                         id={customDeckId}
                         onChange={(event) => onCustomDeckChange(event.target.value)}
                         placeholder={t('create.customDeck.placeholder')}
+                        ref={customDeckInputRef}
+                        status={customDeckError ? 'error' : undefined}
                         value={customDeck}
                     />
-                    {customDeckError && (
-                        <Typography.Text id={errorId} role="alert" type="danger">
-                            {customDeckError}
-                        </Typography.Text>
-                    )}
+                    {/* The live region stays mounted: a region inserted with
+                        its content already inside is often skipped by screen
+                        readers, so only the message is conditional. */}
+                    <Typography.Text id={errorId} role="alert" type="danger">
+                        {customDeckError ?? ''}
+                    </Typography.Text>
                 </div>
             )}
         </>

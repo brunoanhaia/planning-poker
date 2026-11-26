@@ -4,6 +4,7 @@ import {
     CardValue,
     DECK_TYPES,
     DeckType,
+    EstimateValue,
     MAX_CUSTOM_DECK_SIZE,
     MAX_ROOMS,
     MAX_ROUNDS_PER_STORY,
@@ -15,11 +16,13 @@ import {
     PRESET_DECKS,
     ROOM_IDLE_TTL_MS,
     RoomState,
+    RoundVote,
 } from '@planitpoker/shared';
 
 import { DEFAULT_AVATAR, DEFAULT_HOST_COLOR, DEFAULT_TIMER_DURATION_SECONDS } from './constants.js';
 import { generateRoomId, generateRoundId, generateUserId } from './idGenerator.js';
 import {
+    clearOfflineParticipants as clearOfflineParticipantsFromRoom,
     joinParticipant,
     JoinParticipantResult,
     kickParticipant,
@@ -53,6 +56,14 @@ export class RoomManager {
     private readonly rooms: Map<string, RoomState> = new Map();
     /** Last time a room was touched by a client, in milliseconds. */
     private readonly roomTouchedAt: Map<string, number> = new Map();
+    /**
+     * Cards cast by participants who were removed before the reveal.
+     *
+     * The roster no longer carries those identities, but the round still has to
+     * record the cards as they stood at reveal time. Kept out of `RoomState` on
+     * purpose: a detached card must never be broadcast before the reveal.
+     */
+    private readonly detachedVotes = new Map<string, { storyId: string; votes: RoundVote[] }>();
 
     /**
      * Resets the voting state of a room for a new round.
@@ -61,10 +72,66 @@ export class RoomManager {
      */
     private resetRoomVotes(room: RoomState): void {
         room.votesRevealed = false;
+        this.detachedVotes.delete(room.id);
         room.participants.forEach((participant) => {
             participant.vote = null;
             participant.hasVoted = false;
         });
+    }
+
+    /**
+     * Keeps the cards of participants who are about to leave the roster.
+     *
+     * Clearing or moving a participant removes their row from `RoomState`, but a
+     * card they cast before the reveal still belongs to the round. The snapshot
+     * lives beside the room until `recordRound` consumes it, so it is never
+     * broadcast before the cards are public.
+     *
+     * @param room - The room whose round is still open.
+     * @param participants - Participants about to be removed from the roster.
+     */
+    private captureDetachedVotes(room: RoomState, participants: Participant[]): void {
+        const story = room.stories[room.currentStoryIndex];
+        if (!story || room.votesRevealed) {
+            return;
+        }
+
+        const votes = participants
+            .filter(
+                (participant) =>
+                    !participant.isSpectator &&
+                    participant.vote !== null &&
+                    participant.vote !== undefined
+            )
+            .map((participant) => ({
+                name: participant.name,
+                participantId: participant.id,
+                vote: participant.vote as CardValue,
+            }));
+        if (votes.length === 0) {
+            return;
+        }
+
+        const existing = this.detachedVotes.get(room.id);
+        const previous = existing?.storyId === story.id ? existing.votes : [];
+        this.detachedVotes.set(room.id, { storyId: story.id, votes: [...previous, ...votes] });
+    }
+
+    /**
+     * Stops the countdown and restores its initial duration.
+     *
+     * A new round starts from the configured duration rather than from whatever
+     * was left of the previous one, so the timer must be rewound whenever the
+     * round itself is reset. A room with no timer is left untouched.
+     *
+     * @param room - The room whose timer is rewound.
+     */
+    private resetRoomTimer(room: RoomState): void {
+        if (!room.timer) {
+            return;
+        }
+        room.timer.remaining = room.timer.duration;
+        room.timer.isRunning = false;
     }
 
     /**
@@ -268,6 +335,7 @@ export class RoomManager {
             }
             this.rooms.delete(roomId);
             this.roomTouchedAt.delete(roomId);
+            this.detachedVotes.delete(roomId);
             sessionService.revokeByRoom(roomId);
             dropped.push(roomId);
         });
@@ -296,7 +364,15 @@ export class RoomManager {
         if (!room) {
             return null;
         }
-        return leaveParticipant(room, userId);
+
+        const wasRevealed = room.votesRevealed;
+        const updated = leaveParticipant(room, userId);
+        // Leaving can complete the round when the last unvoted online voter
+        // disconnects, so the snapshot is recorded here, not only on submit.
+        if (!wasRevealed && updated.votesRevealed) {
+            this.recordRound(updated);
+        }
+        return updated;
     }
 
     /**
@@ -312,7 +388,44 @@ export class RoomManager {
         if (!room) {
             return null;
         }
-        return removeParticipant(room, userId);
+
+        const leaving = room.participants.find((participant) => participant.id === userId);
+        if (leaving) {
+            this.captureDetachedVotes(room, [leaving]);
+        }
+        const wasRevealed = room.votesRevealed;
+        const updated = removeParticipant(room, userId);
+        if (!wasRevealed && updated.votesRevealed) {
+            this.recordRound(updated);
+        }
+        return updated;
+    }
+
+    /**
+     * Drops every participant who is no longer connected (admin-only).
+     *
+     * The session tokens bound to those rows are revoked with them: a cleared
+     * participant may rejoin as a newcomer, but the token from the removed row
+     * must not be left behind in the in-memory token map.
+     *
+     * @param roomId - The room identifier.
+     * @param userId - ID of the admin or co-host requesting the cleanup.
+     * @returns Updated RoomState or null if unauthorized.
+     */
+    public clearOfflineParticipants(roomId: string, userId: string): RoomState | null {
+        const room = this.getRoom(roomId);
+        if (!room || !this.isUserAdmin(room, userId)) {
+            return null;
+        }
+
+        const offlineParticipants = room.participants.filter(
+            (participant) => !participant.isOnline
+        );
+        const offlineIds = offlineParticipants.map((participant) => participant.id);
+        this.captureDetachedVotes(room, offlineParticipants);
+        const updated = clearOfflineParticipantsFromRoom(room);
+        offlineIds.forEach((offlineId) => sessionService.revokeByUser(roomId, offlineId));
+        return updated;
     }
 
     /**
@@ -431,10 +544,7 @@ export class RoomManager {
             return null;
         }
 
-        if (room.timer) {
-            room.timer.remaining = room.timer.duration;
-            room.timer.isRunning = false;
-        }
+        this.resetRoomTimer(room);
         return room;
     }
 
@@ -535,6 +645,13 @@ export class RoomManager {
                 vote: participant.vote as CardValue,
             }));
 
+        const detached = this.detachedVotes.get(room.id);
+        if (detached?.storyId === story.id) {
+            votes.push(...detached.votes);
+        }
+        // The snapshot is consumed by this reveal and by no other story.
+        this.detachedVotes.delete(room.id);
+
         story.rounds.push({ id: generateRoundId(), revealedAt: Date.now(), votes });
         if (story.rounds.length > MAX_ROUNDS_PER_STORY) {
             story.rounds.splice(0, story.rounds.length - MAX_ROUNDS_PER_STORY);
@@ -558,6 +675,9 @@ export class RoomManager {
         }
 
         this.resetRoomVotes(room);
+        // A reset opens a new round, so a countdown left running from the
+        // previous one would time the new discussion from the wrong position.
+        this.resetRoomTimer(room);
 
         const story = room.stories[room.currentStoryIndex];
         if (story && (story.finalEstimate ?? null) !== null) {
@@ -727,7 +847,7 @@ export class RoomManager {
         roomId: string,
         userId: string,
         storyId: string,
-        estimate: CardValue
+        estimate: EstimateValue
     ): RoomState | null {
         const room = this.getRoom(roomId);
         if (!room || !this.isUserAdmin(room, userId)) {
@@ -753,19 +873,35 @@ export class RoomManager {
             return null;
         }
 
-        deleteStoryFromRoom(room, storyId);
+        const previousStoryId = room.stories[room.currentStoryIndex]?.id ?? null;
+        const updated = deleteStoryFromRoom(room, storyId);
+        if (!updated) {
+            return null;
+        }
 
-        // An empty backlog has no story to estimate, so any vote still on the
-        // table belongs to a story that no longer exists. Stop the countdown
-        // too: it was measuring a discussion about that same story.
-        if (room.stories.length === 0) {
+        // The votes and the countdown belonged to the story that just vanished.
+        // When a different story becomes active, both have to start over rather
+        // than carry the removed story's round into the new one. An empty
+        // backlog has nothing to estimate, so its countdown only stops.
+        const currentStoryId = updated.stories[updated.currentStoryIndex]?.id ?? null;
+        if (currentStoryId !== previousStoryId) {
             this.resetRoomVotes(room);
-            if (room.timer) {
-                room.timer.isRunning = false;
+            const currentStory = updated.stories[updated.currentStoryIndex];
+            if (currentStory) {
+                // The promoted story is now the estimation target; a score it
+                // carried as a completed story would contradict its status.
+                currentStory.finalEstimate = null;
+            }
+            if (room.stories.length === 0) {
+                if (room.timer) {
+                    room.timer.isRunning = false;
+                }
+            } else {
+                this.resetRoomTimer(room);
             }
         }
 
-        return room;
+        return updated;
     }
 
     /**
@@ -855,6 +991,14 @@ export class RoomManager {
             room.isEnded = true;
             room.endedAt = Date.now();
         }
+        // A countdown left running after the session closes would keep ticking
+        // and broadcasting a clock nobody can act on.
+        if (room.timer) {
+            room.timer.isRunning = false;
+        }
+        // No reveal can happen after the end, so a pending detached snapshot is
+        // no longer reachable.
+        this.detachedVotes.delete(roomId);
         return room;
     }
 

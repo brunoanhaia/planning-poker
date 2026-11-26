@@ -30,8 +30,14 @@ const getSpectatorHint = (user: Participant | undefined, t: Translate): NavbarIc
         return null;
     }
     return user.isSpectator
-        ? { icon: React.createElement(EyeInvisibleOutlined), label: t('nav.spectating') }
-        : { icon: React.createElement(EyeOutlined), label: t('nav.voting') };
+        ? {
+              icon: React.createElement(EyeInvisibleOutlined, { 'aria-hidden': true }),
+              label: t('nav.spectating'),
+          }
+        : {
+              icon: React.createElement(EyeOutlined, { 'aria-hidden': true }),
+              label: t('nav.voting'),
+          };
 };
 
 /** Everything the bar renders, plus the actions it dispatches. */
@@ -39,7 +45,6 @@ export interface NavbarModel {
     closeRename: () => void;
     colorModeToggle: NavbarIconLabel;
     handleCopyLink: () => Promise<void>;
-    handleInviteKeyDown: (event: React.KeyboardEvent<HTMLElement>) => Promise<void>;
     isAdmin: boolean;
     isConnected: boolean;
     isEditingTitle: boolean;
@@ -94,14 +99,6 @@ export const useNavbar = (colorMode: ColorMode): NavbarModel => {
         message.error(t('nav.copy.error'));
     };
 
-    const handleInviteKeyDown = async (event: React.KeyboardEvent<HTMLElement>): Promise<void> => {
-        if (event.key !== 'Enter' && event.key !== ' ') {
-            return;
-        }
-        event.preventDefault();
-        await handleCopyLink();
-    };
-
     const openRename = (): void => {
         if (!isAdmin || !roomState) {
             return;
@@ -123,7 +120,6 @@ export const useNavbar = (colorMode: ColorMode): NavbarModel => {
         closeRename,
         colorModeToggle: getColorModeToggle(colorMode, t),
         handleCopyLink,
-        handleInviteKeyDown,
         isAdmin,
         isConnected,
         isEditingTitle,

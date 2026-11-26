@@ -109,6 +109,44 @@ describe('RoomSettingsModal', () => {
         });
     });
 
+    it('rejects an empty custom deck instead of applying a silent fallback', async () => {
+        const socket = createMockSocketValue({ roomState: buildRoomState() });
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);
+        const onClose = vi.fn();
+        render(<RoomSettingsModal onClose={onClose} open />);
+
+        fireEvent.mouseDown(screen.getByLabelText('Estimation Deck Type'));
+        fireEvent.click(
+            await screen.findByText('Custom Deck', {
+                selector: '.ant-select-item-option-content',
+            })
+        );
+
+        // The field starts on a usable deck; clearing it is what used to fall
+        // back to `[1, 2, 3, 5, 8]` without telling the administrator.
+        fireEvent.change(screen.getByLabelText('Comma-Separated Custom Cards'), {
+            target: { value: '' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply Settings' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Enter between 2 and 30 cards.');
+        expect(socket.changeDeck).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('freezes every control once the session has ended', () => {
+        vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(
+            createMockSocketValue({ roomState: buildRoomState({ isEnded: true }) })
+        );
+        render(<RoomSettingsModal onClose={vi.fn()} open />);
+
+        expect(screen.getByRole('button', { name: 'Apply Settings' })).toBeDisabled();
+        expect(screen.getByLabelText('Room / Sprint Title')).toBeDisabled();
+        expect(screen.getByLabelText('Estimation Deck Type')).toBeDisabled();
+        expect(screen.getByRole('switch', { name: 'Auto-Reveal Votes' })).toBeDisabled();
+        expect(screen.getByRole('switch', { name: 'Lock Room' })).toBeDisabled();
+    });
+
     it('confirms ending the session with an Ant Design Popconfirm', async () => {
         const socket = createMockSocketValue({ roomState: buildRoomState() });
         vi.spyOn(SocketContextModule, 'useSocket').mockReturnValue(socket);

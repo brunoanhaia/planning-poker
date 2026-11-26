@@ -1,5 +1,12 @@
+import { buildCsvFilename } from '../../utils/csv-filename';
 import { SessionSummary } from '../../utils/estimation-stats';
 import { escapeCsvCell } from '../story-backlog/story-backlog.utils';
+
+/** Fixed marker appended to a session summary filename. */
+const SUMMARY_FILENAME_SUFFIX = 'Session_Summary';
+
+/** Fallback slug used when the room title yields no usable characters. */
+const SUMMARY_FILENAME_FALLBACK = 'session';
 
 /** CSV columns of the session summary, in order. */
 const SUMMARY_CSV_COLUMNS = [
@@ -12,6 +19,18 @@ const SUMMARY_CSV_COLUMNS = [
     'Std. Deviation',
     'Outliers',
 ] as const;
+
+/**
+ * Builds the download filename of a session summary export.
+ *
+ * A summary is not a backlog, so it must not reuse the backlog marker: the
+ * filename is the first thing a user sees after the session ends.
+ *
+ * @param roomTitle - The (untrusted) room title.
+ * @returns A filesystem-safe filename ending in `.csv`.
+ */
+export const buildSessionSummaryCsvFilename = (roomTitle: null | string | undefined): string =>
+    buildCsvFilename(roomTitle, SUMMARY_FILENAME_SUFFIX, SUMMARY_FILENAME_FALLBACK);
 
 /** Formats a millisecond duration as `h:mm:ss` or `m:ss`. */
 export const formatDuration = (durationMs: null | number): string => {

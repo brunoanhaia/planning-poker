@@ -63,7 +63,6 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
         closeRename,
         colorModeToggle,
         handleCopyLink,
-        handleInviteKeyDown,
         isAdmin,
         isConnected,
         isEditingTitle,
@@ -112,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                                     <Tooltip title={t('nav.rename')}>
                                         <Button
                                             aria-label={t('nav.rename')}
-                                            icon={<EditOutlined />}
+                                            icon={<EditOutlined aria-hidden />}
                                             onClick={openRename}
                                             size="small"
                                             type="text"
@@ -130,21 +129,24 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
 
                         {roomState.isLocked && (
                             <Tooltip title={t('nav.locked.hint')}>
-                                <Tag icon={<LockOutlined />}>{t('nav.locked')}</Tag>
+                                <Tag icon={<LockOutlined aria-hidden />}>{t('nav.locked')}</Tag>
                             </Tooltip>
                         )}
 
+                        {/* A real button rather than a Tag with `role="button"`:
+                            focus ring, disabled state and Enter/Space activation
+                            are native, so no keyboard handler is needed. */}
                         <Tooltip title={t('nav.copy.hint')}>
-                            <Tag
-                                icon={<CopyOutlined />}
+                            <Button
+                                aria-label={t('nav.copy.aria', {
+                                    room: t('nav.room', { code: roomState.id }),
+                                })}
+                                icon={<CopyOutlined aria-hidden />}
                                 onClick={handleCopyLink}
-                                role="button"
-                                style={{ cursor: 'pointer' }}
-                                tabIndex={0}
-                                onKeyDown={handleInviteKeyDown}
+                                type="text"
                             >
                                 {t('nav.room', { code: roomState.id })}
-                            </Tag>
+                            </Button>
                         </Tooltip>
 
                         {spectatorHint && (
@@ -165,7 +167,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             <Tooltip title={t('nav.settings')}>
                                 <Button
                                     aria-label={t('nav.settings')}
-                                    icon={<SettingOutlined />}
+                                    icon={<SettingOutlined aria-hidden />}
                                     onClick={onOpenSettings}
                                     type="text"
                                 />
@@ -183,7 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             <Button
                                 aria-label={t('nav.leave')}
                                 danger
-                                icon={<LogoutOutlined />}
+                                icon={<LogoutOutlined aria-hidden />}
                                 onClick={leaveRoom}
                                 type="text"
                             />

@@ -19,7 +19,7 @@ The application uses a client-server model communicating over WebSockets for rea
 - **Session tokens**: On create/join the server issues an opaque token (`apps/server/src/sessionService.ts`) bound to the room participant. Reconnection is only honored when the token proves ownership of the `userId`; a client-supplied `userId` alone is never trusted. Tokens are revoked on kick. The token is kept per browser per room (`localStorage` key `planit_room_token:<ROOM>`), so a returning browser rejoins its participant instead of minting a duplicate. A second tab takes the participant over, and the older tab is closed with code 4001 and stops with a notice. One browser holds one room session at a time: opening another room offers to return to the existing room or to end it and continue. The switch is honored only when the client presents the token of the room it is leaving, after which the server removes that participant from the old room and closes the old connection with code 4002, leaving that tab on a notice.
 - **Payload validation**: Every inbound WebSocket message is validated against a `zod` schema (`apps/server/src/validation.ts`) before reaching domain logic. Invalid payloads receive an `ERROR` and are never broadcast.
 - **Input limits**: Names (≤50), room titles (≤120), story titles (≤120), descriptions (≤2000), bulk imports (≤50), custom decks (2–30 unique cards), and timer durations (5–3600 s) are enforced server-side. Limits are shared constants in `packages/shared`.
-- **Safe export**: CSV export neutralizes spreadsheet formula injection and sanitizes the download filename (`apps/client/src/components/story-backlog/story-backlog.utils.ts`).
+- **Safe export**: CSV export neutralizes spreadsheet formula injection and sanitizes the download filename through `apps/client/src/utils/csv-filename.ts`, so a backlog export (`_Backlog_Estimates`) and a session summary (`_Session_Summary`) never share a misleading filename.
 - **Room codes**: 8 characters from a 32-character alphabet (~1.1×10¹² candidates), so a code is a secret rather than a guessing game. Ambiguous characters (`0`/`O`, `1`/`I`) are excluded so a code can be read out loud.
 - **Behind Cloudflare**: the server takes the real client from `CF-Connecting-IP`, and only for requests that genuinely arrive from a published Cloudflare address — a forged header from anywhere else is ignored, so a client cannot choose its own identity by sending one. `X-Forwarded-For` is not walked in front of Cloudflare, because the value a client sent before Cloudflare overwrote it is not a claim worth honouring. Set `CLOUDFLARE_ENABLED=true` on the server.
 - **Abuse controls**: every WebSocket connection carries an `error` listener, so a frame the receiver refuses (over the 32 KiB cap) closes that socket instead of the process; one address may hold a bounded number of sockets and a bounded number of failed room joins; message dispatch only honours types the handler owns. The per-address ceilings are sized for a shared address — an office or a carrier-grade NAT is a crowd, not a flood — and a code that matches a room is never refused by the join budget. See `docs/security-review.md`.
@@ -91,17 +91,18 @@ The application supports multiple users connecting to a single room to vote on t
     - **Guided setup**: a fresh room opens on a setup screen where the host names the session, picks the deck and stages the first stories; the room deals cards as soon as it starts.
     - Select a card to submit an estimate.
     - Toggle personal status between Voter and Spectator.
+    - **Presence**: the roster lists online participants first and collapses anyone who left behind a count; an offline voter's card still appears in the revealed round, but is not counted as an active voter.
     - View the current story backlog, with a per-story breakdown of every revealed round.
     - **Voting rounds**: re-voting a story keeps the previous rounds instead of erasing them, so the room can compare attempts before accepting a number.
     - **Result statistics**: average, median, consensus, top vote, voters and population standard deviation, plus the voters whose card falls outside 1.5 interquartile ranges.
-    - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it.
+    - **Session summary**: ending a session opens a summary with the accepted points, rounds and duration, the round-by-round breakdown of each story, and a CSV export of it. The ended room is read-only: the server refuses content changes with `SESSION_ENDED` and stops a running countdown.
     - **Interface languages**: English, Brazilian Portuguese and Spanish, switchable from the application bar and remembered across reloads.
     - **Full Responsiveness**: Access and interact seamlessly across mobile devices, tablets, and desktops.
 
 - **Administrative Features** (Restricted to Admin and Co-host):
     - **Room Settings**: Rename the room, lock/unlock the room to prevent new joins, and change the estimation deck type (e.g., Fibonacci, T-Shirt sizes).
-    - **Participant Management**: Kick users from the room, promote users to Co-host, and transfer the primary Administrator role.
-    - **Voting Control**: Reveal all submitted votes, reset the current voting session, and finalize the agreed-upon estimate (automated average/mode or custom manual override) with automatic progression to the next backlog story.
+    - **Participant Management**: Kick users from the room, promote users to Co-host, transfer the primary Administrator role, and clear the participants who left.
+    - **Voting Control**: Reveal all submitted votes, reset the current voting session, and finalize the agreed-upon estimate (automated average/mode or custom manual override) with automatic progression to the next backlog story. Resetting the votes also rewinds the discussion timer.
     - **Backlog Management**: Add new stories, delete stories, bulk import stories, and manually edit story estimates.
     - **Time Management**: Start, stop, and manage a synchronized countdown timer for discussions.
 

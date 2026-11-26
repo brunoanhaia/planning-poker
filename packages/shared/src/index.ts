@@ -248,6 +248,7 @@ export type WSMessageType =
     | 'TRANSFER_ADMIN'
     | 'PROMOTE_COADMIN'
     | 'KICK_PARTICIPANT'
+    | 'CLEAR_OFFLINE_PARTICIPANTS'
     | 'KICKED'
     | 'UPDATE_ROOM_TITLE'
     | 'TOGGLE_LOCK_ROOM'
@@ -300,7 +301,8 @@ export interface SetCurrentStoryPayload {
 }
 
 export interface UpdateStoryEstimatePayload {
-    estimate: CardValue;
+    /** Accepted estimate; `null` clears it and reopens the story. */
+    estimate: EstimateValue;
     storyId: string;
 }
 

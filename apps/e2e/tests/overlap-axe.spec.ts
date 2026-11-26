@@ -213,7 +213,7 @@ const expectCleanLayout = async (page: Page, viewportName: string, state: string
     await page.mouse.move(0, 0);
     await waitForSettledMotion(page);
     const accessibilityScanResults = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa'])
         .analyze();
 
     expect(
