@@ -1,7 +1,7 @@
 ---
 name: Bug report
 about: Report a reproducible defect — behavior that does not match what the wiki documents
-title: "[bug] <area>: <one-line symptom>"
+title: '[bug] <area>: <one-line symptom>'
 labels: bug
 assignees: ''
 ---
@@ -86,7 +86,12 @@ a hypothesis, and hypotheses do not get scheduled. -->
 
 <!-- Where to capture: browser DevTools → Network → WS tab shows every frame in
 both directions; apps/e2e/chaos/ws-chaos.mjs is a working example of a scripted
-client for back-end-only reproduction. -->
+client for back-end-only reproduction.
+
+Uploading: `gh issue create --attach shot.png` (gh CLI ≥ 2.99) uploads the file
+as a native `user-attachments` asset — the same thing the web editor's
+drag-and-drop produces. The upload needs a user token with write access to this
+repository; images and video only. -->
 
 ## Fix direction (optional — for whoever picks it up)
 
