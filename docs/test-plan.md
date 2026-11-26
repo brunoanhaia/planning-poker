@@ -72,9 +72,9 @@ These are the contracts the new suites must assert.
 - No horizontal scrolling, clipping or overlapping text/controls at 320, 375, 768, 1024, 1280,
   1920 and 2560 px.
 - Secondary header actions collapse before primary information is pushed or covered.
-- Primary action labels wrap onto additional lines when needed; they are never clipped or pushed
-  outside the button. Ellipsis is reserved for compact/secondary labels whose full text stays
-  available through a tooltip or accessible name.
+- Primary action labels stay on one line. A label wider than the button is ellipsized, never
+  wrapped or pushed outside it; the full text stays in the accessible name and the native
+  title.
 - Tooltips never obscure the room code, title or primary action on touch-sized layouts.
 - Touch targets are at least 24×24 CSS px, ideally 44×44 for primary actions.
 
@@ -275,8 +275,8 @@ Rules:
 
 ## 8. Implementation status
 
-- [x] C5: the primary lobby action is short in pt-BR ("Entrar na Sala"), wraps instead of
-      clipping in the longer locales, keeps a 44 px touch target and is covered in
+- [x] C5: the primary lobby action is short in pt-BR ("Entrar na Sala"), stays on one line and
+      ellipsizes in the longer locales, keeps a 44 px touch target and is covered in
       `content-stress` for en/pt-BR/es.
 - [ ] C1/C2: connection lifecycle, action queue and cold-start feedback.
 - [ ] C3: public-origin health contract and deployment smoke.

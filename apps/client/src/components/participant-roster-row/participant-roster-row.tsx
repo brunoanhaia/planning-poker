@@ -22,8 +22,10 @@ import { buildParticipantMenuItems, isParticipantMenuAction } from './participan
 /** Padding applied to each roster row, in pixels. */
 const ROW_PADDING = 12;
 
-/** Width of the participant name before it collapses to an ellipsis. */
-const NAME_MAX_WIDTH = '16ch';
+/** Width of the participant name before it collapses to an ellipsis.
+ *  The pixel cap keeps the layout stable when a fallback font has wide digit
+ *  glyphs, since `ch` is derived from that glyph's advance. */
+const NAME_MAX_WIDTH = 'min(16ch, 128px)';
 
 /**
  * Foreground used on a participant's avatar.

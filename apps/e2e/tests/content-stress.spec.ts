@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test';
 import { createRoom } from './support/room-session';
 
 test.describe('Content Stress', () => {
-    test('the lobby primary action fits a 320 px viewport in every locale', async ({ browser }) => {
+    test('the lobby primary action stays on one line at 320 px in every locale', async ({
+        browser,
+    }) => {
         for (const locale of ['en-US', 'pt-BR', 'es-ES']) {
             const context = await browser.newContext({
                 locale,
@@ -23,9 +25,28 @@ test.describe('Content Stress', () => {
                     scrollWidth: element.scrollWidth,
                 }));
                 expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
-                // A primary touch target stays comfortable even when the label
-                // fits on a single line.
+                // One line, never a second row, and a comfortable touch target.
                 expect(metrics.height).toBeGreaterThanOrEqual(44);
+                expect(metrics.height).toBeLessThanOrEqual(46);
+
+                const content = submit.locator('span').first();
+                const contentMetrics = await content.evaluate((element) => ({
+                    clientWidth: element.clientWidth,
+                    scrollWidth: element.scrollWidth,
+                    textOverflow: getComputedStyle(element).textOverflow,
+                    whiteSpace: getComputedStyle(element).whiteSpace,
+                }));
+                expect(contentMetrics.textOverflow).toBe('ellipsis');
+                expect(contentMetrics.whiteSpace).toBe('nowrap');
+                if (locale === 'pt-BR') {
+                    // The shortened label fits, so nothing is hidden.
+                    expect(contentMetrics.scrollWidth).toBeLessThanOrEqual(
+                        contentMetrics.clientWidth + 1
+                    );
+                } else {
+                    // The longer labels are ellipsized instead of overflowing.
+                    expect(contentMetrics.scrollWidth).toBeGreaterThan(contentMetrics.clientWidth);
+                }
 
                 const box = await submit.boundingBox();
                 expect(box).not.toBeNull();

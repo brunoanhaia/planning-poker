@@ -72,17 +72,26 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                     }}
                 />
 
-                {/* The primary action must stay fully readable on a narrow
-                    phone: wrapping is preferable to clipping the label, which
-                    would hide what the button actually does. `height: auto`
-                    lets it grow with a second line; the explicit minimum keeps
-                    the touch target comfortable when the label fits on one. */}
+                {/* The primary action always stays on one line. A label that
+                    does not fit is ellipsized instead of growing the button or
+                    spilling outside it; the full text remains the accessible
+                    name and is exposed through the native title. */}
                 <Button
                     block
                     disabled={disabled}
                     htmlType="submit"
                     size="large"
-                    style={{ height: 'auto', minHeight: 44, whiteSpace: 'normal' }}
+                    style={{ height: 44, overflow: 'hidden' }}
+                    styles={{
+                        content: {
+                            display: 'block',
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                        },
+                    }}
+                    title={t('create.submit')}
                     type="primary"
                 >
                     {t('create.submit')}
