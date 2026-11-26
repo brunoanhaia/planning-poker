@@ -252,9 +252,7 @@ test.describe('UI Overlap & Text Visibility Validation', () => {
                 await expectCleanLayout(page, viewport.name, `${colorMode} lobby`);
 
                 await page.getByLabel(/Your Display Name/i).fill('Overlap Tester');
-                await page
-                    .getByRole('button', { name: /Start Session & Generate Room Code/i })
-                    .click();
+                await page.getByRole('button', { name: /^Enter Room$/i }).click();
 
                 await expect(page.getByText('👑 Admin')).toBeVisible({ timeout: 10000 });
 

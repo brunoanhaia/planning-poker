@@ -23,7 +23,7 @@ describe('Home room creation', () => {
             await screen.findByText('Custom Deck', { selector: '.ant-select-item-option-content' })
         );
         const cards = screen.getByLabelText('Comma-Separated Custom Cards');
-        const submit = screen.getByRole('button', { name: /Start Session/ });
+        const submit = screen.getByRole('button', { name: /Enter Room/ });
         for (const value of [
             '',
             '1',

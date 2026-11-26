@@ -10,7 +10,7 @@ test('creates a room and verifies admin presence', async ({ page }) => {
     await page.getByLabel(/Session \/ Project Title/i).fill('E2E Test Session');
 
     // Click start session
-    await page.getByRole('button', { name: /Start Session & Generate Room Code/i }).click();
+    await page.getByRole('button', { name: /^Enter Room$/i }).click();
 
     // Verify navigation to room by checking if the room title is visible in the Navbar
     await expect(page.getByText('E2E Test Session')).toBeVisible({ timeout: 10000 });

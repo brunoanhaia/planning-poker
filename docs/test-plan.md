@@ -275,9 +275,9 @@ Rules:
 
 ## 8. Implementation status
 
-- [x] C5: the primary lobby action is short in pt-BR ("Entrar na Sala"), stays on one line and
-      ellipsizes in the longer locales, keeps a 44 px touch target and is covered in
-      `content-stress` for en/pt-BR/es.
+- [x] C5: the primary lobby action uses the same short label in every locale ("Enter Room" /
+      "Entrar na Sala" / "Entrar en la Sala"), stays on one line, ellipsizes any longer label
+      and keeps a 44 px touch target; covered in `content-stress` for en/pt-BR/es.
 - [ ] C1/C2: connection lifecycle, action queue and cold-start feedback.
 - [ ] C3: public-origin health contract and deployment smoke.
 - [ ] C4/C6: setup discovery, keyboard journeys and per-state axe.

@@ -56,7 +56,7 @@
     "create.error.count": "Enter between {{min}} and {{max}} cards.",
     "create.error.duplicate": "Custom cards must be unique.",
     "create.error.label": "Use finite numbers or labels up to {{max}} characters.",
-    "create.submit": "Start Session & Generate Room Code",
+    "create.submit": "Enter Room",
     "create.title": "Session / Project Title (Optional)",
     "create.title.placeholder": "e.g. Sprint 42 Estimation",
     "deck.aria.cards": "Estimation cards",

@@ -15,7 +15,7 @@ test.describe('Content Stress', () => {
                 await page.goto('/');
 
                 const submit = page.getByRole('button', {
-                    name: /^(Start Session & Generate Room Code|Entrar na Sala|Iniciar Sesión y Generar Código de Sala)$/i,
+                    name: /^(Enter Room|Entrar na Sala|Entrar en la Sala)$/i,
                 });
                 await expect(submit).toBeVisible();
 
@@ -38,15 +38,11 @@ test.describe('Content Stress', () => {
                 }));
                 expect(contentMetrics.textOverflow).toBe('ellipsis');
                 expect(contentMetrics.whiteSpace).toBe('nowrap');
-                if (locale === 'pt-BR') {
-                    // The shortened label fits, so nothing is hidden.
-                    expect(contentMetrics.scrollWidth).toBeLessThanOrEqual(
-                        contentMetrics.clientWidth + 1
-                    );
-                } else {
-                    // The longer labels are ellipsized instead of overflowing.
-                    expect(contentMetrics.scrollWidth).toBeGreaterThan(contentMetrics.clientWidth);
-                }
+                // Every shipped locale uses the same short concept, so the
+                // label fits instead of being hidden.
+                expect(contentMetrics.scrollWidth).toBeLessThanOrEqual(
+                    contentMetrics.clientWidth + 1
+                );
 
                 const box = await submit.boundingBox();
                 expect(box).not.toBeNull();
@@ -63,6 +59,25 @@ test.describe('Content Stress', () => {
                         )
                     )
                     .toBe(true);
+
+                // A future translation may be longer than the current short
+                // labels. Prove the one-line contract still holds: the label is
+                // ellipsized inside the button and the button does not grow.
+                const longLabel = await content.evaluate((element) => {
+                    element.textContent =
+                        'A much longer translated label that cannot fit on 320 px';
+                    return {
+                        buttonHeight: element.closest('button')?.getBoundingClientRect().height,
+                        clientWidth: element.clientWidth,
+                        scrollWidth: element.scrollWidth,
+                        textOverflow: getComputedStyle(element).textOverflow,
+                        whiteSpace: getComputedStyle(element).whiteSpace,
+                    };
+                });
+                expect(longLabel.textOverflow).toBe('ellipsis');
+                expect(longLabel.whiteSpace).toBe('nowrap');
+                expect(longLabel.scrollWidth).toBeGreaterThan(longLabel.clientWidth);
+                expect(longLabel.buttonHeight).toBeLessThanOrEqual(46);
             } finally {
                 await context.close();
             }
