@@ -72,7 +72,17 @@ export const CreateSessionForm: React.FC<CreateSessionFormProps> = ({ disabled, 
                     }}
                 />
 
-                <Button block disabled={disabled} htmlType="submit" size="large" type="primary">
+                {/* The primary action must stay fully readable on a narrow
+                    phone: wrapping is preferable to clipping the label, which
+                    would hide what the button actually does. */}
+                <Button
+                    block
+                    disabled={disabled}
+                    htmlType="submit"
+                    size="large"
+                    style={{ height: 'auto', whiteSpace: 'normal' }}
+                    type="primary"
+                >
                     {t('create.submit')}
                 </Button>
             </Flex>
