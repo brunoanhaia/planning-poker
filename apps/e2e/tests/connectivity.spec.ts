@@ -31,8 +31,8 @@ test.describe('Connection lifecycle', () => {
         // provider must ignore it instead of creating a second room.
         await create.click({ clickCount: 2, delay: 20 });
 
-        await expect(page.getByRole('alert')).toContainText('Connecting to the server');
         await expect(page.getByText(/Your request will run as soon as/)).toBeVisible();
+        expect(createFrames).toHaveLength(0);
 
         await socket.release();
 
@@ -58,10 +58,9 @@ test.describe('Connection lifecycle', () => {
         const retry = page.getByRole('button', { name: 'Retry now' });
         await expect(retry).toBeVisible();
 
-        // Exercise the retry control, not only its presence: it must replace
-        // the stuck dial and the queued create must run once on the new socket.
+        // Keep the original dial blocked so only a replacement can send the create.
         await retry.click();
-        await socket.release();
+        await socket.release('replacements');
 
         await expect(page.getByText(/^Room: /)).toBeVisible({ timeout: 10000 });
         await expect(page.getByText('Slow Host', { exact: true })).toBeVisible();

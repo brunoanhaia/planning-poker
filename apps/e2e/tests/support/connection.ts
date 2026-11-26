@@ -2,8 +2,8 @@ import { Page } from '@playwright/test';
 
 /** Handle the test uses to release the application-visible socket open. */
 export interface HeldSocket {
-    /** Opens every socket currently held, and lets future sockets open at once. */
-    release: () => Promise<void>;
+    /** Releases held sockets, optionally keeping the original dial blocked. */
+    release: (scope?: 'all' | 'replacements') => Promise<void>;
 }
 
 /**
@@ -20,15 +20,21 @@ export interface HeldSocket {
 export const holdSocketOpen = async (page: Page): Promise<HeldSocket> => {
     await page.addInitScript(() => {
         const NativeWebSocket = window.WebSocket;
-        let released = false;
-        const pendingOpens: (() => void)[] = [];
+        let releaseFrom = Infinity;
+        let nextSocketIndex = 0;
+        const pendingOpens = new Map<number, () => void>();
 
-        const release = () => {
-            released = true;
-            pendingOpens.splice(0).forEach((open) => open());
+        const release = (from: number) => {
+            releaseFrom = from;
+            for (const [index, open] of pendingOpens) {
+                if (index >= releaseFrom) {
+                    pendingOpens.delete(index);
+                    open();
+                }
+            }
         };
 
-        const host = window as typeof window & { __releaseDelayedSockets?: () => void };
+        const host = window as typeof window & { __releaseDelayedSockets: typeof release };
         host.__releaseDelayedSockets = release;
 
         class HeldWebSocket {
@@ -48,6 +54,7 @@ export const holdSocketOpen = async (page: Page): Promise<HeldSocket> => {
 
             constructor(url: string | URL, protocols?: string | string[]) {
                 this.native = new NativeWebSocket(url, protocols);
+                const index = nextSocketIndex++;
                 this.native.onopen = (event) => {
                     const open = () => {
                         if (this.isClosed) {
@@ -56,14 +63,15 @@ export const holdSocketOpen = async (page: Page): Promise<HeldSocket> => {
                         this.readyState = HeldWebSocket.OPEN;
                         this.onopen?.(event);
                     };
-                    if (released) {
+                    if (index >= releaseFrom) {
                         open();
                         return;
                     }
-                    pendingOpens.push(open);
+                    pendingOpens.set(index, open);
                 };
                 this.native.onmessage = (event) => this.onmessage?.(event);
                 this.native.onclose = (event) => {
+                    pendingOpens.delete(index);
                     this.isClosed = true;
                     this.readyState = HeldWebSocket.CLOSED;
                     this.onclose?.(event);
@@ -86,17 +94,28 @@ export const holdSocketOpen = async (page: Page): Promise<HeldSocket> => {
             }
         }
 
-        window.WebSocket = HeldWebSocket as unknown as typeof WebSocket;
+        window.WebSocket = new Proxy(NativeWebSocket, {
+            construct(target, [url, protocols]: [string | URL, (string | string[])?]) {
+                // Leave Vite's hot reload connection untouched.
+                if (protocols === 'vite-hmr') {
+                    return new target(url, protocols);
+                }
+                return new HeldWebSocket(url, protocols);
+            },
+        });
     });
 
     return {
-        release: async () => {
-            await page.evaluate(() => {
-                const host = window as typeof window & {
-                    __releaseDelayedSockets?: () => void;
-                };
-                host.__releaseDelayedSockets?.();
-            });
+        release: async (scope = 'all') => {
+            await page.evaluate(
+                (from) => {
+                    const host = window as typeof window & {
+                        __releaseDelayedSockets: (from: number) => void;
+                    };
+                    host.__releaseDelayedSockets(from);
+                },
+                scope === 'all' ? 0 : 1
+            );
         },
     };
 };

@@ -698,6 +698,14 @@ describe('SocketProvider reconnection', () => {
         // Four seconds after the first dial, even though a second dial failed
         // in between; a reset deadline would still be in `connecting`.
         expect(screen.getByTestId('connection')).toHaveTextContent('waking');
+
+        act(() => {
+            vi.advanceTimersByTime(1000);
+        });
+        act(() => {
+            FakeWebSocket.instances[2].drop();
+        });
+        expect(screen.getByTestId('connection')).toHaveTextContent('waking');
     });
 
     it('releases an abandoned in-flight entry when retry replaces the socket', () => {

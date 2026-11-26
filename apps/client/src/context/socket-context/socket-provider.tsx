@@ -210,6 +210,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         transmit(entry.type, entry.payload);
     }, [transmit]);
 
+    /** Keeps the wake notice and retry available until the outage ends. */
+    const reportDialing = useCallback(() => {
+        const dialing = wasConnectedRef.current ? 'reconnecting' : 'connecting';
+        setConnectionStatus((current) => (current === 'waking' ? current : dialing));
+    }, []);
+
     /**
      * Queues a create/join until the transport opens.
      *
@@ -235,11 +241,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             if (browserOfflineRef.current || navigator.onLine === false) {
                 setConnectionStatus('offline');
             } else {
-                setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+                reportDialing();
             }
             connectRef.current?.();
         },
-        [flushPendingEntry]
+        [flushPendingEntry, reportDialing]
     );
 
     const send = useCallback(
@@ -320,24 +326,24 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     useEffect(() => {
         let isMounted = true;
         let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-        let wakingTimeout: ReturnType<typeof setTimeout> | null = null;
+        let wakingTimeout: ReturnType<typeof setTimeout> | 'elapsed' | null = null;
 
         const clearWakingTimeout = () => {
-            if (wakingTimeout) {
+            if (wakingTimeout !== null && wakingTimeout !== 'elapsed') {
                 clearTimeout(wakingTimeout);
-                wakingTimeout = null;
             }
+            wakingTimeout = null;
         };
 
         const scheduleWaking = () => {
             // The deadline belongs to the outage, not to an individual dial:
             // resetting it on every failed reconnect would keep the banner in
             // `connecting` forever when dials fail faster than the grace period.
-            if (wakingTimeout) {
+            if (wakingTimeout !== null) {
                 return;
             }
             wakingTimeout = setTimeout(() => {
-                wakingTimeout = null;
+                wakingTimeout = 'elapsed';
                 if (!isMounted) {
                     return;
                 }
@@ -457,7 +463,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setConnectionStatus('offline');
                     return;
                 }
-                setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+                reportDialing();
                 // Keep the deadline from the first failed dial: a reconnect
                 // attempt that fails quickly must not push `waking` out again.
                 scheduleWaking();
@@ -477,7 +483,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setConnectionStatus('offline');
                     return;
                 }
-                setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+                reportDialing();
                 scheduleWaking();
             };
         };
@@ -501,7 +507,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 setConnectionStatus('connected');
                 return;
             }
-            setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+            reportDialing();
+            scheduleWaking();
             connect();
         };
 
@@ -530,6 +537,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         forgetSession,
         forgetStoredToken,
         releaseRoom,
+        reportDialing,
         resolveEntry,
         send,
     ]);
@@ -751,9 +759,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Closing a socket that is still connecting can throw; the fresh
             // dial below is what matters.
         }
-        setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+        reportDialing();
         connectRef.current?.();
-    }, [resolveEntry]);
+    }, [reportDialing, resolveEntry]);
 
     /** Asks the server to drop every participant who is no longer connected. */
     const clearOfflineParticipants = useCallback(() => {
