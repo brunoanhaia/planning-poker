@@ -48,6 +48,7 @@
     "common.reset": "Reset",
     "common.save": "Save",
     "common.yes": "Yes",
+    "connection.connected": "Connected to the server.",
     "connection.connecting": "Connecting to the server…",
     "connection.offline": "You are offline. Check your connection and retry.",
     "connection.queued": "Your request will run as soon as the server is reachable.",

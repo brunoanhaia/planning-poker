@@ -48,6 +48,7 @@
     "common.reset": "Restablecer",
     "common.save": "Guardar",
     "common.yes": "Sí",
+    "connection.connected": "Conectado al servidor.",
     "connection.connecting": "Conectando al servidor…",
     "connection.offline": "Estás sin conexión. Revisa tu conexión y vuelve a intentarlo.",
     "connection.queued": "Tu solicitud se ejecutará en cuanto el servidor esté disponible.",

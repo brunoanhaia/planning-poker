@@ -675,4 +675,77 @@ describe('SocketProvider reconnection', () => {
         });
         expect(screen.getByTestId('connection')).toHaveTextContent('connected');
     });
+
+    it('keeps the wake deadline across failed reconnect attempts', () => {
+        renderProbe();
+
+        act(() => {
+            vi.advanceTimersByTime(1000);
+        });
+        act(() => {
+            FakeWebSocket.instances[0].drop();
+        });
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        act(() => {
+            FakeWebSocket.instances[1].drop();
+        });
+        act(() => {
+            vi.advanceTimersByTime(1000);
+        });
+
+        // Four seconds after the first dial, even though a second dial failed
+        // in between; a reset deadline would still be in `connecting`.
+        expect(screen.getByTestId('connection')).toHaveTextContent('waking');
+    });
+
+    it('releases an abandoned in-flight entry when retry replaces the socket', () => {
+        renderProbe();
+        const first = FakeWebSocket.instances[0];
+        act(() => {
+            first.open();
+        });
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+        expect(first.sent).toHaveLength(1);
+
+        // The socket is left closed without a close event, so the retry replaces
+        // it and the old identity guard would never resolve the entry.
+        first.readyState = FakeWebSocket.CLOSED;
+        act(() => {
+            screen.getByRole('button', { name: 'retry' }).click();
+        });
+        expect(screen.getByTestId('pending')).toHaveTextContent('none');
+
+        const second = FakeWebSocket.instances[1];
+        act(() => {
+            second.open();
+        });
+        act(() => {
+            screen.getByRole('button', { name: 'create' }).click();
+        });
+
+        expect(
+            second.sent.filter((frame) => JSON.parse(frame).type === 'CREATE_ROOM')
+        ).toHaveLength(1);
+    });
+
+    it('still handles a takeover close when the browser is offline', () => {
+        renderProbe();
+        const socket = enterRoom();
+
+        act(() => {
+            window.dispatchEvent(new Event('offline'));
+        });
+        act(() => {
+            socket.dropWithCode(4001);
+        });
+
+        expect(screen.getByText('lobby')).toBeInTheDocument();
+        expect(
+            screen.getByText('This room was opened in another tab. This tab stopped updating.')
+        ).toBeInTheDocument();
+    });
 });

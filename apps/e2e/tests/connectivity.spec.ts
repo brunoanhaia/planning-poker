@@ -1,20 +1,27 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-import { delaySocketOpen } from './support/connection';
+import { holdSocketOpen } from './support/connection';
+
+/** Counts the room-creation frames the app sends through the browser socket. */
+const countCreateFrames = (page: Page): string[] => {
+    const frames: string[] = [];
+    page.on('websocket', (socket) => {
+        socket.on('framesent', (event) => {
+            const frame = String(event.payload);
+            if (frame.includes('CREATE_ROOM')) {
+                frames.push(frame);
+            }
+        });
+    });
+    return frames;
+};
 
 test.describe('Connection lifecycle', () => {
-    test('queues a create while the socket opens and sends it exactly once', async ({ page }) => {
-        await delaySocketOpen(page, 2000);
-
-        const createFrames: string[] = [];
-        page.on('websocket', (socket) => {
-            socket.on('framesent', (event) => {
-                const frame = String(event.payload);
-                if (frame.includes('CREATE_ROOM')) {
-                    createFrames.push(frame);
-                }
-            });
-        });
+    test('queues a create while the socket is held open and sends it exactly once', async ({
+        page,
+    }) => {
+        const socket = await holdSocketOpen(page);
+        const createFrames = countCreateFrames(page);
 
         await page.goto('/');
         await page.getByLabel(/Your Display Name/i).fill('Queued Host');
@@ -26,14 +33,20 @@ test.describe('Connection lifecycle', () => {
 
         await expect(page.getByRole('alert')).toContainText('Connecting to the server');
         await expect(page.getByText(/Your request will run as soon as/)).toBeVisible();
+
+        await socket.release();
+
         await expect(page.getByText(/^Room: /)).toBeVisible({ timeout: 10000 });
         await expect(page.getByText('Queued Host', { exact: true })).toBeVisible();
         await expect(page.getByText(/Participants \(1\)/)).toBeVisible();
         expect(createFrames).toHaveLength(1);
     });
 
-    test('reports a cold start after the grace period and offers a retry', async ({ page }) => {
-        await delaySocketOpen(page, 6000);
+    test('offers a retry after the grace period and the retry sends the queued create', async ({
+        page,
+    }) => {
+        const socket = await holdSocketOpen(page);
+        const createFrames = countCreateFrames(page);
 
         await page.goto('/');
         await page.getByLabel(/Your Display Name/i).fill('Slow Host');
@@ -42,10 +55,17 @@ test.describe('Connection lifecycle', () => {
         await expect(page.getByRole('alert')).toContainText('Waking the server', {
             timeout: 8000,
         });
-        await expect(page.getByRole('button', { name: 'Retry now' })).toBeVisible();
-        // The queued create still runs when the delayed socket finally opens.
-        await expect(page.getByText(/^Room: /)).toBeVisible({ timeout: 12000 });
+        const retry = page.getByRole('button', { name: 'Retry now' });
+        await expect(retry).toBeVisible();
+
+        // Exercise the retry control, not only its presence: it must replace
+        // the stuck dial and the queued create must run once on the new socket.
+        await retry.click();
+        await socket.release();
+
+        await expect(page.getByText(/^Room: /)).toBeVisible({ timeout: 10000 });
         await expect(page.getByText('Slow Host', { exact: true })).toBeVisible();
+        expect(createFrames).toHaveLength(1);
     });
 
     test('reports offline and recovers when the browser reconnects', async ({ context, page }) => {

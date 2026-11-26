@@ -330,8 +330,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         };
 
         const scheduleWaking = () => {
-            clearWakingTimeout();
+            // The deadline belongs to the outage, not to an individual dial:
+            // resetting it on every failed reconnect would keep the banner in
+            // `connecting` forever when dials fail faster than the grace period.
+            if (wakingTimeout) {
+                return;
+            }
             wakingTimeout = setTimeout(() => {
+                wakingTimeout = null;
                 if (!isMounted) {
                     return;
                 }
@@ -420,18 +426,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 if (!isMounted || socketRef.current !== ws) {
                     return;
                 }
-                clearWakingTimeout();
                 resolveEntry();
-                if (browserOfflineRef.current) {
-                    // The online event owns the next dial; reconnecting in the
-                    // background while the browser is offline only spins.
-                    setConnectionStatus('offline');
-                    return;
-                }
                 if (event.code === SESSION_REPLACED_CLOSE_CODE) {
                     // Another tab of this browser took the participant over. Hand
                     // the room over, keep the stored token for the tab that owns
                     // it, and stay put instead of fighting for the socket.
+                    clearWakingTimeout();
                     setConnectionStatus('offline');
                     releaseRoom();
                     setErrorNotice({ key: 'session.replaced' });
@@ -442,13 +442,24 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     // server removed this participant: the token this tab holds is
                     // dead and must not be replayed. The room that took over owns
                     // `planit_active_room`, so that record stays untouched.
+                    clearWakingTimeout();
                     setConnectionStatus('offline');
                     forgetStoredToken();
                     releaseRoom();
                     setErrorNotice({ key: 'session.moved' });
                     return;
                 }
+                if (browserOfflineRef.current) {
+                    // The online event owns the next dial; reconnecting in the
+                    // background while the browser is offline only spins. The
+                    // terminal close codes above still ran their cleanup first.
+                    clearWakingTimeout();
+                    setConnectionStatus('offline');
+                    return;
+                }
                 setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
+                // Keep the deadline from the first failed dial: a reconnect
+                // attempt that fails quickly must not push `waking` out again.
                 scheduleWaking();
                 reconnectTimeout = setTimeout(() => {
                     if (isMounted) {
@@ -475,6 +486,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         const handleOffline = () => {
             browserOfflineRef.current = true;
+            clearWakingTimeout();
             if (isMounted) {
                 setConnectionStatus('offline');
             }
@@ -727,6 +739,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (socket?.readyState === WebSocket.OPEN) {
             return;
         }
+        // A request already handed to this socket may have reached the server.
+        // Re-sending it automatically could create a second room, so the retry
+        // only releases the abandoned marker and spinner; the user can submit
+        // a fresh request once the replacement socket is connected.
+        resolveEntry();
         socketRef.current = null;
         try {
             socket?.close();
@@ -736,7 +753,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         setConnectionStatus(wasConnectedRef.current ? 'reconnecting' : 'connecting');
         connectRef.current?.();
-    }, []);
+    }, [resolveEntry]);
 
     /** Asks the server to drop every participant who is no longer connected. */
     const clearOfflineParticipants = useCallback(() => {

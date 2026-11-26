@@ -1,27 +1,43 @@
 import { Page } from '@playwright/test';
 
+/** Handle the test uses to release the application-visible socket open. */
+export interface HeldSocket {
+    /** Opens every socket currently held, and lets future sockets open at once. */
+    release: () => Promise<void>;
+}
+
 /**
- * Delays the `open` event the application sees without delaying the real
- * server connection.
+ * Holds the `open` event the application sees until the test releases it.
  *
- * The connectivity spec uses it to simulate a cold backend: the socket is
- * created and connects normally, but the app stays in `connecting` until the
- * configured delay elapses.
+ * The native socket still connects to the server; only the callback the app
+ * observes is deferred. This makes the queued-create and cold-start tests
+ * deterministic: the test asserts the connecting/waking state first, then
+ * releases the socket and waits for the resulting state.
  *
  * @param page - Page to instrument before navigation.
- * @param delayMs - Milliseconds to hold the application-visible open event.
+ * @returns A handle that releases the held sockets.
  */
-export const delaySocketOpen = async (page: Page, delayMs: number): Promise<void> => {
-    await page.addInitScript((delay) => {
+export const holdSocketOpen = async (page: Page): Promise<HeldSocket> => {
+    await page.addInitScript(() => {
         const NativeWebSocket = window.WebSocket;
+        let released = false;
+        const pendingOpens: (() => void)[] = [];
 
-        class DelayedWebSocket {
+        const release = () => {
+            released = true;
+            pendingOpens.splice(0).forEach((open) => open());
+        };
+
+        const host = window as typeof window & { __releaseDelayedSockets?: () => void };
+        host.__releaseDelayedSockets = release;
+
+        class HeldWebSocket {
             static readonly CONNECTING = 0;
             static readonly OPEN = 1;
             static readonly CLOSING = 2;
             static readonly CLOSED = 3;
 
-            readyState = DelayedWebSocket.CONNECTING;
+            readyState = HeldWebSocket.CONNECTING;
             onopen: ((event: Event) => void) | null = null;
             onmessage: ((event: MessageEvent) => void) | null = null;
             onclose: ((event: CloseEvent) => void) | null = null;
@@ -29,23 +45,27 @@ export const delaySocketOpen = async (page: Page, delayMs: number): Promise<void
 
             private readonly native: WebSocket;
             private isClosed = false;
-            private openTimer: ReturnType<typeof setTimeout> | null = null;
 
             constructor(url: string | URL, protocols?: string | string[]) {
                 this.native = new NativeWebSocket(url, protocols);
                 this.native.onopen = (event) => {
-                    this.openTimer = setTimeout(() => {
+                    const open = () => {
                         if (this.isClosed) {
                             return;
                         }
-                        this.readyState = DelayedWebSocket.OPEN;
+                        this.readyState = HeldWebSocket.OPEN;
                         this.onopen?.(event);
-                    }, delay);
+                    };
+                    if (released) {
+                        open();
+                        return;
+                    }
+                    pendingOpens.push(open);
                 };
                 this.native.onmessage = (event) => this.onmessage?.(event);
                 this.native.onclose = (event) => {
                     this.isClosed = true;
-                    this.readyState = DelayedWebSocket.CLOSED;
+                    this.readyState = HeldWebSocket.CLOSED;
                     this.onclose?.(event);
                 };
                 this.native.onerror = (event) => this.onerror?.(event);
@@ -57,11 +77,7 @@ export const delaySocketOpen = async (page: Page, delayMs: number): Promise<void
 
             close(): void {
                 this.isClosed = true;
-                if (this.openTimer) {
-                    clearTimeout(this.openTimer);
-                    this.openTimer = null;
-                }
-                this.readyState = DelayedWebSocket.CLOSED;
+                this.readyState = HeldWebSocket.CLOSED;
                 try {
                     this.native.close();
                 } catch {
@@ -70,6 +86,17 @@ export const delaySocketOpen = async (page: Page, delayMs: number): Promise<void
             }
         }
 
-        window.WebSocket = DelayedWebSocket as unknown as typeof WebSocket;
-    }, delayMs);
+        window.WebSocket = HeldWebSocket as unknown as typeof WebSocket;
+    });
+
+    return {
+        release: async () => {
+            await page.evaluate(() => {
+                const host = window as typeof window & {
+                    __releaseDelayedSockets?: () => void;
+                };
+                host.__releaseDelayedSockets?.();
+            });
+        },
+    };
 };
