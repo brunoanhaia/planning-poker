@@ -5,6 +5,7 @@ import {
     EstimateValue,
     RoomState,
     RoomStatePayload,
+    RoomStatusPayload,
     ROOM_SWITCHED_CLOSE_CODE,
     SESSION_REPLACED_CLOSE_CODE,
     SessionPayload,
@@ -18,10 +19,24 @@ import { useTranslation } from '../../i18n/use-translation';
 import { forgetActiveRoom, readActiveRoom, rememberActiveRoom } from '../../utils/active-room';
 import { chunkStoriesForImport, ImportableStory } from '../../utils/bulk-import';
 import { resolveSocketUrl } from '../../utils/socket-url';
-import { ConnectionStatus, SocketContext, SocketContextValue } from './socket-context';
+import {
+    ConnectionStatus,
+    SocketContext,
+    SocketContextValue,
+    StoredRoomStatus,
+} from './socket-context';
 
 /** Reconnection delay applied whenever the socket drops. */
 const RECONNECT_DELAY_MS = 2000;
+
+/**
+ * How long the lobby waits for a stored-room check before falling back to the
+ * join path.
+ *
+ * The check is an optimization, not a source of truth: if the server does not
+ * answer, the switch dialog and the room-not-found fallback still work.
+ */
+const CHECK_ROOM_TIMEOUT_MS = 3000;
 
 /**
  * How long a connection may stay unopened before the UI calls it a cold start.
@@ -124,6 +139,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'connecting'
     );
     const [pendingEntry, setPendingEntry] = useState<null | 'create' | 'join'>(null);
+    const [storedRoomStatus, setStoredRoomStatus] = useState<StoredRoomStatus>(() =>
+        readActiveRoom() ? 'checking' : 'none'
+    );
     const [errorNotice, setErrorNotice] = useState<ErrorNotice | null>(null);
     const [isKicked, setIsKicked] = useState(false);
     const socketRef = useRef<null | WebSocket>(null);
@@ -139,9 +157,26 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const wasConnectedRef = useRef(false);
     const browserOfflineRef = useRef(false);
     const connectRef = useRef<null | (() => void)>(null);
+    /**
+     * Room of the most recent join attempt.
+     *
+     * A `ROOM_NOT_FOUND` for the stored active room means that session is
+     * gone; the same code for a different room is a mistyped lobby code and
+     * must not cost the browser the session it still holds.
+     */
+    const lastJoinRoomIdRef = useRef<null | string>(null);
+    const checkedRoomIdRef = useRef<null | string>(null);
+    const checkRoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         sessionTokenRef.current = sessionStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+    }, []);
+
+    const clearCheckRoomTimeout = useCallback(() => {
+        if (checkRoomTimeoutRef.current) {
+            clearTimeout(checkRoomTimeoutRef.current);
+            checkRoomTimeoutRef.current = null;
+        }
     }, []);
 
     /**
@@ -175,10 +210,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const roomId = roomStateRef.current?.id;
         forgetStoredToken();
         releaseRoom();
+        checkedRoomIdRef.current = null;
+        clearCheckRoomTimeout();
+        setStoredRoomStatus('none');
         if (roomId) {
             forgetActiveRoom(roomId);
         }
-    }, [forgetStoredToken, releaseRoom]);
+    }, [clearCheckRoomTimeout, forgetStoredToken, releaseRoom]);
 
     const transmit = useCallback((type: WSMessageType, payload: unknown) => {
         socketRef.current?.send(JSON.stringify({ payload, type }));
@@ -259,6 +297,60 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         [transmit]
     );
 
+    /** Applies the answer to the stored-room preflight. */
+    const applyRoomStatus = useCallback(
+        (payload: RoomStatusPayload) => {
+            if (roomStateRef.current !== null) {
+                return;
+            }
+            if (payload.roomId !== checkedRoomIdRef.current) {
+                // A late answer for a room that is no longer being checked.
+                return;
+            }
+            checkedRoomIdRef.current = null;
+            clearCheckRoomTimeout();
+            if (payload.exists) {
+                setStoredRoomStatus('exists');
+                return;
+            }
+            // The stored room is gone: drop the record and every token bound to
+            // it, so the lobby no longer offers a session that cannot rejoin.
+            forgetActiveRoom(payload.roomId);
+            localStorage.removeItem(roomTokenKey(payload.roomId));
+            sessionTokenRef.current = null;
+            sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+            lastJoinRoomIdRef.current = null;
+            setStoredRoomStatus('gone');
+        },
+        [clearCheckRoomTimeout]
+    );
+
+    /**
+     * Asks the server whether the room the browser remembers still exists.
+     *
+     * The check is a preflight, not a source of truth: if it times out the
+     * client keeps the session and falls back to the normal switch/join path,
+     * whose `ROOM_NOT_FOUND` handling clears a room that disappeared meanwhile.
+     */
+    const requestRoomStatus = useCallback(() => {
+        const activeRoomId = readActiveRoom();
+        if (!activeRoomId || roomStateRef.current !== null) {
+            setStoredRoomStatus('none');
+            return;
+        }
+        setStoredRoomStatus('checking');
+        checkedRoomIdRef.current = activeRoomId;
+        clearCheckRoomTimeout();
+        checkRoomTimeoutRef.current = setTimeout(() => {
+            if (checkedRoomIdRef.current !== activeRoomId) {
+                return;
+            }
+            checkedRoomIdRef.current = null;
+            setStoredRoomStatus('exists');
+        }, CHECK_ROOM_TIMEOUT_MS);
+        send('CHECK_ROOM', { roomId: activeRoomId });
+    }, [clearCheckRoomTimeout, send]);
+
     /** Applies a `ROOM_STATE` broadcast: refs, rendered state, token, entry notice and self id. */
     const applyRoomState = useCallback(
         (payload: RoomStatePayload) => {
@@ -280,9 +372,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 setCurrentUserId(payload.currentUserId);
             }
             // A room state means the queued create/join was accepted.
+            lastJoinRoomIdRef.current = null;
+            checkedRoomIdRef.current = null;
+            clearCheckRoomTimeout();
+            setStoredRoomStatus('none');
             clearEntry();
         },
-        [clearEntry]
+        [clearCheckRoomTimeout, clearEntry]
     );
 
     /** Applies a `SESSION` message: the issued token and the participant it was bound to. */
@@ -309,6 +405,28 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 message: payload.message,
             });
             const { code } = payload;
+            const attemptedRoomId = lastJoinRoomIdRef.current;
+            // The stored active room is only a convenience, not a claim. When
+            // the server says that exact room is gone, drop the record and its
+            // token so the lobby stops offering a session that cannot rejoin.
+            // A `ROOM_NOT_FOUND` for a different code is a mistyped lobby code
+            // and must keep the session the browser still holds.
+            const isStaleActiveRoom =
+                code === 'ROOM_NOT_FOUND' &&
+                roomStateRef.current === null &&
+                attemptedRoomId !== null &&
+                attemptedRoomId === readActiveRoom();
+            if (isStaleActiveRoom) {
+                forgetActiveRoom(attemptedRoomId);
+                localStorage.removeItem(roomTokenKey(attemptedRoomId));
+                sessionTokenRef.current = null;
+                sessionStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+                lastJoinRoomIdRef.current = null;
+                checkedRoomIdRef.current = null;
+                clearCheckRoomTimeout();
+                setStoredRoomStatus('gone');
+                setErrorNotice({ key: 'session.stale' });
+            }
             // `ROOM_NOT_FOUND` only means the session is gone when the client still holds
             // that room: a mistyped lobby code must not drop the token of the room the
             // user left. `BANNED` and `NO_SESSION` always end the session.
@@ -320,7 +438,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 forgetSession();
             }
         },
-        [clearEntry, forgetSession]
+        [clearCheckRoomTimeout, clearEntry, forgetSession]
     );
 
     useEffect(() => {
@@ -396,6 +514,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 const token = sessionTokenRef.current;
                 const self = room?.participants.find((participant) => participant.id === userId);
                 if (room && token && userId && self) {
+                    lastJoinRoomIdRef.current = room.id;
                     send('JOIN_ROOM', {
                         avatar: self.avatar,
                         color: self.color,
@@ -404,7 +523,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         sessionToken: token,
                         userId,
                     });
+                    return;
                 }
+                // A fresh lobby page asks whether the room it remembers still
+                // exists before offering to re-enter it.
+                requestRoomStatus();
             };
 
             ws.onmessage = (event) => {
@@ -417,6 +540,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                         applyRoomState(payload);
                     } else if (type === 'SESSION') {
                         applySession(payload);
+                    } else if (type === 'ROOM_STATUS') {
+                        applyRoomStatus(payload);
                     } else if (type === 'KICKED') {
                         forgetSession();
                         setIsKicked(true);
@@ -433,6 +558,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     return;
                 }
                 resolveEntry();
+                clearCheckRoomTimeout();
+                checkedRoomIdRef.current = null;
                 if (event.code === SESSION_REPLACED_CLOSE_CODE) {
                     // Another tab of this browser took the participant over. Hand
                     // the room over, keep the stored token for the tab that owns
@@ -440,6 +567,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     clearWakingTimeout();
                     setConnectionStatus('offline');
                     releaseRoom();
+                    setStoredRoomStatus('none');
                     setErrorNotice({ key: 'session.replaced' });
                     return;
                 }
@@ -452,6 +580,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     setConnectionStatus('offline');
                     forgetStoredToken();
                     releaseRoom();
+                    setStoredRoomStatus('none');
                     setErrorNotice({ key: 'session.moved' });
                     return;
                 }
@@ -464,6 +593,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                     return;
                 }
                 reportDialing();
+                // Re-check the remembered room after the reconnect, so a room
+                // that disappeared while the socket was down is not offered.
+                setStoredRoomStatus(
+                    roomStateRef.current === null && readActiveRoom() ? 'checking' : 'none'
+                );
                 // Keep the deadline from the first failed dial: a reconnect
                 // attempt that fails quickly must not push `waking` out again.
                 scheduleWaking();
@@ -525,19 +659,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 clearTimeout(reconnectTimeout);
             }
             clearWakingTimeout();
+            clearCheckRoomTimeout();
             if (socketRef.current) {
                 socketRef.current.close();
             }
         };
     }, [
         applyRoomState,
+        applyRoomStatus,
         applyServerError,
         applySession,
+        clearCheckRoomTimeout,
         flushPendingEntry,
         forgetSession,
         forgetStoredToken,
         releaseRoom,
         reportDialing,
+        requestRoomStatus,
         resolveEntry,
         send,
     ]);
@@ -551,6 +689,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             deckType: DeckType = 'fibonacci',
             customDeck?: (number | string)[]
         ) => {
+            lastJoinRoomIdRef.current = null;
             enqueueEntry('create', 'CREATE_ROOM', {
                 avatar,
                 color,
@@ -572,6 +711,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // code misses the token and mints a second participant.
             const normalizedRoomId = roomId.trim().toUpperCase();
 
+            lastJoinRoomIdRef.current = normalizedRoomId;
             enqueueEntry('join', 'JOIN_ROOM', {
                 avatar,
                 color,
@@ -724,8 +864,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             forgetActiveRoom(roomId);
         }
         releaseRoom();
+        checkedRoomIdRef.current = null;
+        clearCheckRoomTimeout();
+        setStoredRoomStatus('none');
         window.location.hash = '';
-    }, [releaseRoom]);
+    }, [clearCheckRoomTimeout, releaseRoom]);
 
     const clearError = useCallback(() => setErrorNotice(null), []);
     const clearKickedMessage = useCallback(() => setIsKicked(false), []);
@@ -752,6 +895,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // only releases the abandoned marker and spinner; the user can submit
         // a fresh request once the replacement socket is connected.
         resolveEntry();
+        clearCheckRoomTimeout();
+        checkedRoomIdRef.current = null;
         socketRef.current = null;
         try {
             socket?.close();
@@ -761,7 +906,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         reportDialing();
         connectRef.current?.();
-    }, [reportDialing, resolveEntry]);
+    }, [clearCheckRoomTimeout, reportDialing, resolveEntry]);
 
     /** Asks the server to drop every participant who is no longer connected. */
     const clearOfflineParticipants = useCallback(() => {
@@ -808,6 +953,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             roomState,
             setCurrentStory,
             startTimer,
+            storedRoomStatus,
             submitVote,
             toggleAutoReveal,
             toggleLockRoom,
@@ -844,6 +990,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         roomState,
         setCurrentStory,
         startTimer,
+        storedRoomStatus,
         submitVote,
         t,
         toggleAutoReveal,

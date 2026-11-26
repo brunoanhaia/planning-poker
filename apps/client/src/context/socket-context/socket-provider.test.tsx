@@ -100,6 +100,7 @@ const Probe = () => {
         pendingEntry,
         retryConnection,
         roomState,
+        storedRoomStatus,
     } = useSocket();
     return (
         <>
@@ -107,6 +108,7 @@ const Probe = () => {
             <span>{error ?? ''}</span>
             <span data-testid="connection">{connectionStatus}</span>
             <span data-testid="pending">{pendingEntry ?? 'none'}</span>
+            <span data-testid="stored-room">{storedRoomStatus}</span>
             <button onClick={leaveRoom} type="button">
                 leave
             </button>
@@ -121,6 +123,9 @@ const Probe = () => {
             </button>
             <button onClick={() => joinRoom('room01', 'Ana', 'avatar-1', '#1890ff')} type="button">
                 join-lowercase
+            </button>
+            <button onClick={() => joinRoom('ROOM02', 'Ana', 'avatar-1', '#1890ff')} type="button">
+                join-other
             </button>
         </>
     );
@@ -427,6 +432,148 @@ describe('SocketProvider reconnection', () => {
 
         expect(screen.getByText('lobby')).toBeInTheDocument();
         expect(sessionStorage.getItem('planit_session_token')).toBe('tok');
+    });
+
+    it('checks the stored room on connect and drops it when the server says it is gone', () => {
+        // The browser still records a room the server lost (an idle sweep or a
+        // restart). The preflight must drop that record instead of showing the
+        // switch dialog forever.
+        localStorage.setItem('planit_active_room', 'ROOM01');
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        sessionStorage.setItem('planit_session_token', 'tok-room');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+
+        expect(JSON.parse(socket.sent[0])).toEqual({
+            payload: { roomId: 'ROOM01' },
+            type: 'CHECK_ROOM',
+        });
+
+        act(() => {
+            socket.receive({
+                payload: { exists: false, roomId: 'ROOM01' },
+                type: 'ROOM_STATUS',
+            });
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBeNull();
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBeNull();
+        expect(sessionStorage.getItem('planit_session_token')).toBeNull();
+        expect(screen.getByTestId('stored-room')).toHaveTextContent('gone');
+    });
+
+    it('keeps the stored room when the preflight says it exists', () => {
+        localStorage.setItem('planit_active_room', 'ROOM01');
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        sessionStorage.setItem('planit_session_token', 'tok-room');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+
+        act(() => {
+            socket.receive({
+                payload: { exists: true, roomId: 'ROOM01' },
+                type: 'ROOM_STATUS',
+            });
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBe('ROOM01');
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok-room');
+        expect(sessionStorage.getItem('planit_session_token')).toBe('tok-room');
+        expect(screen.getByTestId('stored-room')).toHaveTextContent('exists');
+    });
+
+    it('clears the active room when the join still reports it as not found', () => {
+        // The room can disappear between the check and the join; the join
+        // rejection is the fallback that still clears the record.
+        localStorage.setItem('planit_active_room', 'ROOM01');
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        sessionStorage.setItem('planit_session_token', 'tok-room');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+        act(() => {
+            socket.receive({
+                payload: { exists: true, roomId: 'ROOM01' },
+                type: 'ROOM_STATUS',
+            });
+        });
+        act(() => {
+            screen.getByRole('button', { name: 'join' }).click();
+        });
+
+        act(() => {
+            socket.receive({
+                payload: { code: 'ROOM_NOT_FOUND', message: 'Room not found.' },
+                type: 'ERROR',
+            });
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBeNull();
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBeNull();
+        expect(sessionStorage.getItem('planit_session_token')).toBeNull();
+        expect(
+            screen.getByText('That session no longer exists. Start a new one.')
+        ).toBeInTheDocument();
+        expect(screen.getByTestId('stored-room')).toHaveTextContent('gone');
+    });
+
+    it('falls back to the session when the preflight times out', () => {
+        localStorage.setItem('planit_active_room', 'ROOM01');
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        renderProbe();
+        act(() => {
+            FakeWebSocket.instances[0].open();
+        });
+
+        act(() => {
+            vi.advanceTimersByTime(3000);
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBe('ROOM01');
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok-room');
+        expect(screen.getByTestId('stored-room')).toHaveTextContent('exists');
+    });
+
+    it('keeps the active room when a different code is not found', () => {
+        // A mistyped lobby code must not cost the browser the session it still
+        // holds, so the active record and both tokens survive.
+        localStorage.setItem('planit_active_room', 'ROOM01');
+        localStorage.setItem('planit_room_token:ROOM01', 'tok-room');
+        sessionStorage.setItem('planit_session_token', 'tok-room');
+        renderProbe();
+        const socket = FakeWebSocket.instances[0];
+        act(() => {
+            socket.open();
+        });
+        act(() => {
+            socket.receive({
+                payload: { exists: true, roomId: 'ROOM01' },
+                type: 'ROOM_STATUS',
+            });
+        });
+        act(() => {
+            screen.getByRole('button', { name: 'join-other' }).click();
+        });
+
+        act(() => {
+            socket.receive({
+                payload: { code: 'ROOM_NOT_FOUND', message: 'Room not found.' },
+                type: 'ERROR',
+            });
+        });
+
+        expect(localStorage.getItem('planit_active_room')).toBe('ROOM01');
+        expect(localStorage.getItem('planit_room_token:ROOM01')).toBe('tok-room');
+        expect(sessionStorage.getItem('planit_session_token')).toBe('tok-room');
+        expect(screen.getByText('Room not found. Please check the room code.')).toBeInTheDocument();
     });
 
     it('keeps the credential when the user leaves, so nothing rejoins on its own', () => {

@@ -65,6 +65,9 @@ These are the contracts the new suites must assert.
   the room state is synchronised); any transient disabled state has visible feedback.
 - Joining with a lowercase room code works and keeps the returning participant’s identity.
 - The waiting state for a participant who joins before the setup is complete is explicit.
+- Before offering to re-enter a stored room, the client confirms it still exists
+  (`CHECK_ROOM`/`ROOM_STATUS`). A room the server lost is forgotten without a switch dialog,
+  while a live room still asks before switching.
 
 ### C5 — Responsive layout
 
@@ -109,6 +112,7 @@ These are the contracts the new suites must assert.
 | Accessibility journeys     | `apps/e2e/tests/a11y-journeys.spec.ts`                                        | e2e + axe        | C6     |
 | Mobile header and touch    | `apps/e2e/tests/mobile-header.spec.ts`                                        | visual/e2e       | C5     |
 | Setup and role discovery   | `apps/e2e/tests/setup-flow.spec.ts`                                           | e2e              | C4     |
+| Stored room preflight      | `apps/e2e/tests/stale-session.spec.ts`                                        | e2e              | C4     |
 | Results snapshot integrity | server test + `results-panel.hooks.test.ts`                                   | integration/unit | C7     |
 | Dialog freeze matrix       | client component tests                                                        | component        | C7     |
 | Remote staging smoke       | `apps/e2e/tests/remote-smoke.spec.ts`                                         | e2e, env-gated   | C1–C4  |
@@ -190,6 +194,14 @@ Assertions:
 4. A voter who joins before Start sees an explicit waiting state.
 5. A lowercase code joins the canonical room and reuses the stored token.
 6. The room code copy action keeps the visible text in its accessible name.
+7. Reopen the browser with a stored room the server no longer has.
+    - The lobby checks it before enabling Create/Join; the stale record and its tokens are
+      dropped without a switch dialog, and the requested action proceeds.
+8. Reopen with a stored room that still exists.
+    - The switch confirmation is shown, and the rejoin works.
+9. Delay the socket during the preflight.
+    - Create/Join stay disabled with visible progress; after the socket opens and the check
+      resolves, a stale room is cleared and the action can proceed.
 
 ### 4.6 Voting integrity
 
@@ -284,6 +296,9 @@ Rules:
       the provider unit tests.
 - [x] Phase 1: `support/connection.ts` provides the delayed-open helper used to simulate a
       cold backend without delaying the real server connection.
+- [x] C4 (stored-room preflight): `CHECK_ROOM`/`ROOM_STATUS` plus `stale-session.spec.ts` and
+      provider unit tests; the `ROOM_NOT_FOUND` join fallback remains for a room that vanishes
+      between the check and the join.
 - [ ] C3: public-origin health contract and deployment smoke.
 - [ ] C4/C6: setup discovery, keyboard journeys and per-state axe.
 - [ ] C7: remaining dialog and snapshot regression matrix.
