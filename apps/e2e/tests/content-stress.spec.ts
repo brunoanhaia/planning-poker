@@ -2,6 +2,48 @@ import { expect, test } from '@playwright/test';
 import { createRoom } from './support/room-session';
 
 test.describe('Content Stress', () => {
+    test('the lobby primary action fits a 320 px viewport in every locale', async ({ browser }) => {
+        for (const locale of ['en-US', 'pt-BR', 'es-ES']) {
+            const context = await browser.newContext({
+                locale,
+                viewport: { height: 640, width: 320 },
+            });
+            try {
+                const page = await context.newPage();
+                await page.goto('/');
+
+                const submit = page.getByRole('button', {
+                    name: /Start Session|Iniciar Sessão|Iniciar Sesión/i,
+                });
+                await expect(submit).toBeVisible();
+
+                const metrics = await submit.evaluate((element) => ({
+                    clientWidth: element.clientWidth,
+                    scrollWidth: element.scrollWidth,
+                }));
+                expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+
+                const box = await submit.boundingBox();
+                expect(box).not.toBeNull();
+                if (box) {
+                    expect(box.width).toBeLessThanOrEqual(320);
+                }
+
+                await expect
+                    .poll(async () =>
+                        page.evaluate(
+                            () =>
+                                document.documentElement.scrollWidth <=
+                                document.documentElement.clientWidth
+                        )
+                    )
+                    .toBe(true);
+            } finally {
+                await context.close();
+            }
+        }
+    });
+
     test('long content stays inside a 320 px viewport', async ({ browser }) => {
         test.setTimeout(90_000);
 
