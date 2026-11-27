@@ -33,7 +33,7 @@ jobs:
                   cache: npm
                   node-version: 24
 
-            - run: npm ci
+            - run: npm ci --ignore-scripts
 
             - run: npm run docs:build
 

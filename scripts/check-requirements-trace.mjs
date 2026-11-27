@@ -61,12 +61,18 @@ const requirementNumbers = (body) => {
 const traceNumbers = (body) => {
     const numbers = new Set();
     for (const line of body) {
-        const match = line.match(/^\|\s*(\d+)\s*(?:[‐‑–—-]\s*(\d+))?\s*\|/);
-        if (!match) {
+        if (!line.startsWith('|')) {
             continue;
         }
-        const from = Number(match[1]);
-        const to = match[2] === undefined ? from : Number(match[2]);
+        // A row is parsed cell by cell: anchored and unambiguous, so no
+        // backtracking can make the scan super-linear on long rows.
+        const cells = line.split('|').map((cell) => cell.trim());
+        const range = /^(\d+)(?:[‐‑–—-](\d+))?$/.exec(cells[1] ?? '');
+        if (!range) {
+            continue;
+        }
+        const from = Number(range[1]);
+        const to = range[2] === undefined ? from : Number(range[2]);
         for (let n = from; n <= to; n += 1) {
             numbers.add(n);
         }
