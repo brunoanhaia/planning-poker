@@ -1,6 +1,6 @@
 ---
 name: update-readme
-description: Keep README.md accurate as a landing page after significant code changes; behavior prose belongs in the docs site.
+description: Keep README.md accurate as a landing page after significant code changes; behavior prose belongs in the docs folder.
 ---
 
 # Update README Rule

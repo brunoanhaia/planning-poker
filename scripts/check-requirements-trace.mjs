@@ -36,6 +36,7 @@ const sectionsOf = (markdown) => {
     return sections;
 };
 
+/** Finds the `## ` section key that holds a given requirements part. */
 const headingKey = (sections, part) => {
     for (const key of sections.keys()) {
         if (key.includes('functional') && key.includes('non') === (part === 'non-functional')) {
@@ -73,8 +74,8 @@ const traceNumbers = (body) => {
         }
         const from = Number(range[1]);
         const to = range[2] === undefined ? from : Number(range[2]);
-        for (let n = from; n <= to; n += 1) {
-            numbers.add(n);
+        for (let numberInRange = from; numberInRange <= to; numberInRange += 1) {
+            numbers.add(numberInRange);
         }
     }
     return numbers;
@@ -88,11 +89,12 @@ for (const part of ['functional', 'non-functional']) {
     const required = requirementNumbers(requirements.get(headingKey(requirements, part)));
     const traced = traceNumbers(trace.get(headingKey(trace, part)));
 
-    const unmapped = [...required].filter((n) => !traced.has(n)).sort((a, b) => a - b);
-    const stale = [...traced].filter((n) => !required.has(n)).sort((a, b) => a - b);
-    console.log(
+    const unmapped = [...required].filter((number) => !traced.has(number)).sort((a, b) => a - b);
+    const stale = [...traced].filter((number) => !required.has(number)).sort((a, b) => a - b);
+    process.stdout.write(
         `${part}: ${required.size} requirements, ${traced.size} trace rows` +
-            (unmapped.length === 0 && stale.length === 0 ? ' — ok' : ' — MISMATCH')
+            (unmapped.length === 0 && stale.length === 0 ? ' — ok' : ' — MISMATCH') +
+            '\n'
     );
     if (unmapped.length > 0) {
         failures.push(`requirements without a trace row (${part}): ${unmapped.join(', ')}`);
@@ -103,7 +105,7 @@ for (const part of ['functional', 'non-functional']) {
 }
 
 if (failures.length > 0) {
-    console.error(failures.map((f) => `FAIL ${f}`).join('\n'));
+    process.stderr.write(`${failures.map((failure) => `FAIL ${failure}`).join('\n')}\n`);
     // `process.exit()` drops pending writes, and stdout is a pipe when the gate
     // runs in CI — the exit code alone lets the streams flush.
     process.exitCode = 1;

@@ -88,12 +88,12 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.
 
-## Documentation site
+## Documentation
 
 Behavior documentation lives in `docs/` and **is the source of truth for behavior** —
-features, roles, flows, limits, security, deployment. The site (VitePress) is built from the
-same pages on merge and published to GitHub Pages; there is no external wiki and nothing is
-published by hand. The repository keeps only what must match the code exactly: commands
+features, roles, flows, limits, security, deployment. The pages are plain repository files:
+agents read them straight from the tree, GitHub renders them, and nothing is published or
+mirrored anywhere else. The repository keeps only what must match the code exactly: commands
 (`TOOLS.md`), the numbered requirements (`requirements.md`), the changelog and these agent
 rules.
 
@@ -105,8 +105,9 @@ rules.
   makes, and move its `Last verified: <date> against commit <hash>` stamp to the new commit.
   The `update-wiki` rule under `.agents/rules/` applies to every session.
 - Pages are ordinary repository files: they travel through pull requests, Prettier and the
-  analyzers like any other change, and merging to `main` publishes them.
-- The site is public: describe abuse controls, never their exact calibration.
+  analyzers like any other change. A new page is linked from `docs/README.md`, the folder
+  index.
+- The docs are public: describe abuse controls, never their exact calibration.
 - A docs page whose claims no longer match the code is a bug in the docs — fix the page, do
   not fork the truth into the README.
 

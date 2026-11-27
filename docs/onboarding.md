@@ -28,7 +28,7 @@ baked in.
 - The **layout and rules** for agents and humans live in
   [`AGENTS.md`](https://github.com/brunoanhaia/planning-poker/blob/main/AGENTS.md) — module
   boundaries, conventions, gotchas. When prose and config disagree, the config wins.
-- **The docs site** documents behavior; the repository keeps what must match the code exactly
+- **The docs in `docs/`** document behavior; the repository keeps what must match the code exactly
   (commands, requirements, changelog).
 - Every user-visible string is a key in the i18n catalogs; every socket payload is a type in
   `packages/shared`. Nothing is redefined locally — see [Real Time Protocol](./real-time-protocol.md) and

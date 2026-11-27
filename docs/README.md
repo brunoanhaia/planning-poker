@@ -26,14 +26,15 @@ The interface ships in English, Brazilian Portuguese and Spanish, works from 320
 
 Every functional and non-functional requirement maps to a page: [Requirements Trace](./requirements-trace.md).
 
-## How this site is maintained
+## How these docs are maintained
 
 - **These pages are the source of truth for behavior.** They are written from the code, not
   from the README, and each carries a _Last verified_ stamp with the commit it was checked
   against. If a page and the code disagree, the code wins and the page gets fixed.
-- **One source, one artifact.** The pages live in `docs/` in the repository, travel through
-  pull requests like any other change, and this site is built from them on merge — nothing is
-  published by hand.
+- **One source.** The pages live in `docs/` in the repository and travel through pull
+  requests like any other change — nothing is published by hand and nothing is mirrored
+  anywhere else. Agents read them straight from the tree; GitHub renders them, Mermaid
+  included.
 - **The repository keeps what must match the code exactly** — build and test commands, agent
   rules, requirements, changelog. The pages link there instead of copying.
 - Pages are written in English, like every other artifact in this repository.

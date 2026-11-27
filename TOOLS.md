@@ -27,8 +27,6 @@ Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries sh
 | `npm run format`       | Prettier over `**/*.{ts,tsx,js,jsx,json,css,md}`               |
 | `npm run lint:commits` | `commitlint --from origin/main`                                |
 | `npm run trace:check`  | fails when a numbered requirement has no docs trace row        |
-| `npm run docs:dev`     | the docs site locally (VitePress)                              |
-| `npm run docs:build`   | the production site build into `docs/.vitepress/dist`          |
 | `npm run prepare`      | the Husky commit-msg hook installed                            |
 
 ## Package Scripts
@@ -136,5 +134,5 @@ codacy patterns <provider> <org> <repo> <toolName>    # per-pattern state and pa
 ```
 
 - Re-analysis happens on push, so `codacy issues` shows the last analysed commit, not local edits.
-- GitHub Actions runs CodeQL, dependency review, conventional commits, the release workflow, the skills-lock check, the requirements-trace check and the docs-site Pages deploy (`.github/workflows/`); no workflow calls the `gh` CLI.
+- GitHub Actions runs CodeQL, dependency review, conventional commits, the release workflow, the skills-lock check and the requirements-trace check (`.github/workflows/`); no workflow calls the `gh` CLI.
 - Once the branch is pushed, `codacy pull-request <number>` shows its analysis.
