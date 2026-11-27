@@ -98,5 +98,7 @@ for (const part of ['functional', 'non-functional']) {
 
 if (failures.length > 0) {
     console.error(failures.map((f) => `FAIL ${f}`).join('\n'));
-    process.exit(1);
+    // `process.exit()` drops pending writes, and stdout is a pipe when the gate
+    // runs in CI — the exit code alone lets the streams flush.
+    process.exitCode = 1;
 }
