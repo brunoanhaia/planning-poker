@@ -272,8 +272,9 @@ OpenCode does not discover `.agents/rules/` files through frontmatter or auto-ap
 Read and follow these rule files when their conditions apply:
 
 - [`.agents/rules/update-wiki.md`](./.agents/rules/update-wiki.md) — when observable behavior changes: the wiki page and its verification stamp move with the code
+- [`.agents/rules/report-bugs.md`](./.agents/rules/report-bugs.md) — when filing a defect: reproduce, evidence typed by where it lives, attach natively, report only
 - [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change: the README stays a landing page
-- [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a functional/non-functional requirement is added
+- [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a requirement is added: requirements.md, the wiki trace row and the page move together, enforced by the `requirements-trace` workflow
 - [`.agents/rules/update-agents.md`](./.agents/rules/update-agents.md) — when a skill, rule, or workflow changes
 
 Only YAML frontmatter fields that tooling actually implements should be used. `trigger: model_decision` was removed as it is non-standard and silently ignored.

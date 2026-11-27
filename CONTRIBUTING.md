@@ -97,7 +97,7 @@ Coding conventions, module boundaries, and accessibility requirements are under 
 ## Other kinds of report
 
 - **Defects** — open an issue with the
-  [bug report template](./.github/ISSUE_TEMPLATE/bug_report.md): reproduction steps,
+  [bug report form](./.github/ISSUE_TEMPLATE/bug_report.yml): reproduction steps,
   environment, criticality, consequences and annotated evidence are part of the report.
   Report only — the fix belongs to whoever picks the issue up.
 - **Setup or runtime problems** — open an issue including your OS, `node -v`, and the exact command that failed.

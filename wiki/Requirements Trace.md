@@ -7,6 +7,10 @@
 > "where is X described?" has one answer — and so a requirement without a page is visible the
 > moment it is added.
 
+The mapping is enforced: the repository's `requirements-trace` workflow fails a pull request
+whose `requirements.md` holds a number this page does not carry — and a stale row nothing
+backs. Run the same check locally with `npm run trace:check`.
+
 ## Functional requirements
 
 | #   | Requirement (gist)                                                                  | Documented in                                                           |

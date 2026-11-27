@@ -1,0 +1,33 @@
+# The mechanical half of the update-requirements rule: a pull request whose
+# requirements.md holds a numbered requirement without a matching row in the
+# wiki trace fails here. The prose half lives in
+# .agents/rules/update-requirements.md, and the wiki page itself is
+# wiki/Requirements Trace.md in the staging folder.
+name: Requirements trace
+
+on:
+    pull_request:
+        paths:
+            - 'requirements.md'
+            - 'wiki/Requirements Trace.md'
+    push:
+        branches: [main]
+        paths:
+            - 'requirements.md'
+            - 'wiki/Requirements Trace.md'
+
+permissions:
+    contents: read
+
+jobs:
+    trace:
+        name: Requirements trace coverage
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 24
+
+            - run: npm run trace:check
