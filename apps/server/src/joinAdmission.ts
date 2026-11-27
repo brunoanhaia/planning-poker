@@ -56,6 +56,9 @@ export const resolveJoinAttempt = (
 /** Sends a machine-readable refusal to a client. */
 type SendError = (ws: ExtendedWebSocket, message: string, code: ErrorCode) => void;
 
+/** Wording of the failed-join budget refusal, shared by joins and room checks. */
+const RATE_LIMITED_MESSAGE = 'Too many wrong room codes from this network. Try again in a minute.';
+
 /** Dependencies the admission checks need, all of them state the handler owns. */
 export interface JoinAdmissionOptions {
     /** Bars a kicked participant from re-entering the room immediately. */
@@ -143,17 +146,69 @@ export class JoinAdmission {
         // The failed-join budget is consulted before the room is looked up, so a
         // barred address cannot tell a code that exists from one that does not:
         // every join it sends is answered the same way until the window frees.
-        if (!this.joinFailures.allows(attempt.address, now)) {
-            auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
-            this.sendError(
-                ws,
-                'Too many wrong room codes from this network. Try again in a minute.',
-                'RATE_LIMITED'
-            );
+        return !this.allowAddress(ws, now);
+    }
+
+    /**
+     * Applies the failed-join budget to a room-existence preflight.
+     *
+     * A check is not a join, so the kick bars and the non-browser identity
+     * requirement do not apply; only the anti-enumeration budget does. A barred
+     * address receives the same rate-limit refusal and no existence answer.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param now - Current timestamp, in milliseconds.
+     * @returns True when the address may still have a room looked up.
+     */
+    public allowsCheck(ws: ExtendedWebSocket, now: number): boolean {
+        return this.allowAddress(ws, now);
+    }
+
+    /**
+     * Records an unknown room code found by a preflight.
+     *
+     * The current caller still receives the negative answer; the budget bars
+     * its next request when this was the code that exhausted it.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param roomId - The normalized code that matched no room.
+     * @param now - Current timestamp, in milliseconds.
+     */
+    public reportUnknownCheck(ws: ExtendedWebSocket, roomId: string, now: number): void {
+        this.recordUnknownRoom(ws.remoteAddress ?? 'unknown', roomId, now);
+    }
+
+    /**
+     * Applies the failed-join budget to a connection's peer address.
+     *
+     * @param ws - The sender's WebSocket connection.
+     * @param now - Shared timestamp of the attempt.
+     * @returns True when the address may still have a room looked up.
+     */
+    private allowAddress(ws: ExtendedWebSocket, now: number): boolean {
+        const address = ws.remoteAddress ?? 'unknown';
+        if (this.joinFailures.allows(address, now)) {
             return true;
         }
-
+        auditLog({ action: 'join.rejected.rate-limited', outcome: 'denied' });
+        this.sendError(ws, RATE_LIMITED_MESSAGE, 'RATE_LIMITED');
         return false;
+    }
+
+    /**
+     * Records an unknown room code and its audit line.
+     *
+     * @param address - The normalized peer address.
+     * @param roomId - The code that matched no room.
+     * @param now - Current timestamp, in milliseconds.
+     */
+    private recordUnknownRoom(address: string, roomId: string, now: number): void {
+        this.joinFailures.recordFailure(address, roomId, now);
+        auditLog({
+            action: 'join.rejected.room-not-found',
+            outcome: 'denied',
+            roomId,
+        });
     }
 
     /**
@@ -168,12 +223,7 @@ export class JoinAdmission {
      * @param attempt - The join that matched no room.
      */
     public reportUnknownRoom(ws: ExtendedWebSocket, attempt: JoinAttempt): void {
-        this.joinFailures.recordFailure(attempt.address, attempt.normalizedRoomId, attempt.now);
-        auditLog({
-            action: 'join.rejected.room-not-found',
-            outcome: 'denied',
-            roomId: attempt.normalizedRoomId,
-        });
+        this.recordUnknownRoom(attempt.address, attempt.normalizedRoomId, attempt.now);
         this.sendError(
             ws,
             `Room "${attempt.roomId}" not found. Please check room code.`,

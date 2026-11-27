@@ -9,6 +9,14 @@ import { createContext } from 'react';
  */
 export type ConnectionStatus = 'connected' | 'connecting' | 'offline' | 'reconnecting' | 'waking';
 
+/**
+ * State of the room the browser remembers from a previous visit.
+ *
+ * `checking` holds the lobby entry actions until the server confirms the room
+ * still exists; `gone` means the record and its tokens were dropped.
+ */
+export type StoredRoomStatus = 'checking' | 'exists' | 'gone' | 'none';
+
 /** Everything a screen needs to talk to the room over the WebSocket session. */
 export interface SocketContextValue {
     addStory: (title: string, description?: string) => void;
@@ -47,6 +55,8 @@ export interface SocketContextValue {
     roomState: null | RoomState;
     setCurrentStory: (index: number) => void;
     startTimer: (duration?: number) => void;
+    /** Whether the room remembered from a previous visit still exists. */
+    storedRoomStatus: StoredRoomStatus;
     submitVote: (vote: number | string) => void;
     toggleAutoReveal: () => void;
     toggleLockRoom: () => void;

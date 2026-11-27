@@ -2,6 +2,7 @@ import {
     AddStoryPayload,
     BulkAddStoriesPayload,
     ChangeDeckPayload,
+    CheckRoomPayload,
     CreateRoomPayload,
     DeleteStoryPayload,
     ErrorCode,
@@ -94,6 +95,7 @@ export class WebSocketHandler {
         BULK_ADD_STORIES: (ws, payload) =>
             this.handleBulkAddStories(ws, payload as BulkAddStoriesPayload),
         CHANGE_DECK: (ws, payload) => this.handleChangeDeck(ws, payload as ChangeDeckPayload),
+        CHECK_ROOM: (ws, payload) => this.handleCheckRoom(ws, payload as CheckRoomPayload),
         CLEAR_OFFLINE_PARTICIPANTS: (ws) => this.handleClearOfflineParticipants(ws),
         CREATE_ROOM: (ws, payload) => this.handleCreateRoom(ws, payload as CreateRoomPayload),
         DELETE_STORY: (ws, payload) => this.handleDeleteStory(ws, payload as DeleteStoryPayload),
@@ -515,6 +517,33 @@ export class WebSocketHandler {
             return;
         }
         this.broadcastRoomState(roomId);
+    }
+
+    /**
+     * Answers whether a stored room still exists, without joining it.
+     *
+     * The lobby uses this before offering to re-enter a session the browser
+     * remembers. It is deliberately side-effect free for an existing room: no
+     * participant is seated, no session is issued and the room's idle clock is
+     * untouched. The failed-join budget still runs first, and a missing code is
+     * charged and audited like a failed join, so a check cannot be used to
+     * enumerate codes from an address that is already barred.
+     *
+     * @param ws - The requesting connection.
+     * @param payload - Room code to check.
+     */
+    private handleCheckRoom(ws: ExtendedWebSocket, payload: CheckRoomPayload): void {
+        const roomId = payload.roomId.trim().toUpperCase();
+        const now = Date.now();
+        if (!this.admission.allowsCheck(ws, now)) {
+            return;
+        }
+        if (roomManager.hasRoom(roomId)) {
+            this.send(ws, 'ROOM_STATUS', { exists: true, roomId });
+            return;
+        }
+        this.admission.reportUnknownCheck(ws, roomId, now);
+        this.send(ws, 'ROOM_STATUS', { exists: false, roomId });
     }
 
     /**

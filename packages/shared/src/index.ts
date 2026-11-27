@@ -234,6 +234,7 @@ export interface RoomState {
 export type WSMessageType =
     | 'CREATE_ROOM'
     | 'JOIN_ROOM'
+    | 'CHECK_ROOM'
     | 'VOTE'
     | 'REVEAL_VOTES'
     | 'RESET_VOTES'
@@ -258,6 +259,7 @@ export type WSMessageType =
     | 'RESET_TIMER'
     | 'END_SESSION'
     | 'ROOM_STATE'
+    | 'ROOM_STATUS'
     | 'SESSION'
     | 'ERROR';
 
@@ -281,6 +283,17 @@ export interface JoinRoomPayload {
     roomId: string;
     sessionToken?: string | null;
     userId?: string | null;
+}
+
+/**
+ * Lobby preflight: asks whether a stored room still exists.
+ *
+ * It is a read-only check used before offering to re-enter a room the browser
+ * remembers, so a session the server lost is forgotten instead of blocking the
+ * lobby. It never creates a participant or changes the room.
+ */
+export interface CheckRoomPayload {
+    roomId: string;
 }
 
 export interface VotePayload {
@@ -330,6 +343,12 @@ export interface StartTimerPayload {
 export interface RoomStatePayload {
     currentUserId?: string;
     roomState: RoomState;
+}
+
+/** Answer to {@link CheckRoomPayload}; carries no room content. */
+export interface RoomStatusPayload {
+    exists: boolean;
+    roomId: string;
 }
 
 export interface SessionPayload {

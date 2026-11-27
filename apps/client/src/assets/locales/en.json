@@ -214,6 +214,7 @@
     "results.votes_other": "{{count}} votes",
     "session.moved": "This session ended because the room was opened somewhere else in this browser.",
     "session.replaced": "This room was opened in another tab. This tab stopped updating.",
+    "session.stale": "That session no longer exists. Start a new one.",
     "session.switch.body": "This browser is already in room {{roomId}}. Continuing here ends that session.",
     "session.switch.proceed": "End it and continue",
     "session.switch.rejoin": "Go to room {{roomId}}",

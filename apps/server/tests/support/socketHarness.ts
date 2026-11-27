@@ -11,7 +11,9 @@ export const DEFAULT_CLIENT_ID = '11111111-1111-4111-8111-111111111111';
 export interface SentMessage {
     payload: {
         code?: string;
+        exists?: boolean;
         message?: string;
+        roomId?: string;
         roomState?: {
             hostId: string;
             id: string;

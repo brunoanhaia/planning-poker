@@ -43,6 +43,7 @@ export const createMockSocketValue = (
     roomState: null,
     setCurrentStory: vi.fn(),
     startTimer: vi.fn(),
+    storedRoomStatus: 'none',
     submitVote: vi.fn(),
     toggleAutoReveal: vi.fn(),
     toggleLockRoom: vi.fn(),

@@ -214,6 +214,7 @@
     "results.votes_other": "{{count}} votos",
     "session.moved": "Esta sesión terminó porque la sala se abrió en otro lugar de este navegador.",
     "session.replaced": "Esta sala se abrió en otra pestaña. Esta pestaña dejó de actualizarse.",
+    "session.stale": "Esa sesión ya no existe. Inicia una nueva.",
     "session.switch.body": "Este navegador ya está en la sala {{roomId}}. Continuar aquí termina esa sesión.",
     "session.switch.proceed": "Terminar y continuar",
     "session.switch.rejoin": "Ir a la sala {{roomId}}",
