@@ -15,8 +15,7 @@
 | Bulk import       | 50 stories per message       | `INVALID_PAYLOAD` / quota |
 | Custom deck       | 2–30 unique, non-empty cards | `FORBIDDEN` on the change |
 
-Overlong room and story titles are **silently trimmed** by the domain layer rather than
-refused; a blank title is a no-op. A custom deck with duplicates or empty cards is refused.
+Overlong room and story titles are **refused by validation** with `INVALID_PAYLOAD` before the domain layer runs, so the domain truncation never sees an overlong value. A blank title is refused the same way. A custom deck with duplicates or empty cards is refused.
 
 ## Resource ceilings
 
@@ -35,16 +34,16 @@ reclaimed, however long it sits.
 
 ## Transport and abuse ceilings
 
-| Control                    | Value / behavior                                                       | Refusal                      |
-| -------------------------- | ---------------------------------------------------------------------- | ---------------------------- |
-| WebSocket frame            | 32 KiB maximum                                                         | close `1009`                 |
-| Messages per socket        | 30 per 10 s                                                            | `RATE_LIMITED`, close `1008` |
-| HTTP requests              | 300 per 15 min per client, ahead of the body parser                    | HTTP `429`                   |
-| JSON body                  | 50 KiB                                                                 | HTTP `413`                   |
-| Buffered writes per socket | 1 MiB before a stalled client is dropped                               | connection terminated        |
-| Sockets per address        | bounded (sized for a shared office NAT)                                | handshake `429`              |
-| Failed joins per address   | budgeted per minute; a code that matches a room is never refused by it | `RATE_LIMITED`               |
-| Kick bar                   | 5 minutes, advisory (token + participant id + browser cookie)          | `BANNED`                     |
+| Control                    | Value / behavior                                                                             | Refusal                      |
+| -------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------- |
+| WebSocket frame            | 32 KiB maximum                                                                               | close `1009`                 |
+| Messages per socket        | the contract's allowance (`requirements.md`, FR 15)                                          | `RATE_LIMITED`, close `1008` |
+| HTTP requests              | the contract's allowance per client (`requirements.md`, FR 16), ahead of the body parser     | HTTP `429`                   |
+| JSON body                  | 50 KiB                                                                                       | HTTP `413`                   |
+| Buffered writes per socket | 1 MiB before a stalled client is dropped                                                     | connection terminated        |
+| Sockets per address        | bounded (sized for a shared office NAT)                                                      | handshake `429`              |
+| Failed joins per address   | budgeted per minute; a code that matches a room is never refused by it                       | `RATE_LIMITED`               |
+| Kick bar                   | a short window, advisory (token + participant id + browser cookie; `requirements.md`, FR 19) | `BANNED`                     |
 
 The per-address ceilings are deliberately not quoted to the byte: they are calibrated for a
 crowd behind one NAT, and the exact tuning belongs to the server's own constants. What the

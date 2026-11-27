@@ -136,7 +136,7 @@ Two of those rows are deliberate product decisions, not accidents:
   This is the strongest argument for appointing a co-host early: the room stays administrable
   through a flaky connection.
 - **Kick.** Removes the participant from the roster entirely (they are not an "offline" row),
-  revokes their session tokens, bars re-entry for 5 minutes, and shows them a removal notice.
+  revokes their session tokens, bars re-entry for a short window (`requirements.md`, FR 19), and shows them a removal notice.
   The bar is advisory by design: it holds the revoked token and the browser identity cookie,
   and a client that discards both is admitted as a brand-new participant.
 - **End of session.** The room becomes **read-only**: new joins, votes and every content change — stories, decks, estimates, reveals, timers, settings — are refused with `SESSION_ENDED`, while presence, moderation, the summary and a repeat end still work. A token-proven reconnect of an existing participant is still honored, and the end timestamp freezes.

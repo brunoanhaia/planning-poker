@@ -65,7 +65,7 @@ three-person team with one outlier is a conversation, not a statistic.
 ## What the room keeps
 
 - **Round history** per story: every revealed round, its cards and its statistics — visible
-  to everyone, including spectators. Unrevealed votes are never stored anywhere.
+  to everyone, including spectators. Unrevealed cards live only in the live room state, hidden from everyone else; they enter round history only at reveal.
 - **Session summary**: once the host ends the session, everyone gets estimated stories,
   total accepted points, duration, and the round-by-round breakdown of each story, with a
   CSV export. The export is safe against spreadsheet formula injection (`=`, `+`, `-`, `@`,

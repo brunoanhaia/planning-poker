@@ -62,6 +62,6 @@ transfer — is in [Roles and Permissions](./roles-and-permissions.md); the roun
 [Voting and Results](./voting-and-results.md). Two host-specific habits worth adopting:
 
 - **Appoint a co-host early.** If your connection drops, even for a moment, the host role
-  moves to the next online admin and does not come back on reconnect.
+  moves to the next online admin — or, failing that, to any online participant — and does not come back on reconnect.
 - **Use the timer** for timeboxing: presets of 30/60/120/300 seconds, or a custom duration;
-  everyone sees the countdown, only you control it.
+  everyone sees the countdown, only admins control it.

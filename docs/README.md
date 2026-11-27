@@ -31,10 +31,10 @@ Every functional and non-functional requirement maps to a page: [Requirements Tr
 - **These pages are the source of truth for behavior.** They are written from the code, not
   from the README, and each carries a _Last verified_ stamp with the commit it was checked
   against. If a page and the code disagree, the code wins and the page gets fixed.
-- **One source.** The pages live in `docs/` in the repository and travel through pull
-  requests like any other change — nothing is published by hand and nothing is mirrored
-  anywhere else. Agents read them straight from the tree; GitHub renders them, Mermaid
-  included.
+- **One source, two audiences.** The pages live in `docs/` and travel through pull requests
+  like any other change. Agents read them straight from the tree; people read the same
+  pages rendered at https://brunoanhaia.github.io/planning-poker/ — built on merge, never
+  edited there.
 - **The repository keeps what must match the code exactly** — build and test commands, agent
   rules, requirements, changelog. The pages link there instead of copying.
 - Pages are written in English, like every other artifact in this repository.

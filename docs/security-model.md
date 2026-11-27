@@ -69,8 +69,10 @@ rather than against one.
 
 One structured JSON line per security-relevant action — room creation and its rejection, idle
 drops, kicks, promotions, host transfers, refused story indices, throttled sockets, refused
-joins, socket errors. **Room and user identifiers only**: no display name, no token, no vote
-ever reaches the log, so it can be retained and shipped without holding participant data.
+joins, socket errors. **Room and user identifiers only**: no display name, no token, no vote ever reaches the
+log. The room identifier is a caveat: the room code _is_ the join key, so a log that is
+shipped or retained must be protected like a credential — it exposes which rooms existed
+and how to enter them, even though it holds no participant data.
 
 ## Accepted risks, on the record
 

@@ -35,7 +35,7 @@ enters as a **voter**.
 | Room is locked                    | The host locked the room. Ask them to unlock.                                                                         |
 | Room is full                      | The room holds its cap of 100 participants.                                                                           |
 | This session has ended            | The host ended the session — ask for a new room.                                                                      |
-| You are barred (removed recently) | A kick bars this browser for 5 minutes; wait and re-enter.                                                            |
+| You are barred (removed recently) | A kick bars this browser for a short window (`requirements.md`, FR 19); wait and re-enter.                            |
 
 A mistyped code in the lobby never drops the token of the room you already have — the two
 are deliberately separate.

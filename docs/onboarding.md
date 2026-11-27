@@ -16,7 +16,10 @@
    `paths`, so `tsc --noEmit` works without it; everything else does not.)
 3. **Two dev servers** — there is no root `npm run dev`: `npm run dev:server` (Express + `ws`
    on :5000) and `npm run dev:client` (Vite on :5173, proxying `/ws` to the server).
-4. **Run the suites once before touching anything**, so you know the baseline:
+4. **Install the e2e browser once**: `npx playwright install chromium` — `npm run test`
+   includes the Playwright workspace, and a native setup has no browser until this runs
+   (the devcontainer bakes Chromium in).
+5. **Run the suites once before touching anything**, so you know the baseline:
    `npm run test`, `npm run lint`.
 
 The devcontainer gives you the same environment in one command: Node 24, forwarded ports

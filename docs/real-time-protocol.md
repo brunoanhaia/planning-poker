@@ -22,7 +22,7 @@ inside the same frame, throttle and rate ceilings.
 ## What the server does with a frame, in order
 
 1. **Frame cap** — over 32 KiB, the socket is refused with close code `1009`.
-2. **Throttle** — over 30 messages per 10 s, one `RATE_LIMITED` error and close code `1008`.
+2. **Throttle** — over its message allowance (`requirements.md`, FR 15), one `RATE_LIMITED` error and close code `1008`.
 3. **Parse** — invalid JSON answers `INVALID_MESSAGE`.
 4. **Dispatch** — only own-property handler keys resolve; anything else answers
    `UNKNOWN_ACTION` (a prototype-chain key cannot reach the table).

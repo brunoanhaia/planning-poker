@@ -1,12 +1,12 @@
 name: Bug report
-description: Report a reproducible defect — behavior that does not match what the wiki documents
+description: Report a reproducible defect — behavior that does not match what the docs document
 labels: [bug]
 body:
     - type: markdown
       attributes:
           value: |
               A bug is behavior that does not match the documented truth. Before filing,
-              check the wiki page for the feature and its _Last verified_ commit: what
+              check the docs page for the feature (`docs/`) and its _Last verified_ commit: what
               looks like a bug may be a documented sharp edge, and what looks intended may
               contradict a page that has not caught up with the code.
 
@@ -68,7 +68,7 @@ body:
       attributes:
           label: Expected result
           description: |
-              What should happen, and the document that says so — the wiki page that owns the behavior and/or the requirement number in requirements.md. If nothing documents it, say so: that is a second defect, in the documentation.
+              What should happen, and the document that says so — the docs page (`docs/`) that owns the behavior and/or the requirement number in requirements.md. If nothing documents it, say so: that is a second defect, in the documentation.
       validations:
           required: true
 

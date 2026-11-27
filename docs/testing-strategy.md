@@ -18,19 +18,19 @@ The config auto-starts both dev servers (5000/5173); the base URL is the Vite cl
 `E2E_BASE_URL` points the suite at an already-running stack instead. The inventory, by
 concern:
 
-| Spec                          | Owns                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------- |
-| `room-creation`, `room-setup` | the create flow, the guided setup, the first story activating at once     |
-| `voting-flow`                 | vote → reveal → reset → re-vote → accept                                  |
-| `rounds-summary`              | append-only rounds, the statistics grid, the end-of-session summary       |
-| `session-closure`             | the frozen end timestamp, refused joins and votes afterwards              |
-| `admin-management`            | the 19 privileged actions and their refusals                              |
-| `participant-management`      | roster, roles, kick/promote/transfer                                      |
-| `session-identity`            | tokens, tab supersession (4001), room switch (4002), the switch modal     |
-| `backlog-import`              | paste parsing, batching, the backlog quota                                |
-| `timer`                       | start/pause/reset and the shared countdown                                |
-| `i18n`                        | key-set equality across catalogs, plural forms, the JSON-only folder rule |
-| `content-stress`              | long titles, long descriptions, many stories — the layout under load      |
+| Spec                          | Owns                                                                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `room-creation`, `room-setup` | the create flow, the guided setup, the first story activating at once                                                       |
+| `voting-flow`                 | vote → reveal → reset → re-vote → accept                                                                                    |
+| `rounds-summary`              | append-only rounds, the statistics grid, the end-of-session summary                                                         |
+| `session-closure`             | the frozen end timestamp, refused joins and votes afterwards                                                                |
+| `admin-management`            | the 19 privileged actions and their refusals                                                                                |
+| `participant-management`      | roster, roles, kick/promote/transfer                                                                                        |
+| `session-identity`            | tokens, tab supersession (4001), room switch (4002), the switch modal                                                       |
+| `backlog-import`              | paste parsing, batching, the backlog quota                                                                                  |
+| `timer`                       | start/pause/reset and the shared countdown                                                                                  |
+| `i18n` (e2e)                  | language selection and rendered translations — the key-set, plural and JSON-only checks run in the client unit spec instead |
+| `content-stress`              | long titles, long descriptions, many stories — the layout under load                                                        |
 
 ## The accessibility gate
 

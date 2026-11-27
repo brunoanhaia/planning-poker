@@ -22,8 +22,9 @@ docs update in the execution steps.
 3. Move the page's `Last verified: <date> against commit <hash>` stamp to the new commit.
 4. Run `npm run format` over the touched files.
 5. Commit the pages together with the code change so the two cannot drift apart. There is no
-   publishing step and no site: the pages are the artifact. A new page needs its link in
-   `docs/README.md`, the folder index.
+   publishing step: the pages are the artifact, and the site is rebuilt from them on merge.
+   A new page needs its link in `docs/README.md`; its site entry lives in
+   `docs/.vitepress/config.mts`.
 
 ## Rationale
 

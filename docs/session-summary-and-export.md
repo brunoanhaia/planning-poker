@@ -25,7 +25,7 @@ it — the duration you read is the duration that happened.
 
 ## The CSV export
 
-One row **per revealed round**, in backlog order:
+One row **per retained round**, in backlog order — a story keeps its 10 most recent, so an older reveal cannot appear:
 
 | Column                            | Content                                                        |
 | --------------------------------- | -------------------------------------------------------------- |

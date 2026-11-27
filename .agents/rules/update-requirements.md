@@ -11,10 +11,11 @@ Whenever a developer adds a new requirement (functional or non‑functional) to 
 ## Enforcement
 
 - This rule should be referenced in code review checklists.
-- The `requirements-trace` workflow enforces the mapping mechanically: it fails a pull
+- The `requirements-trace` workflow enforces the matching row mechanically: it fails a pull
   request whose `requirements.md` holds a numbered requirement without a matching row in
-  `docs/requirements-trace.md`, and a stale trace row no requirement backs. Run it locally
-  with `npm run trace:check`.
+  `docs/requirements-trace.md` (and a stale row no requirement backs). It compares numbers
+  only — the page behind the row is the reviewer's check. Run it locally with
+  `npm run trace:check`.
 - The rule is part of the repository's custom rules set and should be kept up to date in `AGENTS.md` via the existing `update-agents.md` rule.
 
 ## Usage
