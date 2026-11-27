@@ -1,6 +1,6 @@
 # Roles and Permissions
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > Enforcement pointers at the bottom name where each rule lives in code.
 
 ## Two axes, not four roles
@@ -41,23 +41,24 @@ The server applies one rule to every moderation action: it is allowed for the **
 co-host**. The single exception is transferring the primary host role, which only the host can
 do.
 
-| Action                                | Host | Co-host | Non-admin |
-| ------------------------------------- | :--: | :-----: | :-------: |
-| Rename the room                       |  ✅  |   ✅    |     —     |
-| Lock / unlock the room (blocks joins) |  ✅  |   ✅    |     —     |
-| Toggle auto-reveal                    |  ✅  |   ✅    |     —     |
-| Start / pause / reset the timer       |  ✅  |   ✅    |     —     |
-| Reveal votes                          |  ✅  |   ✅    |     —     |
-| Reset votes (starts a new round)      |  ✅  |   ✅    |     —     |
-| Set the active story                  |  ✅  |   ✅    |     —     |
-| Finalize / adjust a story's estimate  |  ✅  |   ✅    |     —     |
-| Add, bulk-import or delete stories    |  ✅  |   ✅    |     —     |
-| Change the estimation deck            |  ✅  |   ✅    |     —     |
-| End the session                       |  ✅  |   ✅    |     —     |
-| Toggle another participant's role     |  ✅  |   ✅    |     —     |
-| Promote / demote a co-host            |  ✅  |   ✅    |     —     |
-| Kick a participant                    |  ✅  |   ✅¹   |     —     |
-| **Transfer the primary host**         |  ✅  |  **—**  |     —     |
+| Action                                |             Host             | Co-host | Non-admin |
+| ------------------------------------- | :--------------------------: | :-----: | :-------: |
+| Rename the room                       |              ✅              |   ✅    |     —     |
+| Lock / unlock the room (blocks joins) |              ✅              |   ✅    |     —     |
+| Toggle auto-reveal                    |              ✅              |   ✅    |     —     |
+| Start / pause / reset the timer       |              ✅              |   ✅    |     —     |
+| Reveal votes                          |              ✅              |   ✅    |     —     |
+| Reset votes (starts a new round)      |              ✅              |   ✅    |     —     |
+| Set the active story                  |              ✅              |   ✅    |     —     |
+| Finalize / adjust a story's estimate  |              ✅              |   ✅    |     —     |
+| Add, bulk-import or delete stories    |              ✅              |   ✅    |     —     |
+| Change the estimation deck            |              ✅              |   ✅    |     —     |
+| End the session                       |              ✅              |   ✅    |     —     |
+| Toggle another participant's role     |              ✅              |   ✅    |     —     |
+| Promote / demote a co-host            |              ✅              |   ✅    |     —     |
+| Kick a participant                    |              ✅              |   ✅¹   |     —     |
+| Clear the offline (left) rows         | admins (see Troubleshooting) |
+| **Transfer the primary host**         |              ✅              |  **—**  |     —     |
 
 ¹ Never the primary host: a kick targeting the current host is refused by the server, no
 matter who orders it.
@@ -138,9 +139,7 @@ Two of those rows are deliberate product decisions, not accidents:
   revokes their session tokens, bars re-entry for 5 minutes, and shows them a removal notice.
   The bar is advisory by design: it holds the revoked token and the browser identity cookie,
   and a client that discards both is admitted as a brand-new participant.
-- **End of session.** New joins and votes are refused (a token-proven reconnect of an
-  existing participant is still honored), the end timestamp freezes, and everyone gets the
-  summary.
+- **End of session.** The room becomes **read-only**: new joins, votes and every content change — stories, decks, estimates, reveals, timers, settings — are refused with `SESSION_ENDED`, while presence, moderation, the summary and a repeat end still work. A token-proven reconnect of an existing participant is still honored, and the end timestamp freezes.
 
 ## Sharp edges
 
@@ -154,13 +153,7 @@ Honest documentation of behaviors you can run into:
 3. **Promote is a toggle.** The same menu item demotes a co-host. Targeting the host with it
    flips a flag the host does not actually use (host authority comes from the room's `hostId`),
    so nothing visibly changes except the menu label on that row.
-4. **Ending a session stops joins and votes — not moderation.** An admin can still reveal a
-   pending round, edit the backlog or rename a closed room afterwards.
-5. **A spectator keeps the card they already showed.** Switching to spectator after the
-   reveal does not retract a revealed card; the round is frozen. Only Reset Votes alters a
-   revealed round.
-6. **Switching story or deck silently drops in-flight votes** — including yours, if you were
-   mid-pick.
+4. **Ending a session freezes the room, not the roster.** Every content change — stories, decks, estimates, reveals, timers, settings — answers `SESSION_ENDED` afterwards. What still works: presence (voter/spectator), moderation (kick, promote, transfer, clearing left rows), the summary, and a repeat `END_SESSION` that cannot move the timestamp.
 
 ## For maintainers — where the rules live
 

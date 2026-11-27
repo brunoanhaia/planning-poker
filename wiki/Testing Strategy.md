@@ -1,6 +1,6 @@
 # Testing Strategy
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 Three layers, each with a different job: unit tests own the logic, e2e owns the behavior a
 user can reach, chaos owns the faults no assertion covers.
@@ -34,9 +34,9 @@ concern:
 
 ## The accessibility gate
 
-`overlap-axe.spec.ts` scans the lobby, the room and the revealed results on **four viewports
-in both colour schemes**, asserting **zero** axe `wcag2a`/`wcag2aa` violations and **zero
-overlapping text or interactive elements**. It is the safety net under every layout and
+`overlap-axe.spec.ts` scans the lobby, the setup screen, the room and the revealed results on **eight
+viewports — 320 px to 4K — in both colour schemes**, asserting **zero** axe `wcag2a`/`wcag2aa` violations, **zero overlapping text or
+interactive elements** and **zero horizontal overflow**. It is the safety net under every layout and
 colour decision: if a change regresses contrast or breaks the 320px experience, this spec
 fails. Any layout or colour change needs the full e2e suite.
 
@@ -47,8 +47,9 @@ fails. Any layout or colour change needs the full e2e suite.
 - **Container chaos**: the compose stack under faults, proving the deployment survives what
   the process-level suites never see.
 
-Both, plus the automated inventory and the exploratory charters, are part of the release
-gate: the
+Both, plus the automated inventory, the exploratory charters and the ideal-behaviour
+[`docs/test-plan.md`](https://github.com/brunoanhaia/planning-poker/blob/main/docs/test-plan.md),
+are part of the release gate: the
 [regression playbook](https://github.com/brunoanhaia/planning-poker/blob/main/docs/regression-playbook.md)
 records when it was last executed and what it proved.
 

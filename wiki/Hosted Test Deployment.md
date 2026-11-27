@@ -1,6 +1,6 @@
 # Hosted Test Deployment
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > A public test instance, split across two free hosts, configured entirely from the repository
 > (`vercel.json`, `render.yaml`): a push to `main` redeploys both halves.
 

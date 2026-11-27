@@ -1,6 +1,6 @@
 # Session Summary and Export
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 The summary is the room's receipt: it opens once, for everyone, when the host ends the
 session, and it is built entirely from the state the server already broadcast — so it keeps
@@ -42,8 +42,7 @@ One row **per revealed round**, in backlog order:
   another tool expect, not interface copy.
 - **The export is safe to open.** Cells starting with a formula trigger (`=`, `+`, `-`, `@`,
   tab, CR) are prefixed with a single quote, embedded quotes are doubled, and the filename is
-  a sanitized slug (`"<room title> summary"` → `<slug>_Backlog_Estimates.csv`, at most 60
-  characters, with a fixed `.csv` extension the title cannot influence).
+  a sanitized slug: the summary file is `<slug>_Session_Summary.csv` (at most 60 characters, fixed `.csv` extension the title cannot influence), while the backlog export keeps its own `_Backlog_Estimates` suffix — so the two files never share a name.
 
 ## After the end
 

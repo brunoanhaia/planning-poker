@@ -1,6 +1,6 @@
 # Architecture Overview
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The exact commands to build, test and run live in the repository: [`TOOLS.md`](https://github.com/brunoanhaia/planning-poker/blob/main/TOOLS.md).
 
 ## The shape
@@ -54,7 +54,7 @@ rebuild before the dev servers — and the unit suites — see it.
 | Module                  | Owns                                                                                                                                                           |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `index.ts`              | HTTP hardening (helmet, CORS allowlist, body cap, rate limit), `/api/health`, the identity cookie, the WebSocket upgrade with origin and per-address admission |
-| `webSocketHandler.ts`   | Message dispatch, per-action guards, broadcasts, the heartbeat and timer tickers                                                                               |
+| `webSocketHandler.ts`   | Message dispatch, per-action guards, the frozen-after-end read-only rule, broadcasts, the heartbeat and timer tickers                                          |
 | `roomManager.ts`        | Rooms, the moderation check (`isUserAdmin`), voting rounds, the idle sweep                                                                                     |
 | `participantService.ts` | Roster and roles: join/reconnect, succession, promote/demote, transfer, kick, and the per-recipient sanitization                                               |
 | `storyService.ts`       | Backlog: staging, bulk import at the quota, story switching, finalize                                                                                          |
@@ -73,7 +73,7 @@ rebuild before the dev servers — and the unit suites — see it.
 
 - **`context/socket-context/`** is the only place that talks to the socket: connection,
   reconnection (2 s), token persistence, all intent senders, and notice translation. The
-  rest of the app calls intent functions and renders state.
+  rest of the app calls intent functions and renders state. A connection banner announces the socket's state (connecting, reconnecting, offline, waking) in a polite live region.
 - **Components** are presentation-only, one per folder, with colocated hooks and utils.
 - **`i18n/`** owns the catalogs; every user-visible string is a key, and notices are stored
   as codes so they re-translate on a language switch.

@@ -1,6 +1,6 @@
 # Voting and Results
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 How a round flows, what the statistics mean, and what the room keeps.
 
@@ -40,8 +40,7 @@ switches the room to the next story.
 
 - Presets of 30, 60, 120 and 300 seconds, or any duration from 5 s to 1 h (default 60 s).
 - Everyone sees the countdown; only admins get the start/pause/reset controls.
-- Switching the active story clears the in-flight votes and resets the timer; deleting the
-  last story clears the votes and stops a running timer.
+- Switching the active story clears the in-flight votes and resets the timer; deleting the last story clears the votes and stops a running timer. Resetting the votes rewinds the countdown to its configured duration, and deleting the **active** story promotes the story that takes its place (or the previous one) and starts a fresh round — only the active story carries the `estimating` badge.
 
 ## The statistics
 

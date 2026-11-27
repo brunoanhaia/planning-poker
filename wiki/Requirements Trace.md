@@ -1,6 +1,6 @@
 # Requirements Trace
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The numbered, canonical list is
 > [`requirements.md`](https://github.com/brunoanhaia/planning-poker/blob/main/requirements.md)
 > in the repository. This page maps every requirement to the wiki pages that document it, so
@@ -13,35 +13,36 @@ backs. Run the same check locally with `npm run trace:check`.
 
 ## Functional requirements
 
-| #   | Requirement (gist)                                                                  | Documented in                                                           |
-| --- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1   | Real-time native WebSocket synchronization                                          | [[Architecture Overview]], [[Real-Time Protocol]]                       |
-| 2   | Room lifecycle: create, join, leave, idle reclaim                                   | [[Hosting a Session]], [[Joining a Session]], [[Limits and Ceilings]]   |
-| 3   | Four roles, defined permissions                                                     | [[Roles and Permissions]]                                               |
-| 4   | Voting flow: vote, reveal, reset, finalize, frozen revealed cards, auto-progression | [[Voting and Results]], [[Roles and Permissions]]                       |
-| 5   | Room settings: rename, lock, change deck                                            | [[Roles and Permissions]], [[Hosting a Session]]                        |
-| 6   | Participant management: kick, promote, transfer                                     | [[Roles and Permissions]]                                               |
-| 7   | Backlog: add, edit, delete, bulk import, manual estimate                            | [[Hosting a Session]], [[Voting and Results]]                           |
-| 8   | Synchronized countdown timer                                                        | [[Voting and Results]], [[Roles and Permissions]]                       |
-| 9   | Responsive from 320px to 4K, no overlap                                             | [[Testing Strategy]] (the overlap-axe gate)                             |
-| 10  | WAI-ARIA, keyboard navigable, WCAG AA                                               | [[Testing Strategy]] (zero-violation axe gate)                          |
-| 11  | Session identity: tokens, one tab, one room per browser, 4001/4002                  | [[Joining a Session]], [[Troubleshooting]], [[Security Model]]          |
-| 12  | Every inbound payload validated before logic                                        | [[Real-Time Protocol]]                                                  |
-| 13  | Server-side input limits                                                            | [[Limits and Ceilings]]                                                 |
-| 14  | Safe CSV export                                                                     | [[Session Summary and Export]]                                          |
-| 15  | Per-socket message allowance, 1008 on excess                                        | [[Limits and Ceilings]], [[Real-Time Protocol]]                         |
-| 16  | HTTP rate limit ahead of the body parser                                            | [[Limits and Ceilings]], [[Architecture Overview]]                      |
-| 17  | Resource ceilings, each with its own error code                                     | [[Limits and Ceilings]], [[Real-Time Protocol]]                         |
-| 18  | Idle-room reclamation, never with someone inside                                    | [[Limits and Ceilings]], [[Operations Runbook]]                         |
-| 19  | Kick cooldown, advisory by design                                                   | [[Troubleshooting]], [[Security Model]], [[Decisions]]                  |
-| 20  | Distinguishable failures (`ErrorCode`, `INVALID_STORY_INDEX`)                       | [[Real-Time Protocol]], [[Roles and Permissions]]                       |
-| 21  | Audit trail, ids only, no names/tokens/votes                                        | [[Operations Runbook]], [[Security Model]]                              |
-| 22  | First-party identity cookie                                                         | [[Security Model]], [[Troubleshooting]]                                 |
-| 23  | Voting rounds, append-only, capped at 10                                            | [[Voting and Results]], [[Limits and Ceilings]]                         |
-| 24  | Session summary with CSV                                                            | [[Session Summary and Export]]                                          |
-| 25  | Result statistics, symbolic cards excluded                                          | [[Voting and Results]]                                                  |
-| 26  | Interface languages, CLDR plurals, persisted choice                                 | [[Home]], [[Adding a Language]]                                         |
-| 27  | Guided session setup, creator as spectator, waiting state                           | [[Hosting a Session]], [[Joining a Session]], [[Roles and Permissions]] |
+| #   | Requirement (gist)                                                                         | Documented in                                                           |
+| --- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 1   | Real-time native WebSocket synchronization                                                 | [[Architecture Overview]], [[Real-Time Protocol]]                       |
+| 2   | Room lifecycle: create, join, leave, idle reclaim                                          | [[Hosting a Session]], [[Joining a Session]], [[Limits and Ceilings]]   |
+| 3   | Four roles, defined permissions                                                            | [[Roles and Permissions]]                                               |
+| 4   | Voting flow: vote, reveal, reset, finalize, frozen revealed cards, auto-progression        | [[Voting and Results]], [[Roles and Permissions]]                       |
+| 5   | Room settings: rename, lock, change deck                                                   | [[Roles and Permissions]], [[Hosting a Session]]                        |
+| 6   | Participant management: kick, promote, transfer; offline rows and the clear-left action    | [[Roles and Permissions]]                                               |
+| 7   | Backlog: add, edit, delete, bulk import, manual estimate; active-story coherence on delete | [[Hosting a Session]], [[Voting and Results]]                           |
+| 8   | Synchronized countdown timer; a reset rewinds it, the end stops it                         | [[Voting and Results]], [[Roles and Permissions]]                       |
+| 9   | Responsive from 320px to 4K, no overlap                                                    | [[Testing Strategy]] (the overlap-axe gate)                             |
+| 10  | WAI-ARIA, keyboard navigable, WCAG AA                                                      | [[Testing Strategy]] (zero-violation axe gate)                          |
+| 11  | Session identity: tokens, one tab, one room per browser, 4001/4002                         | [[Joining a Session]], [[Troubleshooting]], [[Security Model]]          |
+| 12  | Every inbound payload validated before logic                                               | [[Real-Time Protocol]]                                                  |
+| 13  | Server-side input limits                                                                   | [[Limits and Ceilings]]                                                 |
+| 14  | Safe CSV export                                                                            | [[Session Summary and Export]]                                          |
+| 15  | Per-socket message allowance, 1008 on excess                                               | [[Limits and Ceilings]], [[Real-Time Protocol]]                         |
+| 16  | HTTP rate limit ahead of the body parser                                                   | [[Limits and Ceilings]], [[Architecture Overview]]                      |
+| 17  | Resource ceilings, each with its own error code                                            | [[Limits and Ceilings]], [[Real-Time Protocol]]                         |
+| 18  | Idle-room reclamation, never with someone inside                                           | [[Limits and Ceilings]], [[Operations Runbook]]                         |
+| 19  | Kick cooldown, advisory by design                                                          | [[Troubleshooting]], [[Security Model]], [[Decisions]]                  |
+| 20  | Distinguishable failures (`ErrorCode`, `INVALID_STORY_INDEX`)                              | [[Real-Time Protocol]], [[Roles and Permissions]]                       |
+| 21  | Audit trail, ids only, no names/tokens/votes                                               | [[Operations Runbook]], [[Security Model]]                              |
+| 22  | First-party identity cookie                                                                | [[Security Model]], [[Troubleshooting]]                                 |
+| 23  | Voting rounds, append-only, capped at 10                                                   | [[Voting and Results]], [[Limits and Ceilings]]                         |
+| 24  | Session summary with CSV                                                                   | [[Session Summary and Export]]                                          |
+| 25  | Result statistics, symbolic cards excluded                                                 | [[Voting and Results]]                                                  |
+| 26  | Interface languages, CLDR plurals, persisted choice                                        | [[Home]], [[Adding a Language]]                                         |
+| 27  | Guided session setup, creator as spectator, waiting state                                  | [[Hosting a Session]], [[Joining a Session]], [[Roles and Permissions]] |
+| 28  | Connection lifecycle and cold start (queued create/join, announced states)                 | [[Troubleshooting]], [[Real-Time Protocol]]                             |
 
 ## Non-functional requirements
 
@@ -56,5 +57,5 @@ backs. Run the same check locally with `npm run trace:check`.
 | 11–13 | HTTP hardening, frame cap, explicit proxy trust                             | [[Security Model]], [[Deploy with Docker]]             |
 | 14–15 | Bounded memory; auditability without participant data                       | [[Limits and Ceilings]], [[Operations Runbook]]        |
 | 16–18 | Availability under abuse; room codes as secrets; identity behind Cloudflare | [[Security Model]], [[Limits and Ceilings]]            |
-| 19–20 | Intent-based dispatch; final session closure                                | [[Real-Time Protocol]], [[Session Summary and Export]] |
-| 21    | Translation architecture                                                    | [[Adding a Language]], [[Decisions]]                   |
+| 19–20 | Intent-based dispatch; read-only session closure                            | [[Real-Time Protocol]], [[Session Summary and Export]] |
+| 21    | Translation architecture, with copy parity across locales                   | [[Adding a Language]], [[Decisions]]                   |

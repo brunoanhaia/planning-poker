@@ -1,6 +1,6 @@
 # Adding a Language
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 A language is data, not code — five small edits and the test suite enforces the rest.
 
@@ -41,5 +41,6 @@ if anything is missing.
   the log line, not the interface.)
 - **Notices are stored as codes and translated on render**, which is why an error already on
   screen follows a language switch instead of freezing in the arrival language.
+- **Copy parity across locales.** A label shortened or reworded in one language is shortened or reworded in every shipped locale — same concept, same tone, comparable length — so no language presents a different action.
 - **Keep `assets/locales/` JSON-only.** The folder is excluded from the Sonar scan as a whole;
   the i18n spec fails if anything else lives there.

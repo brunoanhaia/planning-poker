@@ -1,6 +1,6 @@
 # Operations Runbook
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 How to run a deployment day to day. Everything here assumes one of the two shapes described
 in [[Deploy with Docker]] or [[Hosted Test Deployment]].

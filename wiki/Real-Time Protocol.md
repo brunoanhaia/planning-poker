@@ -1,6 +1,6 @@
 # Real-Time Protocol
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The authoritative definition of every type and payload is
 > [`packages/shared/src/index.ts`](https://github.com/brunoanhaia/planning-poker/blob/main/packages/shared/src/index.ts);
 > this page explains how they behave on the wire.
@@ -37,31 +37,32 @@ index is answered as `INVALID_STORY_INDEX` before any permission check.
 
 ## Client → server
 
-| Type                    | Payload                                                                   | Who may send                                      |
-| ----------------------- | ------------------------------------------------------------------------- | ------------------------------------------------- |
-| `CREATE_ROOM`           | name, avatar?, color?, title?, deckType?, customDeck?, previousRoomToken? | anyone — the token of the room being left ends it |
-| `JOIN_ROOM`             | roomId, name, avatar?, color?, sessionToken?, userId?, previousRoomToken? | anyone — the token rebinds the same participant   |
-| `VOTE`                  | vote                                                                      | non-spectators                                    |
-| `REVEAL_VOTES`          | —                                                                         | admins                                            |
-| `RESET_VOTES`           | —                                                                         | admins                                            |
-| `ADD_STORY`             | title, description?                                                       | admins                                            |
-| `BULK_ADD_STORIES`      | stories[]                                                                 | admins (sent in frame-sized batches)              |
-| `SET_CURRENT_STORY`     | storyIndex                                                                | admins                                            |
-| `UPDATE_STORY_ESTIMATE` | storyId, estimate                                                         | admins                                            |
-| `DELETE_STORY`          | storyId                                                                   | admins                                            |
-| `CHANGE_DECK`           | deckType, customDeck?                                                     | admins                                            |
-| `TOGGLE_SPECTATOR`      | —                                                                         | anyone (self)                                     |
-| `TOGGLE_USER_ROLE`      | targetUserId                                                              | admins (other's voter/spectator)                  |
-| `PROMOTE_COADMIN`       | targetUserId                                                              | admins (promote or demote)                        |
-| `TRANSFER_ADMIN`        | targetUserId                                                              | **host only**                                     |
-| `KICK_PARTICIPANT`      | targetUserId                                                              | admins (never the host)                           |
-| `UPDATE_ROOM_TITLE`     | title                                                                     | admins                                            |
-| `TOGGLE_LOCK_ROOM`      | —                                                                         | admins                                            |
-| `TOGGLE_AUTO_REVEAL`    | —                                                                         | admins                                            |
-| `START_TIMER`           | duration? (5–3600 s, default 60)                                          | admins                                            |
-| `PAUSE_TIMER`           | —                                                                         | admins (also resumes)                             |
-| `RESET_TIMER`           | —                                                                         | admins                                            |
-| `END_SESSION`           | —                                                                         | admins                                            |
+| Type                         | Payload                                                                   | Who may send                                      |
+| ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------- |
+| `CREATE_ROOM`                | name, avatar?, color?, title?, deckType?, customDeck?, previousRoomToken? | anyone — the token of the room being left ends it |
+| `JOIN_ROOM`                  | roomId, name, avatar?, color?, sessionToken?, userId?, previousRoomToken? | anyone — the token rebinds the same participant   |
+| `VOTE`                       | vote                                                                      | non-spectators                                    |
+| `REVEAL_VOTES`               | —                                                                         | admins                                            |
+| `RESET_VOTES`                | —                                                                         | admins                                            |
+| `ADD_STORY`                  | title, description?                                                       | admins                                            |
+| `BULK_ADD_STORIES`           | stories[]                                                                 | admins (sent in frame-sized batches)              |
+| `SET_CURRENT_STORY`          | storyIndex                                                                | admins                                            |
+| `UPDATE_STORY_ESTIMATE`      | storyId, estimate (null clears and reopens)                               | storyId, estimate                                 | admins |
+| `DELETE_STORY`               | storyId                                                                   | admins                                            |
+| `CHANGE_DECK`                | deckType, customDeck?                                                     | admins                                            |
+| `TOGGLE_SPECTATOR`           | —                                                                         | anyone (self)                                     |
+| `TOGGLE_USER_ROLE`           | targetUserId                                                              | admins (other's voter/spectator)                  |
+| `PROMOTE_COADMIN`            | targetUserId                                                              | admins (promote or demote)                        |
+| `TRANSFER_ADMIN`             | targetUserId                                                              | **host only**                                     |
+| `KICK_PARTICIPANT`           | targetUserId                                                              | admins (never the host)                           |
+| `CLEAR_OFFLINE_PARTICIPANTS` | —                                                                         | admins (removes the offline rows)                 |
+| `UPDATE_ROOM_TITLE`          | title                                                                     | admins                                            |
+| `TOGGLE_LOCK_ROOM`           | —                                                                         | admins                                            |
+| `TOGGLE_AUTO_REVEAL`         | —                                                                         | admins                                            |
+| `START_TIMER`                | duration? (5–3600 s, default 60)                                          | admins                                            |
+| `PAUSE_TIMER`                | —                                                                         | admins (also resumes)                             |
+| `RESET_TIMER`                | —                                                                         | admins                                            |
+| `END_SESSION`                | —                                                                         | admins                                            |
 
 ## Server → client
 
@@ -78,24 +79,24 @@ last `ROOM_STATE` it received.
 
 ## Error codes
 
-| Code                  | Meaning                                                                   |
-| --------------------- | ------------------------------------------------------------------------- |
-| `BANNED`              | The 5-minute kick bar still holds this browser/participant                |
-| `FORBIDDEN`           | Authorization: the sender lacks the role the action requires              |
-| `INVALID_MESSAGE`     | The frame is not a JSON object the dispatcher understands                 |
-| `INVALID_PAYLOAD`     | The payload failed its zod schema                                         |
-| `INVALID_STORY_INDEX` | Story index outside the backlog — a bad request, not a permission refusal |
-| `INVALID_VOTE`        | Card not in the active deck, spectator vote, empty backlog                |
-| `NO_SESSION`          | No active room session on this socket                                     |
-| `RATE_LIMITED`        | Socket over its message allowance; closed with 1008                       |
-| `ROOM_FULL`           | The room holds its participant cap                                        |
-| `ROOM_LIMIT_REACHED`  | The server holds its room cap                                             |
-| `ROOM_LOCKED`         | The host locked the room                                                  |
-| `ROOM_NOT_FOUND`      | The code matches no live room                                             |
-| `SESSION_ENDED`       | The session is closed: no new joins, no votes                             |
-| `STORY_LIMIT_REACHED` | The backlog holds its quota                                               |
-| `UNKNOWN_ACTION`      | No handler owns this type                                                 |
-| `VOTES_REVEALED`      | The round is public — reset before voting again                           |
+| Code                  | Meaning                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `BANNED`              | The 5-minute kick bar still holds this browser/participant                                                                    |
+| `FORBIDDEN`           | Authorization: the sender lacks the role the action requires                                                                  |
+| `INVALID_MESSAGE`     | The frame is not a JSON object the dispatcher understands                                                                     |
+| `INVALID_PAYLOAD`     | The payload failed its zod schema                                                                                             |
+| `INVALID_STORY_INDEX` | Story index outside the backlog — a bad request, not a permission refusal                                                     |
+| `INVALID_VOTE`        | Card not in the active deck, spectator vote, empty backlog                                                                    |
+| `NO_SESSION`          | No active room session on this socket                                                                                         |
+| `RATE_LIMITED`        | Socket over its message allowance; closed with 1008                                                                           |
+| `ROOM_FULL`           | The room holds its participant cap                                                                                            |
+| `ROOM_LIMIT_REACHED`  | The server holds its room cap                                                                                                 |
+| `ROOM_LOCKED`         | The host locked the room                                                                                                      |
+| `ROOM_NOT_FOUND`      | The code matches no live room                                                                                                 |
+| `SESSION_ENDED`       | The session is closed and **read-only**: no joins, votes or content changes — the 14 mutating types answer this after the end | The session is closed: no new joins, no votes |
+| `STORY_LIMIT_REACHED` | The backlog holds its quota                                                                                                   |
+| `UNKNOWN_ACTION`      | No handler owns this type                                                                                                     |
+| `VOTES_REVEALED`      | The round is public — reset before voting again                                                                               |
 
 Reserved in the catalogue but not sent by the current server: `INVALID_DECK` (a bad deck
 answers `FORBIDDEN` today) and `PARTICIPANT_LIMIT_REACHED` (joins answer `ROOM_FULL`). The

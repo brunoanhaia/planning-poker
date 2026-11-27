@@ -1,6 +1,6 @@
 # Limits and Ceilings
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The numbers live in [`packages/shared/src/index.ts`](https://github.com/brunoanhaia/planning-poker/blob/main/packages/shared/src/index.ts); this page restates them so nobody has to grep for them.
 
 ## Input limits

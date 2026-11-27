@@ -1,6 +1,6 @@
 # Onboarding
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The authoritative command list is [`TOOLS.md`](https://github.com/brunoanhaia/planning-poker/blob/main/TOOLS.md)
 > and the contribution process is
 > [`CONTRIBUTING.md`](https://github.com/brunoanhaia/planning-poker/blob/main/CONTRIBUTING.md);

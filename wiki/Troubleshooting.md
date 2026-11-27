@@ -1,6 +1,6 @@
 # Troubleshooting
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 Symptoms first, mechanics after. Every quoted message below is the exact text the
 application shows (English catalog).
@@ -12,7 +12,7 @@ Before the symptoms, the model behind them:
 - **The client reconnects by itself.** A dropped socket is retried every 2 seconds. On
   reconnect the browser re-sends `JOIN_ROOM` with the session token it holds, and the server
   rebinds the **same participant** — same seat, same role, refreshed name/avatar/color. You
-  do not lose your seat to a network blip.
+  do not lose your seat to a network blip. A banner announces the connection state — "Connecting to the server…", "Connection lost. Reconnecting…", "You are offline. Check your connection and retry.", "Waking the server. This can take up to a minute." — in a polite live region, and a create or join issued while the socket is down is queued and runs exactly once when it opens; a second click while the request is queued is ignored.
 - **One token, two storages.** The session token lives in `sessionStorage`
   (`planit_session_token`) for the tab and in `localStorage`
   (`planit_room_token:<ROOM CODE>`) per room, so the same browser re-enters its existing
@@ -24,6 +24,8 @@ Before the symptoms, the model behind them:
   stand down instead of fighting for the socket.
 
 ## Symptoms and what they mean
+
+| Participants who left still appear in the roster, collapsed behind a count | Presence: offline rows stay until cleared; a revealed card still appears in its round, but an offline voter does not count towards round completion. | An admin can "Clear left participants"; the rows are informational. |
 
 | You see                                                                                                              | What happened                                                                                                                                                                                                               | What to do                                                                                                                      |
 | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |

@@ -1,6 +1,6 @@
 # Deploy with Docker
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The stack is defined by `docker-compose.yml`, `.env.example` and `apps/client/nginx.conf` in
 > the repository; this page explains the decisions behind them.
 

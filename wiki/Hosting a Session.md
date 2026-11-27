@@ -1,6 +1,6 @@
 # Hosting a Session
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 From an empty browser to a running estimation session, as the host experiences it.
 
@@ -20,6 +20,8 @@ The landing screen asks for two things, in this order:
 | Powers of 2         | 1, 2, 4, 8, 16, 32, 64, ?, ☕                 |
 | T-Shirt Sizes       | XS, S, M, L, XL, XXL, ?, ☕                   |
 | Custom              | 2–30 unique non-empty cards you define        |
+
+Clicking while the socket is still connecting is safe: the request is queued and runs exactly once when the socket opens — a second click while it is queued is ignored.
 
 The room is created and you enter as **host and spectator** — you have every moderation
 power and no vote until you flip your own voter/spectator switch. Voting starts when the

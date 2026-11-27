@@ -1,6 +1,6 @@
 # Joining a Session
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 ## Getting in
 
@@ -42,7 +42,7 @@ are deliberately separate.
 
 ## If the connection drops
 
-Nothing to do: the browser retries every 2 seconds and re-presents the session token, which
+Nothing to do: the banner names the state (reconnecting, offline, or waking a sleeping server — with a retry once it answers), the browser retries every 2 seconds and re-presents the session token, which
 rebinds your existing participant with the same seat and role. If you were the host, note
 that the host role moves on disconnect — see [[Roles and Permissions]]. Everything else that
 can go wrong, including the two deliberate close codes, is in [[Troubleshooting]].

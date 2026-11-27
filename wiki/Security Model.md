@@ -1,6 +1,6 @@
 # Security Model
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The full penetration report — findings, reproductions, and the abuse-test measurements — is
 > [`docs/security-review.md`](https://github.com/brunoanhaia/planning-poker/blob/main/docs/security-review.md)
 > in the repository. This page is the model; that document is the evidence.
@@ -89,5 +89,4 @@ ever reaches the log, so it can be retained and shipped without holding particip
 
 Origin allowlist on the handshake; tokens as the only identity for non-browser clients;
 unrevealed votes never reaching another participant; no cross-room broadcast bleed; no
-prototype pollution; authorization refused with no state change for all 19 privileged
-actions; CORS never reflecting a hostile origin; `X-Forwarded-For` ignored when untrusted.
+prototype pollution; authorization refused with no state change for all 20 privileged actions; CORS never reflecting a hostile origin; `X-Forwarded-For` ignored when untrusted.

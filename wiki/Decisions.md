@@ -1,6 +1,6 @@
 # Decisions
 
-> **Last verified:** 2026-11-26 against commit `c557e49`.
+> **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > Short records of the choices that shaped the system — each entry says what was chosen, why,
 > and what it costs. The code comments cited below are the primary sources.
 
