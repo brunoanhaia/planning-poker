@@ -38,12 +38,12 @@ One process owns the truth, and it is not the browser:
 
 ## Monorepo map
 
-| Workspace         | Role                                                                                                     |
-| ----------------- | -------------------------------------------------------------------------------------------------------- |
-| `apps/client`     | React 19 + Vite + Ant Design 6. Components are "dumb"; hooks own logic; one `ConfigProvider` theme       |
-| `apps/server`     | Express for the hardened HTTP surface, native `ws` for the rooms. No database — memory is the store      |
-| `apps/e2e`        | Playwright + axe-core: 4 viewports × 2 colour schemes × 3 states, plus chaos and container gates         |
-| `packages/shared` | The contract: types, enums, limits, close codes. Both apps consume it; the wiki's numbers come from here |
+| Workspace         | Role                                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| `apps/client`     | React 19 + Vite + Ant Design 6. Components are "dumb"; hooks own logic; one `ConfigProvider` theme      |
+| `apps/server`     | Express for the hardened HTTP surface, native `ws` for the rooms. No database — memory is the store     |
+| `apps/e2e`        | Playwright + axe-core: 4 viewports × 2 colour schemes × 3 states, plus chaos and container gates        |
+| `packages/shared` | The contract: types, enums, limits, close codes. Both apps consume it; the docs' numbers come from here |
 
 One build nuance worth knowing: the apps consume `packages/shared` from its compiled `dist/`,
 while type-checking reads the source through `paths`. That is why a type change needs a

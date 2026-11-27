@@ -22,7 +22,7 @@ allowlist genuinely matters here: it must list every hostname the client is serv
   alias.
 - **Wake-up latency is real.** The free Render plan spins the single instance down after 15
   minutes without traffic and takes about a minute to wake. During that window the site is up
-  but the socket cannot connect; the client keeps retrying (see [[Troubleshooting]]).
+  but the socket cannot connect; the client keeps retrying (see [Troubleshooting](./troubleshooting.md)).
 - **One instance, in memory.** No horizontal scaling on the free plan — which matches the
   product's single-writer model anyway: room state is memory, one process, one truth.
 - **Both TLS settings are set for you by the blueprint**: the trusted hop is Render's

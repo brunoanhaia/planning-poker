@@ -30,7 +30,7 @@ inside the same frame, throttle and rate ceilings.
    nothing is broadcast.
 6. **Session** — room-scoped commands need an active session, else `NO_SESSION`.
 7. **Domain guard** — the moderation check and the specific refusals
-   ([[Roles and Permissions]]).
+   ([Roles and Permissions](./roles-and-permissions.md)).
 
 The order matters: a malformed frame still costs the sender budget, and an out-of-range story
 index is answered as `INVALID_STORY_INDEX` before any permission check.

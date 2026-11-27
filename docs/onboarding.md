@@ -28,11 +28,11 @@ baked in.
 - The **layout and rules** for agents and humans live in
   [`AGENTS.md`](https://github.com/brunoanhaia/planning-poker/blob/main/AGENTS.md) — module
   boundaries, conventions, gotchas. When prose and config disagree, the config wins.
-- **This wiki** documents behavior; the repository keeps what must match the code exactly
+- **The docs site** documents behavior; the repository keeps what must match the code exactly
   (commands, requirements, changelog).
 - Every user-visible string is a key in the i18n catalogs; every socket payload is a type in
-  `packages/shared`. Nothing is redefined locally — see [[Real-Time Protocol]] and
-  [[Adding a Language]] before touching either surface.
+  `packages/shared`. Nothing is redefined locally — see [Real Time Protocol](./real-time-protocol.md) and
+  [Adding a Language](./adding-a-language.md) before touching either surface.
 
 ## Contributing a change
 
@@ -56,6 +56,6 @@ baked in.
   folder, kebab-case.
 - All styling through Ant Design tokens (`theme.useToken()`); no hand-rolled CSS, and colour
   contrast must clear WCAG AA — the e2e axe gate asserts it on every layout change (see
-  [[Testing Strategy]]).
+  [Testing Strategy](./testing-strategy.md)).
 - Real-time code keeps business logic out of socket listeners; thin forwarding is the only
   exception.

@@ -48,9 +48,9 @@ fails. Any layout or colour change needs the full e2e suite.
   the process-level suites never see.
 
 Both, plus the automated inventory, the exploratory charters and the ideal-behaviour
-[`docs/test-plan.md`](https://github.com/brunoanhaia/planning-poker/blob/main/docs/test-plan.md),
+[`docs/test-plan.md`](./test-plan.md),
 are part of the release gate: the
-[regression playbook](https://github.com/brunoanhaia/planning-poker/blob/main/docs/regression-playbook.md)
+[regression playbook](./regression-playbook.md)
 records when it was last executed and what it proved.
 
 ## Conventions enforced here too

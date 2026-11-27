@@ -12,11 +12,10 @@ reporter carries its structure by hand. Do not ask for permission; follow the fo
 
 ## Procedure
 
-1. **Check the wiki before filing.** Open the wiki page that owns the behavior and its
+1. **Check the docs before filing.** Open the docs page that owns the behavior and its
    `Last verified` commit: a documented sharp edge is not a defect, and behavior that
    contradicts a page is reported **with the page cited as the expected result**. If no
-   page documents the expected behavior, say so in the report — that is a second defect,
-   in the documentation.
+   page documents the expected behavior, say so in the report — that is a second defect, in the documentation. The docs live in `docs/` in this repository — cite the page by path.
 2. **Reproduce before filing.** Deterministic steps from a clean room; a defect that only
    sometimes happens is reported with its flakiness rate, not hidden. The repo's Playwright
    Chromium plus a scripted `ws` client (see `apps/e2e/chaos/ws-chaos.mjs`) reproduce both
@@ -35,6 +34,4 @@ reporter carries its structure by hand. Do not ask for permission; follow the fo
 5. **Report only.** Filing the issue is the whole task: no code changes, no fixes in the
    same change. The `Fix direction` section is a suggestion for whoever picks it up, and the
    `Regression` section names the test that should fail before the fix and pass after it.
-6. **When the fix lands** — by whoever picks the issue up — the `update-wiki` rule moves
-   the cited page and its verification stamp; the issue's `Expected result` is the contract
-   for that update.
+6. **When the fix lands** — by whoever picks the issue up — the `update-wiki` rule (the docs rule, despite its file name) moves the cited page and its verification stamp; the issue's `Expected result` is the contract for that update.

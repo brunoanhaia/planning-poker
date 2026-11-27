@@ -44,5 +44,5 @@ are deliberately separate.
 
 Nothing to do: the banner names the state (reconnecting, offline, or waking a sleeping server — with a retry once it answers), the browser retries every 2 seconds and re-presents the session token, which
 rebinds your existing participant with the same seat and role. If you were the host, note
-that the host role moves on disconnect — see [[Roles and Permissions]]. Everything else that
-can go wrong, including the two deliberate close codes, is in [[Troubleshooting]].
+that the host role moves on disconnect — see [Roles and Permissions](./roles-and-permissions.md). Everything else that
+can go wrong, including the two deliberate close codes, is in [Troubleshooting](./troubleshooting.md).

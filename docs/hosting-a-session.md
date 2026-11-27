@@ -53,13 +53,13 @@ Two gates you control:
 
 - **Lock the room** — blocks new joins. Reconnects of existing participants still work.
 - **End the session** — closes the room for good: no new joins, no votes, and everyone gets
-  the summary (see [[Session Summary and Export]]).
+  the summary (see [Session Summary and Export](./session-summary-and-export.md)).
 
 ## Running the session
 
 Everything the host and co-hosts can do — reveal, reset, accept, timer, kick, promote,
-transfer — is in [[Roles and Permissions]]; the round mechanics and statistics are in
-[[Voting and Results]]. Two host-specific habits worth adopting:
+transfer — is in [Roles and Permissions](./roles-and-permissions.md); the round mechanics and statistics are in
+[Voting and Results](./voting-and-results.md). Two host-specific habits worth adopting:
 
 - **Appoint a co-host early.** If your connection drops, even for a moment, the host role
   moves to the next online admin and does not come back on reconnect.

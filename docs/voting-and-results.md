@@ -18,7 +18,7 @@ stateDiagram-v2
 - **Staging.** The first story to arrive in an empty backlog becomes active at once; later
   ones wait as `pending`. Adding stories never disturbs a round in progress.
 - **Voting.** Voters pick a card; only the value is secret until reveal (see
-  [[Roles and Permissions]] for who sees what). A revealed round is closed — the server
+  [Roles and Permissions](./roles-and-permissions.md) for who sees what). A revealed round is closed — the server
   refuses further votes on it.
 - **Reveal.** Records the round: each card as it stood, the voter's name at that time, and
   the timestamp. Auto-reveal does the same thing without a click, the moment every online

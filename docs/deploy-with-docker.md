@@ -49,7 +49,7 @@ graph LR
 
 Same-origin is the recommended shape: no CORS, no origin allowlist to maintain, and the
 WebSocket path is the `/ws` Nginx owns. The external-backend shape exists for split hosting —
-see [[Hosted Test Deployment]].
+see [Hosted Test Deployment](./hosted-test-deployment.md).
 
 ## Individual images
 
@@ -60,5 +60,5 @@ docker build -f apps/client/Dockerfile --build-arg VITE_WS_URL=wss://api.example
 ```
 
 Both images run as non-root users and carry their own `HEALTHCHECK` on `/api/health`.
-Remember the operational model of this stack on [[Operations Runbook]]: room state is
+Remember the operational model of this stack on [Operations Runbook](./operations-runbook.md): room state is
 in-memory and a restart is a reset.

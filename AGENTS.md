@@ -88,27 +88,26 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.
 
-## Wiki
+## Documentation site
 
-Behavior documentation lives in the
-[GitHub Wiki](https://github.com/brunoanhaia/planning-poker/wiki) and **the wiki is the
-source of truth for behavior** — features, roles, flows, limits, security, deployment. The
-repository keeps only what must match the code exactly: commands (`TOOLS.md`), the numbered
-requirements (`requirements.md`), the changelog and these agent rules.
+Behavior documentation lives in `docs/` and **is the source of truth for behavior** —
+features, roles, flows, limits, security, deployment. The site (VitePress) is built from the
+same pages on merge and published to GitHub Pages; there is no external wiki and nothing is
+published by hand. The repository keeps only what must match the code exactly: commands
+(`TOOLS.md`), the numbered requirements (`requirements.md`), the changelog and these agent
+rules.
 
 - The **README is a landing page** — quick start and links. Do not grow behavior prose back
   into it; that recreates the duplication this layout removed.
-- **A behavior change is incomplete without its wiki update.** When a change alters
+- **A behavior change is incomplete without its docs update.** When a change alters
   observable behavior — a role rule, a limit, a flow, an `ErrorCode`, a close code, a
-  deployment setting — update the matching page(s) in `wiki/`, re-verify every claim the page
+  deployment setting — update the matching page(s) in `docs/`, re-verify every claim the page
   makes, and move its `Last verified: <date> against commit <hash>` stamp to the new commit.
   The `update-wiki` rule under `.agents/rules/` applies to every session.
-- Pages are authored in `wiki/` at the root, a staging copy of the wiki repository, reviewed
-  here and then pushed to the `planning-poker.wiki.git` remote.
-- [`wiki/README.md`](./wiki/README.md) holds the publishing commands and the editorial rules;
-  it is the one file that never leaves the repository.
-- The wiki is public: describe abuse controls, never their exact calibration.
-- A wiki page whose claims no longer match the code is a bug in the wiki — fix the page, do
+- Pages are ordinary repository files: they travel through pull requests, Prettier and the
+  analyzers like any other change, and merging to `main` publishes them.
+- The site is public: describe abuse controls, never their exact calibration.
+- A docs page whose claims no longer match the code is a bug in the docs — fix the page, do
   not fork the truth into the README.
 
 ## Environment Variables
@@ -271,10 +270,10 @@ Version alignment matters: `ant-design` targets antd 6.x and React 18–19, `vit
 OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. The root `opencode.jsonc` loads them through its `instructions` setting (`[".agents/rules/*.md"]`), and the same mechanism works for any editor that reads that file.
 Read and follow these rule files when their conditions apply:
 
-- [`.agents/rules/update-wiki.md`](./.agents/rules/update-wiki.md) — when observable behavior changes: the wiki page and its verification stamp move with the code
+- [`.agents/rules/update-wiki.md`](./.agents/rules/update-wiki.md) — when observable behavior changes: the docs page and its verification stamp move with the code
 - [`.agents/rules/report-bugs.md`](./.agents/rules/report-bugs.md) — when filing a defect: reproduce, evidence typed by where it lives, attach natively, report only
 - [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change: the README stays a landing page
-- [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a requirement is added: requirements.md, the wiki trace row and the page move together, enforced by the `requirements-trace` workflow
+- [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a requirement is added: requirements.md, the docs trace row and the page move together, enforced by the `requirements-trace` workflow
 - [`.agents/rules/update-agents.md`](./.agents/rules/update-agents.md) — when a skill, rule, or workflow changes
 
 Only YAML frontmatter fields that tooling actually implements should be used. `trigger: model_decision` was removed as it is non-standard and silently ignored.

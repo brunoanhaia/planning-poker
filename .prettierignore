@@ -14,3 +14,7 @@ skills-lock.json
 # Dotenv template: prettier ships no `.env` parser, and its comments and ordering are the
 # documentation for the setting each variable controls.
 .env.example
+
+# The generated site: `npm run docs:build` owns its every byte, and reformatting
+# the output would make the artifact differ from what CI deploys.
+docs/.vitepress/dist/

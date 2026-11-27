@@ -2,7 +2,7 @@
 
 > **Last verified:** 2026-11-26 against commit `4dd98ef`.
 > The full penetration report — findings, reproductions, and the abuse-test measurements — is
-> [`docs/security-review.md`](https://github.com/brunoanhaia/planning-poker/blob/main/docs/security-review.md)
+> [`docs/security-review.md`](./security-review.md)
 > in the repository. This page is the model; that document is the evidence.
 
 ## The assets being protected

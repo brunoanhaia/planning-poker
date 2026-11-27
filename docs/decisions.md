@@ -18,7 +18,7 @@ works).
 **Why:** a single writer makes every invariant (hidden votes, append-only rounds, role
 transitions) trivially correct, and the product has no persistence requirement.
 **Cost:** a restart is a reset, and horizontal scaling is out until the state moves — both
-recorded honestly on [[Architecture Overview]] and [[Operations Runbook]].
+recorded honestly on [Architecture Overview](./architecture-overview.md) and [Operations Runbook](./operations-runbook.md).
 
 ## Session tokens, never a trusted `userId`
 
@@ -43,7 +43,7 @@ never looks like an oversight.
 **Decision:** a reveal records a round; resetting opens the next one instead of erasing; a
 story keeps its 10 most recent rounds.
 **Why:** re-voting exists to be compared, and the cap keeps the broadcast bounded.
-**Cost:** `MAX_ROUNDS_PER_STORY` is a shared constant — see [[Limits and Ceilings]].
+**Cost:** `MAX_ROUNDS_PER_STORY` is a shared constant — see [Limits and Ceilings](./limits-and-ceilings.md).
 
 ## Roles are two axes, not four
 
@@ -51,7 +51,7 @@ story keeps its 10 most recent rounds.
 independent flags; the host starts as a spectator.
 **Why:** moderation must not wait for participation, and admins estimating with the team is
 normal use, not an edge case. The full model — including the sharp edges this creates — is
-[[Roles and Permissions]].
+[Roles and Permissions](./roles-and-permissions.md).
 
 ## Host succession on any disconnect
 
@@ -74,14 +74,14 @@ acceptance.
 the stock palette values that fail AA contrast are overridden once, centrally, in
 `theme/app-theme.ts`.
 **Why:** one theming seam, and contrast fixes that apply everywhere instead of per page.
-**Cost:** the e2e axe gate must stay green on every layout change — [[Testing Strategy]].
+**Cost:** the e2e axe gate must stay green on every layout change — [Testing Strategy](./testing-strategy.md).
 
 ## Languages are chunks, not bundle weight
 
 **Decision:** English and Brazilian Portuguese bundle inline; every other catalog is its own
 chunk, fetched when picked; plural forms follow CLDR.
 **Why:** the initial payload must not grow with the language list, and plurals must not be
-hand-rolled per component. The recipe is [[Adding a Language]].
+hand-rolled per component. The recipe is [Adding a Language](./adding-a-language.md).
 
 ## The shared package is consumed from `dist/`
 
@@ -89,4 +89,4 @@ hand-rolled per component. The recipe is [[Adding a Language]].
 resolves the source through `paths`.
 **Why:** the runtime contract is exactly what was built, not what happens to be on disk.
 **Cost:** `npm run build:shared` after any contract change — the number-one onboarding trap,
-called out on [[Onboarding]].
+called out on [Onboarding](./onboarding.md).

@@ -3,7 +3,7 @@
 > **Last verified:** 2026-11-26 against commit `4dd98ef`.
 
 How to run a deployment day to day. Everything here assumes one of the two shapes described
-in [[Deploy with Docker]] or [[Hosted Test Deployment]].
+in [Deploy with Docker](./deploy-with-docker.md) or [Hosted Test Deployment](./hosted-test-deployment.md).
 
 ## The operational model
 
@@ -55,12 +55,12 @@ mis-shared link); `story.index.rejected` on one user is usually a stale tab.
 3. Verify `GET /api/health`, then open a room and run one vote-reveal-reset-accept cycle —
    that single cycle exercises the whole transport.
 4. Before a release, the repository's own gate applies: the regression playbook
-   ([`docs/regression-playbook.md`](https://github.com/brunoanhaia/planning-poker/blob/main/docs/regression-playbook.md))
+   ([`docs/regression-playbook.md`](./regression-playbook.md))
    — automated inventory, chaos experiments, exploratory charters.
 
 ## The limits an operator gets asked about
 
-All of them are in [[Limits and Ceilings]]. The three that generate support tickets: the
+All of them are in [Limits and Ceilings](./limits-and-ceilings.md). The three that generate support tickets: the
 100-participant room cap (`ROOM_FULL`), the 24-hour idle drop ("my room disappeared"), and
 the free-tier spin-down on the hosted stack ("the site is up but nothing connects" — wait a
 minute for the wake).

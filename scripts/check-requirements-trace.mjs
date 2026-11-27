@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Fails when requirements.md holds a numbered requirement the wiki trace does
+// Fails when requirements.md holds a numbered requirement the docs trace does
 // not map — and when the trace carries a number no requirement backs. This is
 // the mechanical half of the update-requirements rule; the prose half lives in
 // .agents/rules/update-requirements.md.
 //
-// Usage: node scripts/check-requirements-trace.mjs [requirements.md] ["wiki/Requirements Trace.md"]
+// Usage: node scripts/check-requirements-trace.mjs [requirements.md] ["docs/requirements-trace.md"]
 import { readFileSync } from 'node:fs';
 
-const [requirementsPath = 'requirements.md', tracePath = 'wiki/Requirements Trace.md'] =
+const [requirementsPath = 'requirements.md', tracePath = 'docs/requirements-trace.md'] =
     process.argv.slice(2);
 
 /** Splits a markdown file into `## ` sections keyed by normalized heading text. */

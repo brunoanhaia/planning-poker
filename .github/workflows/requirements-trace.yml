@@ -1,20 +1,20 @@
 # The mechanical half of the update-requirements rule: a pull request whose
 # requirements.md holds a numbered requirement without a matching row in the
-# wiki trace fails here. The prose half lives in
-# .agents/rules/update-requirements.md, and the wiki page itself is
-# wiki/Requirements Trace.md in the staging folder.
+# docs trace fails here. The prose half lives in
+# .agents/rules/update-requirements.md, and the trace page itself is
+# docs/requirements-trace.md.
 name: Requirements trace
 
 on:
     pull_request:
         paths:
             - 'requirements.md'
-            - 'wiki/Requirements Trace.md'
+            - 'docs/requirements-trace.md'
     push:
         branches: [main]
         paths:
             - 'requirements.md'
-            - 'wiki/Requirements Trace.md'
+            - 'docs/requirements-trace.md'
 
 permissions:
     contents: read

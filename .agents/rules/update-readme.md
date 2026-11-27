@@ -1,6 +1,6 @@
 ---
 name: update-readme
-description: Keep README.md accurate as a landing page after significant code changes; behavior prose belongs in the wiki.
+description: Keep README.md accurate as a landing page after significant code changes; behavior prose belongs in the docs site.
 ---
 
 # Update README Rule
@@ -10,6 +10,5 @@ description: Keep README.md accurate as a landing page after significant code ch
 "where everything lives" links. Do not ask the user for permission; include the check in your
 final execution steps.
 
-Behavior documentation goes to the wiki under the `update-wiki` rule, **not** back into the
-README. The README is a landing page: it keeps the quick start and the links, and growing
+Behavior documentation goes to `docs/` under the `update-wiki` rule, **not** back into the README. The README is a landing page: it keeps the quick start and the links, and growing
 feature prose back into it recreates the duplication this repository deliberately removed.
