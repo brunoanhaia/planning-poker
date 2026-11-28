@@ -57,7 +57,7 @@ do.
 | Toggle another participant's role     |              ✅              |   ✅    |     —     |
 | Promote / demote a co-host            |              ✅              |   ✅    |     —     |
 | Kick a participant                    |              ✅              |   ✅¹   |     —     |
-| Clear the offline (left) rows         | admins (see Troubleshooting) |
+| Clear the offline (left) rows | ✅ | ✅ | — |
 | **Transfer the primary host**         |              ✅              |  **—**  |     —     |
 
 ¹ Never the primary host: a kick targeting the current host is refused by the server, no

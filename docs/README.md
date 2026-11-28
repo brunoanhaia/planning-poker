@@ -33,7 +33,7 @@ Every functional and non-functional requirement maps to a page: [Requirements Tr
   against. If a page and the code disagree, the code wins and the page gets fixed.
 - **One source, two audiences.** The pages live in `docs/` and travel through pull requests
   like any other change. Agents read them straight from the tree; people read the same
-  pages rendered at https://brunoanhaia.github.io/planning-poker/ — built on merge, never
+  pages rendered at <https://brunoanhaia.github.io/planning-poker/> — built on merge, never
   edited there.
 - **The repository keeps what must match the code exactly** — build and test commands, agent
   rules, requirements, changelog. The pages link there instead of copying.
