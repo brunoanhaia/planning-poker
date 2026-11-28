@@ -37,6 +37,11 @@ jobs:
                   # A moderate-or-worse advisory blocks the pull request; the comment
                   # above still reports everything, so reviewers see the full picture.
                   fail-on-severity: moderate
+                  # The scorecard lists every transitive package without a perfect
+                  # OpenSSF score. Here that is the documentation site's build tooling —
+                  # dev dependencies that never ship — so the section buries the two
+                  # checks that matter. Licenses and vulnerabilities stay on.
+                  show-openssf-scorecard: false
           # The scorecard lists every transitive package without a perfect
           # OpenSSF score. Here that is the documentation site's build tooling —
           # dev dependencies that never ship — so the section buries the two
