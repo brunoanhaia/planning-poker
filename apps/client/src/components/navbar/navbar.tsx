@@ -5,23 +5,12 @@ import {
     LogoutOutlined,
     SettingOutlined,
 } from '@ant-design/icons';
-import {
-    Avatar,
-    Button,
-    Flex,
-    Input,
-    Modal,
-    Space,
-    Switch,
-    Tag,
-    theme,
-    Tooltip,
-    Typography,
-} from 'antd';
+import { Button, Flex, Input, Modal, Space, Switch, Tag, theme, Tooltip, Typography } from 'antd';
 import React from 'react';
 
 import { useTranslation } from '../../i18n/use-translation';
 import { ColorMode } from '../../theme/app-theme';
+import { BrandLogo } from '../brand-logo/brand-logo';
 import { LanguageSwitcher } from '../language-switcher/language-switcher';
 import { useNavbar } from './navbar.hooks';
 
@@ -95,7 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                 wrap
             >
                 <Space align="center" size={8}>
-                    <Avatar size={36}>🃏</Avatar>
+                    <BrandLogo size={36} />
                     <Flex vertical>
                         <Typography.Text strong>{t('app.brand')}</Typography.Text>
                         {roomState && (
