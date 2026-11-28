@@ -136,5 +136,13 @@ codacy patterns <provider> <org> <repo> <toolName>    # per-pattern state and pa
 ```
 
 - Re-analysis happens on push, so `codacy issues` shows the last analysed commit, not local edits.
-- GitHub Actions runs CodeQL, dependency review, conventional commits, the release workflow, the skills-lock check, the requirements-trace check and the docs-site Pages deploy (`.github/workflows/`); no workflow calls the `gh` CLI.
+- GitHub Actions runs these repository workflows (`.github/workflows/`):
+    - CodeQL analysis
+    - dependency review
+    - conventional-commit validation
+    - the release
+    - the skills-lock check
+    - the requirements-trace check
+    - the docs-site Pages deploy
+- No workflow calls the `gh` CLI.
 - Once the branch is pushed, `codacy pull-request <number>` shows its analysis.

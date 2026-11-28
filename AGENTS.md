@@ -93,7 +93,7 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
 Behavior documentation lives in `docs/` and **is the source of truth for behavior** —
 features, roles, flows, limits, security, deployment. The pages are plain repository files:
 agents read them straight from the tree, and a VitePress site renders the same pages for
-human readers — built on merge, never edited by hand, never a second source. The repository keeps only what must match the code exactly: commands
+human readers — built on merge and regenerated from these pages on every deploy. The repository keeps only what has to match the code exactly: commands
 (`TOOLS.md`), the numbered requirements (`requirements.md`), the changelog and these agent
 rules.
 
@@ -107,7 +107,7 @@ rules.
 - Pages are ordinary repository files: they travel through pull requests, Prettier and the
   analyzers like any other change. A new page is linked from `docs/README.md`, the folder
   index.
-- The docs are public: describe abuse controls, never their exact calibration.
+- The docs are public: describe abuse controls rather than their exact calibration — the exception is a value `requirements.md` already publishes.
 - A docs page whose claims no longer match the code is a bug in the docs — fix the page, do
   not fork the truth into the README.
 - The site is read-only by construction: it has no content of its own, so an edit made there
