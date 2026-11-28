@@ -83,10 +83,15 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                 }}
                 wrap
             >
-                <Space align="center" size={8}>
+                <Flex align="flex-start" gap={8}>
                     <BrandLogo size={36} />
                     <Flex vertical>
-                        <Typography.Text strong>{t('app.brand')}</Typography.Text>
+                        {/* The brand line is exactly as tall as the mark, so the
+                            text is centred against the icon; the room title
+                            stays on its own line underneath. */}
+                        <Flex align="center" style={{ minHeight: 36 }}>
+                            <Typography.Text strong>{t('app.brand')}</Typography.Text>
+                        </Flex>
                         {roomState && (
                             <Space align="center" size={4}>
                                 <Typography.Text
@@ -110,7 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({ colorMode, onOpenSettings, onTog
                             </Space>
                         )}
                     </Flex>
-                </Space>
+                </Flex>
 
                 {roomState && (
                     <Flex align="center" gap={8} wrap>
