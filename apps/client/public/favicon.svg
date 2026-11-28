@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <!-- Brand primary matches PRIMARY_COLOR in src/theme/app-theme.ts. -->
+    <rect width="64" height="64" rx="16" fill="#1668dc" />
+    <g transform="rotate(-8 32 32)">
+        <rect x="17" y="11" width="30" height="42" rx="6" fill="#ffffff" />
+        <path
+            d="M24 33l6 6 11-13"
+            fill="none"
+            stroke="#1668dc"
+            stroke-width="6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+        />
+    </g>
+</svg>
