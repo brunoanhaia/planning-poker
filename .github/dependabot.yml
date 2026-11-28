@@ -1,0 +1,35 @@
+# Dependabot keeps the tree fresh — including the transitive packages behind
+# the docs site's tooling, which no one updates by hand. Minor and patch
+# versions arrive grouped in one pull request; majors stay separate because
+# this repository pins some deliberately (TypeScript 6.x, ESLint 10, antd 6)
+# and each one needs a human decision. Every pull request passes the same
+# dependency review and CI gates as a hand-written change.
+version: 2
+updates:
+    - package-ecosystem: npm
+      directory: '/'
+      schedule:
+          interval: weekly
+          day: monday
+      open-pull-requests-limit: 5
+      labels:
+          - dependencies
+      commit-message:
+          prefix: chore
+          include: scope
+      groups:
+          minor-and-patch:
+              patterns:
+                  - '*'
+              update-types:
+                  - minor
+                  - patch
+    - package-ecosystem: github-actions
+      directory: '/'
+      schedule:
+          interval: monthly
+      labels:
+          - dependencies
+      commit-message:
+          prefix: chore
+          include: scope
