@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0](https://github.com/brunoanhaia/planning-poker/compare/v1.2.0...v1.3.0) (2026-11-28)
+
+
+### Features
+
+* **client:** replace the emoji app mark with a card logo ([#95](https://github.com/brunoanhaia/planning-poker/issues/95)) ([5fa6ad4](https://github.com/brunoanhaia/planning-poker/commit/5fa6ad404b961f015e87f8046990b7b3c3f50963))
+* preflight remembered rooms before the lobby offers them ([#84](https://github.com/brunoanhaia/planning-poker/issues/84)) ([a4330df](https://github.com/brunoanhaia/planning-poker/commit/a4330df3672fd3ed81596891c6d8e2bd1537741d))
+* queue room entry through the connection lifecycle ([#83](https://github.com/brunoanhaia/planning-poker/issues/83)) ([4dd98ef](https://github.com/brunoanhaia/planning-poker/commit/4dd98ef0c1a2c7074c28d37b5ace62f3f13d9cb3))
+
+
+### Bug Fixes
+
+* resolve triage batch for sessions, presence and client polish ([#79](https://github.com/brunoanhaia/planning-poker/issues/79)) ([57ea625](https://github.com/brunoanhaia/planning-poker/commit/57ea62583536222e36867562ebc9961972b3cb77))
+
 ## [1.2.0](https://github.com/brunoanhaia/planning-poker/compare/v1.1.0...v1.2.0) (2026-11-04)
 
 
