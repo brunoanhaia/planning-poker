@@ -1,6 +1,6 @@
 # Joining a Session
 
-> **Last verified:** 2026-11-26 against commit `4dd98ef`.
+> **Last verified:** 2026-11-26 against commit `a4330df`.
 
 ## Getting in
 
@@ -18,6 +18,7 @@ enters as a **voter**.
 - The server issues a **session token** bound to your participant, stored per tab and per
   room. Reopening the same room in the same browser rebinds the same participant — you keep
   your seat, your role and your revealed history instead of appearing twice in the roster.
+- **A remembered room is checked first.** Before offering to return to a room from a previous visit, the client asks the server whether it still exists — a check that seats nobody and changes nothing. A room the server has forgotten is dropped with its tokens, silently: no switch dialog for a session that is gone. If the check times out, the client keeps the session and falls back to the join path, which clears a room that disappeared meanwhile; a mistyped code for a different room never clears the stored session.
 - **One browser holds one room session.** Creating or joining a different room while one is
   active opens a confirmation: go back to the existing room, or end it and continue with the
   new one.

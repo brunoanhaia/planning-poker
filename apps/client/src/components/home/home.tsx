@@ -31,7 +31,7 @@ const readRoomCodeFromHash = (): string => {
  * shared by both flows, and only the second step changes with the active tab.
  */
 export const Home: React.FC = () => {
-    const { createRoom, joinRoom, error, clearError, pendingEntry } = useSocket();
+    const { createRoom, joinRoom, error, clearError, pendingEntry, storedRoomStatus } = useSocket();
     const { t } = useTranslation();
     const { token } = theme.useToken();
 
@@ -53,6 +53,7 @@ export const Home: React.FC = () => {
     }>(null);
 
     const hasDisplayName = displayName.trim().length > 0;
+    const isCheckingStoredRoom = storedRoomStatus === 'checking';
 
     const persistProfile = () => {
         localStorage.setItem(NAME_STORAGE_KEY, displayName);
@@ -78,7 +79,7 @@ export const Home: React.FC = () => {
     };
 
     const handleCreate = (title: string, deckType: DeckType, customDeck?: (number | string)[]) => {
-        if (!hasDisplayName) {
+        if (!hasDisplayName || isCheckingStoredRoom) {
             return;
         }
         persistProfile();
@@ -88,7 +89,7 @@ export const Home: React.FC = () => {
     };
 
     const handleJoin = (roomCode: string) => {
-        if (!hasDisplayName) {
+        if (!hasDisplayName || isCheckingStoredRoom) {
             return;
         }
         persistProfile();
@@ -156,7 +157,10 @@ export const Home: React.FC = () => {
                                         children: (
                                             <CreateSessionForm
                                                 disabled={!hasDisplayName}
-                                                loading={pendingEntry === 'create'}
+                                                loading={
+                                                    isCheckingStoredRoom ||
+                                                    pendingEntry === 'create'
+                                                }
                                                 onSubmit={handleCreate}
                                             />
                                         ),
@@ -167,7 +171,9 @@ export const Home: React.FC = () => {
                                         children: (
                                             <JoinSessionForm
                                                 initialRoomCode={roomCodeFromHash}
-                                                loading={pendingEntry === 'join'}
+                                                loading={
+                                                    isCheckingStoredRoom || pendingEntry === 'join'
+                                                }
                                                 onSubmit={handleJoin}
                                             />
                                         ),

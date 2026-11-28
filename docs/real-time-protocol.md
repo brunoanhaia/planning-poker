@@ -1,6 +1,6 @@
 # Real-Time Protocol
 
-> **Last verified:** 2026-11-26 against commit `4dd98ef`.
+> **Last verified:** 2026-11-26 against commit `a4330df`.
 > The authoritative definition of every type and payload is
 > [`packages/shared/src/index.ts`](https://github.com/brunoanhaia/planning-poker/blob/main/packages/shared/src/index.ts);
 > this page explains how they behave on the wire.
@@ -37,41 +37,43 @@ index is answered as `INVALID_STORY_INDEX` before any permission check.
 
 ## Client → server
 
-| Type                         | Payload                                                                   | Who may send                                      |
-| ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------- |
-| `CREATE_ROOM`                | name, avatar?, color?, title?, deckType?, customDeck?, previousRoomToken? | anyone — the token of the room being left ends it |
-| `JOIN_ROOM`                  | roomId, name, avatar?, color?, sessionToken?, userId?, previousRoomToken? | anyone — the token rebinds the same participant   |
-| `VOTE`                       | vote                                                                      | non-spectators                                    |
-| `REVEAL_VOTES`               | —                                                                         | admins                                            |
-| `RESET_VOTES`                | —                                                                         | admins                                            |
-| `ADD_STORY`                  | title, description?                                                       | admins                                            |
-| `BULK_ADD_STORIES`           | stories[]                                                                 | admins (sent in frame-sized batches)              |
-| `SET_CURRENT_STORY`          | storyIndex                                                                | admins                                            |
-| `UPDATE_STORY_ESTIMATE`      | storyId, estimate (null clears and reopens)                               | admins                                            |
-| `DELETE_STORY`               | storyId                                                                   | admins                                            |
-| `CHANGE_DECK`                | deckType, customDeck?                                                     | admins                                            |
-| `TOGGLE_SPECTATOR`           | —                                                                         | anyone (self)                                     |
-| `TOGGLE_USER_ROLE`           | targetUserId                                                              | admins (other's voter/spectator)                  |
-| `PROMOTE_COADMIN`            | targetUserId                                                              | admins (promote or demote)                        |
-| `TRANSFER_ADMIN`             | targetUserId                                                              | **host only**                                     |
-| `KICK_PARTICIPANT`           | targetUserId                                                              | admins (never the host)                           |
-| `CLEAR_OFFLINE_PARTICIPANTS` | —                                                                         | admins (removes the offline rows)                 |
-| `UPDATE_ROOM_TITLE`          | title                                                                     | admins                                            |
-| `TOGGLE_LOCK_ROOM`           | —                                                                         | admins                                            |
-| `TOGGLE_AUTO_REVEAL`         | —                                                                         | admins                                            |
-| `START_TIMER`                | duration? (5–3600 s, default 60)                                          | admins                                            |
-| `PAUSE_TIMER`                | —                                                                         | admins (also resumes)                             |
-| `RESET_TIMER`                | —                                                                         | admins                                            |
-| `END_SESSION`                | —                                                                         | admins                                            |
+| Type                         | Payload                                                                   | Who may send                                                         |
+| ---------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `CREATE_ROOM`                | name, avatar?, color?, title?, deckType?, customDeck?, previousRoomToken? | anyone — the token of the room being left ends it                    |
+| `JOIN_ROOM`                  | roomId, name, avatar?, color?, sessionToken?, userId?, previousRoomToken? | anyone — the token rebinds the same participant                      |
+| `CHECK_ROOM`                 | roomId                                                                    | anyone — the stored-room preflight; seats nobody and changes nothing |
+| `VOTE`                       | vote                                                                      | non-spectators                                                       |
+| `REVEAL_VOTES`               | —                                                                         | admins                                                               |
+| `RESET_VOTES`                | —                                                                         | admins                                                               |
+| `ADD_STORY`                  | title, description?                                                       | admins                                                               |
+| `BULK_ADD_STORIES`           | stories[]                                                                 | admins (sent in frame-sized batches)                                 |
+| `SET_CURRENT_STORY`          | storyIndex                                                                | admins                                                               |
+| `UPDATE_STORY_ESTIMATE`      | storyId, estimate (null clears and reopens)                               | admins                                                               |
+| `DELETE_STORY`               | storyId                                                                   | admins                                                               |
+| `CHANGE_DECK`                | deckType, customDeck?                                                     | admins                                                               |
+| `TOGGLE_SPECTATOR`           | —                                                                         | anyone (self)                                                        |
+| `TOGGLE_USER_ROLE`           | targetUserId                                                              | admins (other's voter/spectator)                                     |
+| `PROMOTE_COADMIN`            | targetUserId                                                              | admins (promote or demote)                                           |
+| `TRANSFER_ADMIN`             | targetUserId                                                              | **host only**                                                        |
+| `KICK_PARTICIPANT`           | targetUserId                                                              | admins (never the host)                                              |
+| `CLEAR_OFFLINE_PARTICIPANTS` | —                                                                         | admins (removes the offline rows)                                    |
+| `UPDATE_ROOM_TITLE`          | title                                                                     | admins                                                               |
+| `TOGGLE_LOCK_ROOM`           | —                                                                         | admins                                                               |
+| `TOGGLE_AUTO_REVEAL`         | —                                                                         | admins                                                               |
+| `START_TIMER`                | duration? (5–3600 s, default 60)                                          | admins                                                               |
+| `PAUSE_TIMER`                | —                                                                         | admins (also resumes)                                                |
+| `RESET_TIMER`                | —                                                                         | admins                                                               |
+| `END_SESSION`                | —                                                                         | admins                                                               |
 
 ## Server → client
 
-| Type         | Payload                  | When                                                           |
-| ------------ | ------------------------ | -------------------------------------------------------------- |
-| `SESSION`    | sessionToken, userId     | After create/join: the token that proves this participant      |
-| `ROOM_STATE` | roomState, currentUserId | After every accepted change — **sanitized per recipient**      |
-| `KICKED`     | message                  | A kick: the client drops its token and shows the notice        |
-| `ERROR`      | code?, message           | Any refusal; the code is the contract, the message is for logs |
+| Type          | Payload                  | When                                                           |
+| ------------- | ------------------------ | -------------------------------------------------------------- |
+| `SESSION`     | sessionToken, userId     | After create/join: the token that proves this participant      |
+| `ROOM_STATE`  | roomState, currentUserId | After every accepted change — **sanitized per recipient**      |
+| `ROOM_STATUS` | exists, roomId           | the answer to `CHECK_ROOM`                                     |
+| `KICKED`      | message                  | A kick: the client drops its token and shows the notice        |
+| `ERROR`       | code?, message           | Any refusal; the code is the contract, the message is for logs |
 
 There is no acknowledgment protocol: a successful action is answered by the broadcast, a
 failed one by an `ERROR`. The client keeps no local room state to reconcile — it renders the

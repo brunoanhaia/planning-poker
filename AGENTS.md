@@ -153,6 +153,7 @@ Project conventions previously in GEMINI.md:
 - Real-time: never put core business logic inside socket event listeners. Thin wiring that only forwards a payload is the exception.
 - Accessibility: WAI-ARIA compliant (WAI: Web Accessibility Initiative; ARIA: Accessible Rich Internet Applications), keyboard navigable.
 - Responsive: support 320px to 4K without horizontal scrolling, clipping, or overlaps.
+- **Visual changes need screenshots**: a pull request that changes a visible screen must include before/after screenshots in its description, uploaded through GitHub's native attachment endpoint. Never commit images to the repository.
 
 ## Styling (Ant Design only)
 

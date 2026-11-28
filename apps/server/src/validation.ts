@@ -75,6 +75,11 @@ const joinRoomSchema = z.object({
     userId: z.string().trim().min(1).optional().nullable(),
 });
 
+/** Lobby preflight: only the room code, nothing that could create a session. */
+const checkRoomSchema = z.object({
+    roomId: z.string().trim().min(1).max(MAX_NAME_LENGTH),
+});
+
 const voteSchema = z.object({
     vote: cardValueSchema,
 });
@@ -135,6 +140,7 @@ export const MESSAGE_SCHEMAS: Partial<Record<WSMessageType, z.ZodType>> = {
     ADD_STORY: addStorySchema,
     BULK_ADD_STORIES: bulkAddStoriesSchema,
     CHANGE_DECK: changeDeckSchema,
+    CHECK_ROOM: checkRoomSchema,
     CREATE_ROOM: createRoomSchema,
     DELETE_STORY: deleteStorySchema,
     JOIN_ROOM: joinRoomSchema,
