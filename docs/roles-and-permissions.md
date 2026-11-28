@@ -41,24 +41,24 @@ The server applies one rule to every moderation action: it is allowed for the **
 co-host**. The single exception is transferring the primary host role, which only the host can
 do.
 
-| Action                                |             Host             | Co-host | Non-admin |
-| ------------------------------------- | :--------------------------: | :-----: | :-------: |
-| Rename the room                       |              ✅              |   ✅    |     —     |
-| Lock / unlock the room (blocks joins) |              ✅              |   ✅    |     —     |
-| Toggle auto-reveal                    |              ✅              |   ✅    |     —     |
-| Start / pause / reset the timer       |              ✅              |   ✅    |     —     |
-| Reveal votes                          |              ✅              |   ✅    |     —     |
-| Reset votes (starts a new round)      |              ✅              |   ✅    |     —     |
-| Set the active story                  |              ✅              |   ✅    |     —     |
-| Finalize / adjust a story's estimate  |              ✅              |   ✅    |     —     |
-| Add, bulk-import or delete stories    |              ✅              |   ✅    |     —     |
-| Change the estimation deck            |              ✅              |   ✅    |     —     |
-| End the session                       |              ✅              |   ✅    |     —     |
-| Toggle another participant's role     |              ✅              |   ✅    |     —     |
-| Promote / demote a co-host            |              ✅              |   ✅    |     —     |
-| Kick a participant                    |              ✅              |   ✅¹   |     —     |
-| Clear the offline (left) rows | ✅ | ✅ | — |
-| **Transfer the primary host**         |              ✅              |  **—**  |     —     |
+| Action                                | Host | Co-host | Non-admin |
+| ------------------------------------- | :--: | :-----: | :-------: |
+| Rename the room                       |  ✅  |   ✅    |     —     |
+| Lock / unlock the room (blocks joins) |  ✅  |   ✅    |     —     |
+| Toggle auto-reveal                    |  ✅  |   ✅    |     —     |
+| Start / pause / reset the timer       |  ✅  |   ✅    |     —     |
+| Reveal votes                          |  ✅  |   ✅    |     —     |
+| Reset votes (starts a new round)      |  ✅  |   ✅    |     —     |
+| Set the active story                  |  ✅  |   ✅    |     —     |
+| Finalize / adjust a story's estimate  |  ✅  |   ✅    |     —     |
+| Add, bulk-import or delete stories    |  ✅  |   ✅    |     —     |
+| Change the estimation deck            |  ✅  |   ✅    |     —     |
+| End the session                       |  ✅  |   ✅    |     —     |
+| Toggle another participant's role     |  ✅  |   ✅    |     —     |
+| Promote / demote a co-host            |  ✅  |   ✅    |     —     |
+| Kick a participant                    |  ✅  |   ✅¹   |     —     |
+| Clear the offline (left) rows         |  ✅  |   ✅    |     —     |
+| **Transfer the primary host**         |  ✅  |  **—**  |     —     |
 
 ¹ Never the primary host: a kick targeting the current host is refused by the server, no
 matter who orders it.

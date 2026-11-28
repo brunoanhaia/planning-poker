@@ -47,7 +47,7 @@ index is answered as `INVALID_STORY_INDEX` before any permission check.
 | `ADD_STORY`                  | title, description?                                                       | admins                                            |
 | `BULK_ADD_STORIES`           | stories[]                                                                 | admins (sent in frame-sized batches)              |
 | `SET_CURRENT_STORY`          | storyIndex                                                                | admins                                            |
-| `UPDATE_STORY_ESTIMATE` | storyId, estimate (null clears and reopens) | admins |
+| `UPDATE_STORY_ESTIMATE`      | storyId, estimate (null clears and reopens)                               | admins                                            |
 | `DELETE_STORY`               | storyId                                                                   | admins                                            |
 | `CHANGE_DECK`                | deckType, customDeck?                                                     | admins                                            |
 | `TOGGLE_SPECTATOR`           | —                                                                         | anyone (self)                                     |
@@ -93,7 +93,7 @@ last `ROOM_STATE` it received.
 | `ROOM_LIMIT_REACHED`  | The server holds its room cap                                                                                                 |
 | `ROOM_LOCKED`         | The host locked the room                                                                                                      |
 | `ROOM_NOT_FOUND`      | The code matches no live room                                                                                                 |
-| `SESSION_ENDED` | The session is closed and **read-only**: no joins, votes or content changes — the 14 mutating types answer this after the end |
+| `SESSION_ENDED`       | The session is closed and **read-only**: no joins, votes or content changes — the 14 mutating types answer this after the end |
 | `STORY_LIMIT_REACHED` | The backlog holds its quota                                                                                                   |
 | `UNKNOWN_ACTION`      | No handler owns this type                                                                                                     |
 | `VOTES_REVEALED`      | The round is public — reset before voting again                                                                               |
