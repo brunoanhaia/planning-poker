@@ -24,6 +24,7 @@ permissions:
     pull-requests: write
 
 jobs:
+<<<<<<< Updated upstream
     dependency-review:
         runs-on: ubuntu-latest
         steps:
@@ -40,3 +41,26 @@ jobs:
               #   fail-on-severity: moderate
               #   deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later
               #   retry-on-snapshot-warnings: true
+=======
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v7
+      - name: 'Dependency Review'
+        uses: actions/dependency-review-action@v5
+        # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
+        with:
+          comment-summary-in-pr: always
+          # A moderate-or-worse advisory blocks the pull request; the comment
+          # above still reports everything, so reviewers see the full picture.
+          fail-on-severity: moderate
+          # The scorecard lists every transitive package without a perfect
+          # OpenSSF score. Here that is the documentation site's build tooling —
+          # dev dependencies that never ship — so the section buries the two
+          # checks that matter. Licenses and vulnerabilities stay on.
+          show-openssf-scorecard: false
+        #   fail-on-severity: moderate
+        #   deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later
+        #   retry-on-snapshot-warnings: true
+>>>>>>> Stashed changes
