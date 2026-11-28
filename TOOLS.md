@@ -26,6 +26,9 @@ Run these from the repo root. The `dev`, `build`, `test` and `test:*` entries sh
 | `npm run lint:fix`     | `eslint . --fix` across the monorepo                           |
 | `npm run format`       | Prettier over `**/*.{ts,tsx,js,jsx,json,css,md}`               |
 | `npm run lint:commits` | `commitlint --from origin/main`                                |
+| `npm run trace:check`  | fails when a numbered requirement has no docs trace row        |
+| `npm run docs:dev`     | the human rendering of `docs/` locally (VitePress)             |
+| `npm run docs:build`   | the Pages artifact into `docs/.vitepress/dist`                 |
 | `npm run prepare`      | the Husky commit-msg hook installed                            |
 
 ## Package Scripts
@@ -133,5 +136,13 @@ codacy patterns <provider> <org> <repo> <toolName>    # per-pattern state and pa
 ```
 
 - Re-analysis happens on push, so `codacy issues` shows the last analysed commit, not local edits.
-- GitHub Actions runs CodeQL, dependency review, conventional commits, the release workflow and the skills-lock check (`.github/workflows/`); no workflow calls the `gh` CLI.
+- GitHub Actions runs these repository workflows (`.github/workflows/`):
+    - CodeQL analysis
+    - dependency review
+    - conventional-commit validation
+    - the release
+    - the skills-lock check
+    - the requirements-trace check
+    - the docs-site Pages deploy
+- No workflow calls the `gh` CLI.
 - Once the branch is pushed, `codacy pull-request <number>` shows its analysis.

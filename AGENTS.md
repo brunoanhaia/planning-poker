@@ -88,6 +88,31 @@ The type list comes from `@commitlint/config-conventional`: `build`, `chore`, `c
     - A rename of behaviour that is not user-visible stays out of the changelog on purpose.
 - `CHANGELOG.md` is listed in `.prettierignore`, so `npm run format` must leave generated markup alone; regenerating the file is the only exception.
 
+## Documentation
+
+Behavior documentation lives in `docs/` and **is the source of truth for behavior** —
+features, roles, flows, limits, security, deployment. The pages are plain repository files:
+agents read them straight from the tree, and a VitePress site renders the same pages for
+human readers — built on merge and regenerated from these pages on every deploy. The repository keeps only what has to match the code exactly: commands
+(`TOOLS.md`), the numbered requirements (`requirements.md`), the changelog and these agent
+rules.
+
+- The **README is a landing page** — quick start and links. Do not grow behavior prose back
+  into it; that recreates the duplication this layout removed.
+- **A behavior change is incomplete without its docs update.** When a change alters
+  observable behavior — a role rule, a limit, a flow, an `ErrorCode`, a close code, a
+  deployment setting — update the matching page(s) in `docs/`, re-verify every claim the page
+  makes, and move its `Last verified: <date> against commit <hash>` stamp to the new commit.
+  The `update-wiki` rule under `.agents/rules/` applies to every session.
+- Pages are ordinary repository files: they travel through pull requests, Prettier and the
+  analyzers like any other change. A new page is linked from `docs/README.md`, the folder
+  index.
+- The docs are public: describe abuse controls rather than their exact calibration — the exception is a value `requirements.md` already publishes.
+- A docs page whose claims no longer match the code is a bug in the docs — fix the page, do
+  not fork the truth into the README.
+- The site is read-only by construction: it has no content of its own, so an edit made there
+  would be lost at the next build.
+
 ## Environment Variables
 
 - Server: `PORT` (PORT: the listening port, default `5000`), `ALLOWED_ORIGINS` (comma-separated) and `TRUST_PROXY_HOPS`.
@@ -249,8 +274,10 @@ Version alignment matters: `ant-design` targets antd 6.x and React 18–19, `vit
 OpenCode does not discover `.agents/rules/` files through frontmatter or auto-apply them. The root `opencode.jsonc` loads them through its `instructions` setting (`[".agents/rules/*.md"]`), and the same mechanism works for any editor that reads that file.
 Read and follow these rule files when their conditions apply:
 
-- [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change
-- [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a functional/non-functional requirement is added
+- [`.agents/rules/update-wiki.md`](./.agents/rules/update-wiki.md) — when observable behavior changes: the docs page and its verification stamp move with the code
+- [`.agents/rules/report-bugs.md`](./.agents/rules/report-bugs.md) — when filing a defect: reproduce, evidence typed by where it lives, attach natively, report only
+- [`.agents/rules/update-readme.md`](./.agents/rules/update-readme.md) — after a feature or architectural change: the README stays a landing page
+- [`.agents/rules/update-requirements.md`](./.agents/rules/update-requirements.md) — when a requirement is added: requirements.md, the docs trace row and the page move together, enforced by the `requirements-trace` workflow
 - [`.agents/rules/update-agents.md`](./.agents/rules/update-agents.md) — when a skill, rule, or workflow changes
 
 Only YAML frontmatter fields that tooling actually implements should be used. `trigger: model_decision` was removed as it is non-standard and silently ignored.

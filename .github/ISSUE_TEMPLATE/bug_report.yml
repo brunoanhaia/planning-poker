@@ -1,0 +1,113 @@
+name: Bug report
+description: Report a reproducible defect — behavior that does not match what the docs document
+labels: [bug]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              A bug is behavior that does not match the documented truth. Before filing,
+              check the docs page for the feature (`docs/`) and its _Last verified_ commit: what
+              looks like a bug may be a documented sharp edge, and what looks intended may
+              contradict a page that has not caught up with the code.
+
+    - type: textarea
+      id: summary
+      attributes:
+          label: Summary
+          description: One or two sentences — what is broken, for whom, since when.
+      validations:
+          required: true
+
+    - type: dropdown
+      id: severity
+      attributes:
+          label: Criticality
+          options:
+              - 'S1 — data loss, crash, security regression, or a core flow blocked with no workaround'
+              - 'S2 — a documented feature is broken; a workaround exists'
+              - 'S3 — a misleading or broken affordance, a wrong message, or a documented behavior not honored; work continues'
+              - 'S4 — cosmetic; no functional impact'
+      validations:
+          required: true
+
+    - type: textarea
+      id: environment
+      attributes:
+          label: Environment
+          description: Deployment, client (browser, OS, viewport, language), room state (roles, participants, deck), build or commit.
+      validations:
+          required: true
+
+    - type: textarea
+      id: preconditions
+      attributes:
+          label: Preconditions
+          description: The state the room must be in — include roles; many defects only reproduce as host, co-host or spectator.
+
+    - type: textarea
+      id: steps
+      attributes:
+          label: Steps to reproduce
+          description: Numbered, from a clean room, no step depending on undocumented state. If it is flaky, say the rate — a flaky bug is reported, not hidden.
+          placeholder: |
+              1.
+              2.
+      validations:
+          required: true
+
+    - type: textarea
+      id: actual
+      attributes:
+          label: Actual result and consequences
+          description: What happens, what the room is left with, who is affected. Consequences matter more than the symptom.
+      validations:
+          required: true
+
+    - type: textarea
+      id: expected
+      attributes:
+          label: Expected result
+          description: |
+              What should happen, and the document that says so — the docs page (`docs/`) that owns the behavior and/or the requirement number in requirements.md. If nothing documents it, say so: that is a second defect, in the documentation.
+      validations:
+          required: true
+
+    - type: checkboxes
+      id: evidence-type
+      attributes:
+          label: Evidence carried by this report
+          description: A report without evidence is a hypothesis, and hypotheses do not get scheduled.
+          options:
+              - label: Front-end defect — an annotated screenshot (element highlighted, one-line caption; 320 px too when layout is involved)
+              - label: Back-end defect — the exact frames, the ErrorCode or close code, the audit line
+              - label: Back-end defect visible in the interface — the screenshot of the front-end consequence, annotated like above
+
+    - type: textarea
+      id: evidence
+      attributes:
+          label: Evidence
+          description: |
+              The content for the boxes checked above — screenshot captions, frames, codes.
+
+              Uploading: `gh issue create --attach shot.png` (gh CLI ≥ 2.99) makes the file
+              a native `user-attachments` asset, the same thing the web editor's
+              drag-and-drop produces; the upload needs a user token with write access to
+              this repository, images and video only. Where to capture frames: DevTools →
+              Network → WS tab; `apps/e2e/chaos/ws-chaos.mjs` is a working scripted
+              client for back-end-only reproduction.
+      validations:
+          required: true
+
+    - type: textarea
+      id: fix-direction
+      attributes:
+          label: Fix direction (optional — for whoever picks it up)
+          description: This issue reports the defect; it does not fix it. A suggestion for the fixer is welcome — code changes belong to the assignee's own branch.
+
+    - type: textarea
+      id: regression
+      attributes:
+          label: Regression
+          description: The test that should fail before the fix and pass after it, named by suite and intent.
+      validations:
+          required: true

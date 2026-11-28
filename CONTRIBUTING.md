@@ -4,10 +4,11 @@ Thanks for taking the time to contribute.
 
 This document covers **process**: branches, commits, pull requests, and review. It also includes setup, build, and test commands used when contributing. For full development and tooling documentation, see the references below.
 
-| For                                                   | See                        |
-| ----------------------------------------------------- | -------------------------- |
-| Install, run, devcontainers, testing, deployment      | [`README.md`](./README.md) |
-| Monorepo layout, exact commands, conventions, gotchas | [`AGENTS.md`](./AGENTS.md) |
+| For                                                           | See                                                                                    |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Product behavior: roles, voting, limits, security, deployment | [`docs/`](./docs) — the source of truth, start at [`docs/README.md`](./docs/README.md) |
+| Install, run, devcontainers, testing                          | [`README.md`](./README.md) and [`TOOLS.md`](./TOOLS.md)                                |
+| Monorepo layout, exact commands, conventions, gotchas         | [`AGENTS.md`](./AGENTS.md)                                                             |
 
 If something here disagrees with `AGENTS.md`, follow `AGENTS.md`.
 
@@ -95,5 +96,9 @@ Coding conventions, module boundaries, and accessibility requirements are under 
 
 ## Other kinds of report
 
+- **Defects** — open an issue with the
+  [bug report form](https://github.com/brunoanhaia/planning-poker/issues/new?template=bug_report.yml): reproduction steps,
+  environment, criticality, consequences and annotated evidence are part of the report.
+  Report only — the fix belongs to whoever picks the issue up.
 - **Setup or runtime problems** — open an issue including your OS, `node -v`, and the exact command that failed.
 - **Security issues** — do not open a public issue first. Contact the repository owner so a fix can be prepared before disclosure.
