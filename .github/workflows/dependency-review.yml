@@ -20,7 +20,8 @@ on:
 # https://docs.github.com/en/enterprise-cloud@latest/code-security/supply-chain-security/understanding-your-software-supply-chain/using-the-dependency-submission-api
 permissions:
     contents: read
-    # Write permissions for pull-requests are required for using the `comment-summary-in-pr` option, comment out if you aren't using this option
+    # Write permissions for pull-requests are required for using the
+    # `comment-summary-in-pr` option, comment out if you aren't using this option.
     pull-requests: write
 
 jobs:
@@ -42,11 +43,6 @@ jobs:
                   # dev dependencies that never ship — so the section buries the two
                   # checks that matter. Licenses and vulnerabilities stay on.
                   show-openssf-scorecard: false
-          # The scorecard lists every transitive package without a perfect
-          # OpenSSF score. Here that is the documentation site's build tooling —
-          # dev dependencies that never ship — so the section buries the two
-          # checks that matter. Licenses and vulnerabilities stay on.
-          show-openssf-scorecard: false
               #   fail-on-severity: moderate
               #   deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later
               #   retry-on-snapshot-warnings: true
